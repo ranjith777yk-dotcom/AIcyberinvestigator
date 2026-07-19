@@ -1,0 +1,28 @@
+dependencies {
+    api project(":shared")
+    implementation project(":common")
+    implementation "org.apache.pdfbox:pdfbox:3.0.8"
+    implementation "com.fasterxml.jackson.core:jackson-databind:2.21.0"
+    implementation "com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.21.0"
+}
+
+tasks.jar {
+    dependsOn configurations.runtimeClasspath
+    archiveBaseName = "cyberinvestigator-pdf-analyzer"
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    manifest {
+        attributes("Main-Class": "ai.cyberinvestigator.plugins.pdf.PdfAnalyzerPluginMain")
+    }
+    from {
+        configurations.runtimeClasspath.collect { dependency ->
+            dependency.isDirectory() ? dependency : zipTree(dependency)
+        }
+    }
+}
+
+tasks.register("assemblePlugin", Copy) {
+    dependsOn tasks.jar
+    from(tasks.jar)
+    from("src/main/resources")
+    into(layout.buildDirectory.dir("plugin-distribution"))
+}

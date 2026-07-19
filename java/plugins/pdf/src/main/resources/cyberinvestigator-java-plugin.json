@@ -1,0 +1,11 @@
+{
+  "name": "pdf-analyzer",
+  "version": "0.1.0-SNAPSHOT",
+  "author": "CyberInvestigator AI",
+  "description": "Extracts PDF metadata and structural indicators without AI integration.",
+  "supported_artifact_types": ["pdf"],
+  "supported_investigation_stages": ["triage", "artifact_analysis"],
+  "required_java_version": "21",
+  "transport": "jar",
+  "jar_file": "cyberinvestigator-pdf-analyzer-0.1.0-SNAPSHOT.jar"
+}

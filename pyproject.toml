@@ -1,0 +1,59 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cyberinvestigator-ai"
+version = "0.1.0"
+description = "AI-powered cyber investigation platform"
+requires-python = ">=3.13"
+dependencies = [
+    "Flask>=3.1,<4.0",
+    "Flask-SQLAlchemy>=3.1,<4.0",
+    "SQLAlchemy>=2.0,<3.0",
+    "psycopg[binary]>=3.2,<4.0",
+    "openai>=1.99,<3.0",
+    "python-dotenv>=1.0,<2.0",
+    "bcrypt>=4.2,<5.0",
+    "gunicorn>=23.0,<24.0; platform_system != 'Windows'",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=8.3,<9.0",
+]
+dev = [
+    "pytest>=8.3,<9.0",
+    "ruff>=0.8.0,<0.9.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-ra"
+
+[tool.ruff]
+target-version = "py313"
+line-length = 120
+src = ["src", "tests"]
+extend-exclude = [
+    "instance",
+    "logs",
+    "java/.gradle",
+    "java/**/build",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B"]
+ignore = [
+    "B008",
+    "E501",
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"

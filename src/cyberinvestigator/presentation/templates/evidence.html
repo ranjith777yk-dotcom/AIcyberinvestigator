@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block content %}
+<div data-module="evidence">
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow">Evidence custody</p>
+      <h2>Evidence repository</h2>
+      <p class="text-muted mb-0">Upload, hash, analyze, and preserve case-linked evidence with chain-of-custody context.</p>
+    </div>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#evidence-modal"><i class="bi bi-cloud-arrow-up"></i> Add evidence</button>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-xl-8">
+      <article class="surface-card">
+        <div class="card-head"><div><h3>Evidence items</h3><p>Registered evidence, hashes, analysis status, and forensic actions.</p></div><a class="btn btn-sm btn-outline-secondary" href="/api/v1/evidence/export">Export inventory</a></div>
+        <div class="toolbar evidence-toolbar">
+          <select class="form-select" id="evidence-case-filter" aria-label="Filter by case"></select>
+          <input class="form-control" id="evidence-search" placeholder="Search evidence, filename, hash, findings">
+          <select class="form-select" id="evidence-analysis-filter" aria-label="Filter by analysis status"><option value="all">All analysis</option><option value="pending">Pending</option><option value="completed">Completed</option></select>
+          <select class="form-select" id="evidence-sort" aria-label="Sort evidence"><option value="acquired_at">Newest</option><option value="evidence_number">Evidence number</option><option value="original_filename">Filename</option><option value="size_bytes">Size</option><option value="analysis_status">Analysis</option></select>
+        </div>
+        <div id="evidence-state" class="empty-state large"><i class="bi bi-hourglass-split"></i><h3>Loading evidence</h3><p>Fetching custody records.</p></div>
+        <div class="table-responsive d-none" id="evidence-table-wrap">
+          <table class="table align-middle professional-table">
+            <thead><tr><th>Evidence</th><th>Case</th><th>Type</th><th>Size</th><th>SHA-256</th><th>Analysis</th><th class="text-end">Actions</th></tr></thead>
+            <tbody id="evidence-table"></tbody>
+          </table>
+        </div>
+      </article>
+    </div>
+    <div class="col-xl-4">
+      <article class="surface-card">
+        <div class="card-head"><div><h3>Forensic report</h3><p>Detailed findings from the selected analysis.</p></div><span class="badge text-bg-light" id="evidence-report-status">Idle</span></div>
+        <div id="evidence-report" class="empty-state compact"><i class="bi bi-search"></i><h3>No report selected</h3><p>Click Analyze on an evidence row to inspect encodings, archives, entropy, strings, metadata, and flags.</p></div>
+      </article>
+      <article class="surface-card mt-4">
+        <h3>Custody checklist</h3>
+        <ul class="check-list">
+          <li><i class="bi bi-check-circle"></i> Link to an investigation case</li>
+          <li><i class="bi bi-check-circle"></i> Record source and acquisition time</li>
+          <li><i class="bi bi-check-circle"></i> Preserve SHA-256 integrity hash</li>
+          <li><i class="bi bi-check-circle"></i> Analyze bytes read-only</li>
+        </ul>
+      </article>
+    </div>
+  </div>
+
+  <div class="modal fade" id="evidence-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+      <form class="modal-content" id="evidence-form">
+        <div class="modal-header"><h5 class="modal-title">Add evidence</h5><button class="btn-close" type="button" data-bs-dismiss="modal" aria-label="Close"></button></div>
+        <div class="modal-body">
+          <div class="upload-zone mb-3">
+            <i class="bi bi-cloud-arrow-up"></i>
+            <div><strong>Professional upload</strong><small>Select a file or register a manual text artifact. Hashing is calculated during custody storage.</small></div>
+          </div>
+          <div class="row g-3">
+            <div class="col-md-6"><label class="form-label" for="evidence-case">Case</label><select class="form-select" id="evidence-case" required></select></div>
+            <div class="col-md-6"><label class="form-label" for="evidence-number">Evidence number</label><input class="form-control" id="evidence-number" required maxlength="64"></div>
+            <div class="col-12"><label class="form-label" for="evidence-file">File</label><input class="form-control" id="evidence-file" type="file"></div>
+            <div class="col-12"><label class="form-label" for="evidence-description">Source description</label><textarea class="form-control" id="evidence-description" rows="3"></textarea></div>
+          </div>
+        </div>
+        <div class="modal-footer"><button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary" type="submit">Register evidence</button></div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-heading dashboard-heading">
+  <div>
+    <p class="eyebrow">{{ 'Administration Workspace' if current_user.role == 'admin' else 'Investigation Workspace' }}</p>
+    <h2>{{ 'Administration command center' if current_user.role == 'admin' else 'Investigation command center' }}</h2>
+    <p class="text-muted mb-0">{{ 'A consolidated view of platform health, security posture, and investigation readiness.' if current_user.role == 'admin' else 'A consolidated view of your cases, evidence, timelines, reports, and AI insights.' }}</p>
+  </div>
+  <div class="dashboard-heading-actions">
+    <a class="btn btn-outline-secondary" href="{{ url_for('web.ai_chat') }}"><i class="bi bi-stars"></i> Ask AI</a>
+    <a class="btn btn-primary" href="{{ url_for('web.cases') }}"><i class="bi bi-plus-lg"></i> New case</a>
+  </div>
+</div>
+
+<div class="dashboard-grid" data-dashboard-root aria-live="polite">
+  <a class="metric-card dashboard-link metric-card-lg skeleton" href="{{ url_for('web.cases') }}" data-dashboard-card="cases">
+    <span class="metric-icon blue"><i class="bi bi-briefcase"></i></span>
+    <div>
+      <small>Cases</small>
+      <strong data-metric="cases-count">-</strong>
+      <span class="metric-note" data-metric-note="cases">Loading cases</span>
+    </div>
+    <i class="bi bi-arrow-right-short dashboard-link-icon"></i>
+  </a>
+  <a class="metric-card dashboard-link skeleton" href="{{ url_for('web.evidence') }}" data-dashboard-card="evidence">
+    <span class="metric-icon violet"><i class="bi bi-folder2-open"></i></span>
+    <div>
+      <small>Evidence</small>
+      <strong data-metric="evidence-count">-</strong>
+      <span class="metric-note" data-metric-note="evidence">Loading inventory</span>
+    </div>
+    <i class="bi bi-arrow-right-short dashboard-link-icon"></i>
+  </a>
+  <a class="metric-card dashboard-link skeleton" href="{{ url_for('web.timeline') }}" data-dashboard-card="timeline">
+    <span class="metric-icon amber"><i class="bi bi-clock-history"></i></span>
+    <div>
+      <small>Timeline</small>
+      <strong data-metric="timeline-count">-</strong>
+      <span class="metric-note" data-metric-note="timeline">Loading activity</span>
+    </div>
+    <i class="bi bi-arrow-right-short dashboard-link-icon"></i>
+  </a>
+  {% if can('plugins.read') %}<a class="metric-card dashboard-link skeleton" href="{{ url_for('web.plugins') }}" data-dashboard-card="plugins">
+    <span class="metric-icon green"><i class="bi bi-puzzle"></i></span>
+    <div>
+      <small>Plugins</small>
+      <strong data-metric="plugin-status">-</strong>
+      <span class="metric-note" data-metric-note="plugins">Loading health</span>
+    </div>
+    <i class="bi bi-arrow-right-short dashboard-link-icon"></i>
+  </a>{% endif %}
+  <a class="metric-card dashboard-link skeleton" href="{{ url_for('web.reports') }}" data-dashboard-card="reports">
+    <span class="metric-icon blue"><i class="bi bi-file-earmark-bar-graph"></i></span>
+    <div>
+      <small>Reports</small>
+      <strong data-metric="reports-count">-</strong>
+      <span class="metric-note" data-metric-note="reports">Loading reports</span>
+    </div>
+    <i class="bi bi-arrow-right-short dashboard-link-icon"></i>
+  </a>
+  <a class="metric-card dashboard-link skeleton" href="{{ url_for('web.ai_chat') }}" data-dashboard-card="ai">
+    <span class="metric-icon violet"><i class="bi bi-stars"></i></span>
+    <div>
+      <small>AI Chat</small>
+      <strong data-metric="ai-status">-</strong>
+      <span class="metric-note" data-metric-note="ai">Loading assistant</span>
+    </div>
+    <i class="bi bi-arrow-right-short dashboard-link-icon"></i>
+  </a>
+  <a class="metric-card dashboard-link metric-card-lg skeleton" href="{{ url_for('web.timeline') }}" data-dashboard-card="threat">
+    <span class="metric-icon amber"><i class="bi bi-activity"></i></span>
+    <div>
+      <small>Threat Score</small>
+      <strong data-metric="threat-score">-</strong>
+      <span class="metric-note" data-metric-note="threat">Loading signal</span>
+    </div>
+    <i class="bi bi-arrow-right-short dashboard-link-icon"></i>
+  </a>
+</div>
+
+<div class="dashboard-layout mt-4">
+  <article class="surface-card dashboard-panel dashboard-panel-wide">
+    <div class="card-head">
+      <div>
+        <h3>Threat Graph</h3>
+        <p>Timeline-derived threat movement for the active investigation.</p>
+      </div>
+      <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('web.timeline') }}">Timeline</a>
+    </div>
+    <div class="dashboard-chart" data-chart="threat">
+      <div class="skeleton-block"></div>
+    </div>
+  </article>
+
+  <article class="surface-card dashboard-panel">
+    <div class="card-head">
+      <div>
+        <h3>Investigation Progress</h3>
+        <p>Completion signal based on timeline depth.</p>
+      </div>
+      <span class="badge text-bg-light" data-metric="progress">-</span>
+    </div>
+    <div class="progress-ring-wrap">
+      <div class="progress-ring" data-progress-ring="0"><span data-progress-label>0%</span></div>
+      <div>
+        <strong data-progress-title>No active case</strong>
+        <small data-progress-detail>Loading investigation status</small>
+      </div>
+    </div>
+  </article>
+
+  <article class="surface-card dashboard-panel">
+    <div class="card-head">
+      <div>
+        <h3>Recent Activity</h3>
+        <p>Latest timeline events.</p>
+      </div>
+      <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('web.timeline') }}">Open</a>
+    </div>
+    <div class="activity-feed" data-list="recent-activity"><div class="skeleton-list"></div></div>
+  </article>
+
+  <article class="surface-card dashboard-panel">
+    <div class="card-head">
+      <div>
+        <h3>Recent Evidence</h3>
+        <p>Newest custody records.</p>
+      </div>
+      <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('web.evidence') }}">Open</a>
+    </div>
+    <div class="compact-list" data-list="recent-evidence"><div class="skeleton-list"></div></div>
+  </article>
+
+  <article class="surface-card dashboard-panel dashboard-panel-wide">
+    <div class="card-head">
+      <div>
+        <h3>Case Graph</h3>
+        <p>Timeline volume across active cases.</p>
+      </div>
+      <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('web.cases') }}">Cases</a>
+    </div>
+    <div class="bar-chart" data-chart="cases"><div class="skeleton-block"></div></div>
+  </article>
+
+  <article class="surface-card dashboard-panel">
+    <div class="card-head">
+      <div>
+        <h3>Timeline Preview</h3>
+        <p>Condensed active-case sequence.</p>
+      </div>
+      <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('web.timeline') }}">Open</a>
+    </div>
+    <div class="mini-timeline" data-list="timeline-preview"><div class="skeleton-list"></div></div>
+  </article>
+
+  <article class="surface-card dashboard-panel">
+    <div class="card-head">
+      <div>
+        <h3>Latest Reports</h3>
+        <p>Newest generated deliverables.</p>
+      </div>
+      <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('web.reports') }}">Reports</a>
+    </div>
+    <div class="compact-list" data-list="latest-reports"><div class="skeleton-list"></div></div>
+  </article>
+
+  <article class="surface-card dashboard-panel">
+    <div class="card-head">
+      <div>
+        <h3>AI Insights</h3>
+        <p>Recent reasoning and investigation guidance.</p>
+      </div>
+      <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('web.ai_chat') }}">Chat</a>
+    </div>
+    <div class="insight-list" data-list="ai-insights"><div class="skeleton-list"></div></div>
+  </article>
+
+  {% if can('plugins.read') %}<article class="surface-card dashboard-panel">
+    <div class="card-head">
+      <div>
+        <h3>Plugin Health</h3>
+        <p>Registry and execution readiness.</p>
+      </div>
+      <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('web.plugins') }}">Plugins</a>
+    </div>
+    <div class="health-grid" data-plugin-health><div class="skeleton-list"></div></div>
+  </article>{% endif %}
+
+  <article class="surface-card dashboard-panel">
+    <div class="card-head">
+      <div>
+        <h3>Quick Actions</h3>
+        <p>Common investigation paths.</p>
+      </div>
+    </div>
+    <div class="quick-actions" data-list="quick-actions"><div class="skeleton-list"></div></div>
+  </article>
+
+  <article class="surface-card dashboard-panel">
+    <div class="card-head">
+      <div>
+        <h3>Recent Notifications</h3>
+        <p>Workspace alerts and readiness notes.</p>
+      </div>
+    </div>
+    <div class="compact-list" data-list="recent-notifications"><div class="skeleton-list"></div></div>
+  </article>
+</div>
+{% endblock %}

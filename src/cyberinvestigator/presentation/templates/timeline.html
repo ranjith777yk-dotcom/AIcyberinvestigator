@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+<div data-module="timeline">
+  <div class="page-heading">
+    <div><p class="eyebrow">Event correlation</p><h2>Investigation timeline</h2><p class="text-muted mb-0">Interactive chronology with evidence, case, and threat correlation.</p></div>
+    <div class="dashboard-heading-actions">
+      <a class="btn btn-outline-secondary" id="timeline-export" href="/api/v1/timeline/export"><i class="bi bi-download"></i> Export</a>
+      <button class="btn btn-outline-secondary" id="timeline-ai-summary" type="button"><i class="bi bi-stars"></i> AI summary</button>
+      <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#timeline-modal"><i class="bi bi-plus-lg"></i> Add event</button>
+    </div>
+  </div>
+  <article class="surface-card">
+    <div class="timeline-toolbar timeline-control-grid">
+      <select class="form-select" id="timeline-case-filter" aria-label="Select case"></select>
+      <select class="form-select" id="timeline-type-filter" aria-label="Filter events"><option value="all">All event types</option><option value="case.created">Case created</option><option value="case.updated">Case updated</option><option value="evidence.added">Evidence added</option><option value="evidence.analysis.completed">Evidence analyzed</option><option value="observation.manual">Manual observation</option><option value="report.generated">Report generated</option></select>
+      <select class="form-select" id="timeline-group-filter" aria-label="Filter groups"><option value="all">All groups</option><option value="case">Case</option><option value="evidence">Evidence</option><option value="observation">Observation</option><option value="report">Report</option></select>
+      <select class="form-select" id="timeline-threat-filter" aria-label="Filter threat"><option value="all">All threat</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select>
+      <select class="form-select" id="timeline-zoom" aria-label="Zoom timeline"><option value="compact">Compact</option><option value="normal" selected>Normal</option><option value="expanded">Expanded</option></select>
+      <input class="form-control" id="timeline-search" placeholder="Search timeline, evidence, case">
+    </div>
+    <div class="timeline-summary-strip" id="timeline-correlations"></div>
+    <div id="timeline-state" class="empty-state large"><i class="bi bi-hourglass-split"></i><h3>Loading timeline</h3><p>Fetching correlated events.</p></div>
+    <div id="timeline-list" class="timeline-list interactive-timeline d-none"></div>
+  </article>
+  <article class="surface-card mt-4">
+    <div class="card-head"><div><h3>AI timeline summary</h3><p>Case-aware summary of gaps, correlations, and next actions.</p></div><span class="badge text-bg-light" id="timeline-summary-status">Idle</span></div>
+    <div id="timeline-summary-panel" class="empty-state compact"><i class="bi bi-stars"></i><h3>No summary generated</h3><p>Use AI summary after selecting a case or reviewing the full timeline.</p></div>
+  </article>
+  <div class="modal fade" id="timeline-modal" tabindex="-1" aria-hidden="true"><div class="modal-dialog"><form class="modal-content" id="timeline-form"><div class="modal-header"><h5 class="modal-title">Add timeline event</h5><button class="btn-close" type="button" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><div class="mb-3"><label class="form-label" for="timeline-case">Case</label><select class="form-select" id="timeline-case" required></select></div><div class="mb-3"><label class="form-label" for="timeline-summary">Summary</label><input class="form-control" id="timeline-summary" required maxlength="1024"></div><div><label class="form-label" for="timeline-details">Details</label><textarea class="form-control" id="timeline-details" rows="3"></textarea></div></div><div class="modal-footer"><button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary" type="submit">Add event</button></div></form></div></div>
+</div>
+{% endblock %}

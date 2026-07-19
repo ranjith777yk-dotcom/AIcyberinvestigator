@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#111b2e">
+  <title>Login - CyberInvestigator</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="{{ url_for('static', filename='css/dashboard.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='css/dashboard_polish.css') }}" rel="stylesheet">
+</head>
+<body class="auth-body">
+  <main class="auth-shell">
+    <section class="auth-hero" aria-label="CyberInvestigator overview">
+      <div class="brand auth-brand">
+        <span class="brand-mark"><i class="bi bi-shield-lock-fill"></i></span>
+        <span><strong>Cyber</strong>Investigator<small>Enterprise DFIR Platform</small></span>
+      </div>
+      <div>
+        <p class="eyebrow">Secure Investigation Workspace</p>
+        <h1>AI-assisted incident response for modern security teams.</h1>
+        <p>Manage cases, evidence, timelines, reports, and AI analysis from one controlled cybersecurity workspace.</p>
+      </div>
+    </section>
+
+    <section class="auth-panel">
+      <div class="auth-card-heading">
+        <p class="eyebrow">Secure Access</p>
+        <h2>{% if auth_mode == 'register' %}Create account{% elif auth_mode == 'forgot' %}Recover access{% else %}Welcome back{% endif %}</h2>
+        <p>{% if auth_mode == 'register' %}New accounts enter the User investigation workspace.{% elif auth_mode == 'forgot' %}Enter your account email to start recovery.{% else %}Sign in to continue your investigation or administration work.{% endif %}</p>
+      </div>
+      <div class="auth-tabs" role="tablist" aria-label="Authentication options">
+        <a class="{% if not auth_mode %}active{% endif %}" href="{{ url_for('web.login') }}">Login</a>
+        <a class="{% if auth_mode == 'register' %}active{% endif %}" href="{{ url_for('web.register') }}">Register</a>
+      </div>
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            <div class="alert alert-{{ category }}" role="alert">{{ message }}</div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+      {% if auth_mode == 'forgot' %}
+      <form method="post" action="{{ url_for('web.forgot_password') }}" class="auth-form" novalidate>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <div>
+          <label class="form-label" for="email">Username or email</label>
+          <input class="form-control" id="email" name="email" autocomplete="email" required autofocus>
+        </div>
+        <button class="btn btn-primary w-100" type="submit"><i class="bi bi-life-preserver"></i> Request recovery</button>
+        <a class="btn btn-outline-secondary w-100" href="{{ url_for('web.login') }}">Back to sign in</a>
+      </form>
+      {% elif auth_mode == 'register' %}
+      <form method="post" action="{{ url_for('web.register') }}" class="auth-form" novalidate>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <div>
+          <label class="form-label" for="reg-username">Username</label>
+          <input class="form-control" id="reg-username" name="username" autocomplete="username" required autofocus>
+        </div>
+        <div>
+          <label class="form-label" for="reg-email">Email</label>
+          <input class="form-control" id="reg-email" name="email" type="email" autocomplete="email" required>
+        </div>
+        <div>
+          <label class="form-label" for="reg-password">Password</label>
+          <input class="form-control" id="reg-password" name="password" type="password" autocomplete="new-password" required minlength="8">
+        </div>
+        <button class="btn btn-primary w-100" type="submit"><i class="bi bi-person-plus"></i> Create account</button>
+        {% if google_oauth_configured %}
+        <a class="btn btn-outline-secondary w-100" href="{{ url_for('web.google_auth') }}"><i class="bi bi-google"></i> Continue with Google</a>
+        {% endif %}
+      </form>
+      {% else %}
+      <form method="post" action="{{ url_for('web.login') }}" class="auth-form" novalidate>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="next" value="{{ request.args.get('next', '') }}">
+        <div>
+          <label class="form-label" for="username">Username or email</label>
+          <input class="form-control" id="username" name="username" autocomplete="username" required autofocus>
+        </div>
+        <div>
+          <label class="form-label" for="password">Password</label>
+          <input class="form-control" id="password" name="password" type="password" autocomplete="current-password" required>
+        </div>
+        <div class="d-flex justify-content-between align-items-center">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="remember" name="remember">
+            <label class="form-check-label" for="remember">Remember me</label>
+          </div>
+          <a class="auth-link" href="{{ url_for('web.forgot_password') }}">Forgot password?</a>
+        </div>
+        <button class="btn btn-primary w-100" type="submit"><i class="bi bi-box-arrow-in-right"></i> Sign in</button>
+        {% if google_oauth_configured %}
+        <a class="btn btn-outline-secondary w-100" href="{{ url_for('web.google_auth') }}"><i class="bi bi-google"></i> Continue with Google</a>
+        {% endif %}
+      </form>
+      {% endif %}
+    </section>
+  </main>
+</body>
+</html>

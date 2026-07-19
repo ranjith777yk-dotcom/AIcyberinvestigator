@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block content %}
+<div data-module="profile">
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow">Account</p>
+      <h2>Profile settings</h2>
+      <p class="text-muted mb-0">Manage your account identity, password, preferences, and recent activity.</p>
+    </div>
+  </div>
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }}" role="alert">{{ message }}</div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+  <div class="settings-layout">
+    <aside class="surface-card setting-nav settings-page-nav">
+      <a class="active" href="#profile" data-profile-page="profile"><i class="bi bi-person-circle"></i> Profile</a>
+      <a href="#security" data-profile-page="security"><i class="bi bi-shield-lock"></i> Security</a>
+      <a href="#change-password" data-profile-page="change-password"><i class="bi bi-key"></i> Password</a>
+      <a href="#notifications" data-profile-page="notifications"><i class="bi bi-bell"></i> Notifications</a>
+      <a href="#sessions" data-profile-page="sessions"><i class="bi bi-display"></i> Sessions</a>
+      <a href="#login-history" data-profile-page="login-history"><i class="bi bi-clock"></i> Login History</a>
+      <a href="#activity" data-profile-page="activity"><i class="bi bi-clock-history"></i> Recent Activity</a>
+      <a href="#api-usage" data-profile-page="api-usage"><i class="bi bi-graph-up"></i> API Usage</a>
+      <a href="#preferences" data-profile-page="preferences"><i class="bi bi-sliders"></i> Preferences</a>
+    </aside>
+    <section class="settings-pages">
+      <article class="surface-card settings-page active" id="profile">
+        <h3>Profile</h3>
+        {% if profile_user %}
+        <div class="profile-summary">
+          <span class="avatar xl">{{ profile_user.username[:2]|upper }}</span>
+          <div>
+            <strong>{{ profile_user.username }}</strong>
+            <small>{{ profile_user.email }}</small>
+            <span class="badge text-bg-primary">{{ 'Administrator' if profile_user.role.name == 'admin' else 'User' }}</span>
+            <small>Last login: {{ profile_user.last_login_at or 'Not recorded' }}</small>
+          </div>
+        </div>
+        <form method="post" class="auth-form mt-3">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <input type="hidden" name="form_name" value="profile">
+          <label class="form-label" for="profile_image">Profile photo URL</label>
+          <input class="form-control" id="profile_image" name="profile_image" value="{{ profile_user.profile_image or '' }}" maxlength="1024">
+          <button class="btn btn-primary" type="submit"><i class="bi bi-save"></i> Save profile</button>
+        </form>
+        {% else %}
+        <p class="text-muted">Profile data is unavailable for this session.</p>
+        {% endif %}
+      </article>
+      <article class="surface-card settings-page" id="security">
+        <h3>Security</h3>
+        <div class="health-grid mt-3">
+          <div class="health-item"><small>Role</small><strong>{{ 'Administrator' if profile_user and profile_user.role.name == 'admin' else 'User' }}</strong></div>
+          <div class="health-item"><small>Account status</small><strong>{{ profile_user.status|title if profile_user else 'Unavailable' }}</strong></div>
+          <div class="health-item"><small>Session protection</small><strong>Enabled</strong></div>
+          <div class="health-item"><small>Audit logging</small><strong>Active</strong></div>
+        </div>
+      </article>
+      <article class="surface-card settings-page" id="change-password">
+        <h3>Change Password</h3>
+        <form method="post" class="auth-form mt-3">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <input type="hidden" name="form_name" value="password">
+          <label class="form-label" for="password">New password</label>
+          <input class="form-control" id="password" name="password" type="password" autocomplete="new-password" minlength="10" required>
+          <button class="btn btn-primary" type="submit"><i class="bi bi-key"></i> Update password</button>
+        </form>
+      </article>
+      <article class="surface-card settings-page" id="notifications">
+        <h3>Notification Preferences</h3>
+        <div class="setting-row"><div><strong>Investigation notifications</strong><small>Evidence, report, timeline, and AI analysis updates.</small></div><div class="form-check form-switch"><input class="form-check-input" type="checkbox" checked></div></div>
+        <div class="setting-row"><div><strong>Security notifications</strong><small>Password and sign-in notices for your account.</small></div><div class="form-check form-switch"><input class="form-check-input" type="checkbox" checked></div></div>
+      </article>
+      <article class="surface-card settings-page" id="sessions">
+        <h3>Session Management</h3>
+        <div class="health-grid mt-3">
+          <div class="health-item"><small>Current session</small><strong>Active</strong></div>
+          <div class="health-item"><small>Session timeout</small><strong>Policy managed</strong></div>
+          <div class="health-item"><small>Secure cookies</small><strong>Enabled</strong></div>
+        </div>
+      </article>
+      <article class="surface-card settings-page" id="login-history">
+        <h3>Login History</h3>
+        {% if profile_user %}
+        <div class="compact-list mt-3">
+          <div class="compact-item"><i class="bi bi-box-arrow-in-right"></i><div><strong>Last successful login</strong><small>{{ profile_user.last_login_at or 'Not recorded' }}</small></div></div>
+          <div class="compact-item"><i class="bi bi-shield-check"></i><div><strong>Account status</strong><small>{{ profile_user.status|title }}</small></div></div>
+        </div>
+        {% endif %}
+      </article>
+      <article class="surface-card settings-page" id="activity">
+        <h3>Recent Activity</h3>
+        <div class="admin-list" id="profile-activity"><div class="empty-state">Recent account activity appears here after investigation actions.</div></div>
+      </article>
+      <article class="surface-card settings-page" id="api-usage"><h3>API Usage</h3><div class="health-grid mt-3"><div class="health-item"><small>AI requests</small><strong>Policy tracked</strong></div><div class="health-item"><small>Exports</small><strong>Available</strong></div></div></article>
+      <article class="surface-card settings-page" id="preferences"><h3>Preferences</h3><div class="setting-row"><div><strong>Dark mode</strong><small>Use the professional dark investigation interface.</small></div><div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="theme-toggle"></div></div></article>
+    </section>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.pytest_tmp/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+
+# Runtime data
+instance/
+logs/
+*.log
+%TEMP%/
+.git.invalid-onedrive-reparse/
+
+# Java / Gradle
+.gradle/
+java/.gradle/
+java/**/build/
+java/build/
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Docker local overrides
+docker-compose.override.yml
+compose.override.yml

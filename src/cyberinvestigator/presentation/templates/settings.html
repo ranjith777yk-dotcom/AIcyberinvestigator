@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block content %}
+<div data-module="settings">
+  <div class="page-heading"><div><p class="eyebrow">Administration</p><h2>Platform settings</h2><p class="text-muted mb-0">Separate operational pages for workspace preferences, security, AI, plugins, users, storage, logs, backups, keys, and integrations.</p></div><button class="btn btn-primary" id="settings-save" type="button">Save preferences</button></div>
+  <div class="settings-layout">
+    <aside class="surface-card setting-nav settings-page-nav">
+      <a class="active" href="#appearance" data-settings-page="appearance"><i class="bi bi-palette2"></i> Appearance</a>
+      <a href="#security" data-settings-page="security"><i class="bi bi-shield-check"></i> Security</a>
+      <a href="#ai" data-settings-page="ai"><i class="bi bi-stars"></i> AI Providers</a>
+      <a href="#notifications" data-settings-page="notifications"><i class="bi bi-bell"></i> Notifications</a>
+      <a href="#plugins" data-settings-page="plugins"><i class="bi bi-puzzle"></i> Plugins</a>
+      <a href="#users" data-settings-page="users"><i class="bi bi-person"></i> Users</a>
+      <a href="#roles" data-settings-page="roles"><i class="bi bi-person-lock"></i> Roles</a>
+      <a href="#storage" data-settings-page="storage"><i class="bi bi-hdd"></i> Storage</a>
+      <a href="#logs" data-settings-page="logs"><i class="bi bi-journal-text"></i> Logs</a>
+      <a href="#backups" data-settings-page="backups"><i class="bi bi-archive"></i> Backups</a>
+      <a href="#api-keys" data-settings-page="api-keys"><i class="bi bi-key"></i> API Keys</a>
+      <a href="#integrations" data-settings-page="integrations"><i class="bi bi-diagram-2"></i> Integrations</a>
+    </aside>
+    <section class="settings-pages">
+      <article class="surface-card settings-page active" id="appearance"><h3>Appearance</h3><p class="text-muted">Workspace display preferences.</p><div class="setting-row"><div><strong>Dark mode</strong><small>Use the dark workspace appearance across the dashboard.</small></div><div class="form-check form-switch"><input class="form-check-input" type="checkbox" role="switch" id="theme-toggle"><label class="visually-hidden" for="theme-toggle">Enable dark mode</label></div></div></article>
+      <article class="surface-card settings-page" id="security"><h3>Security</h3><div id="settings-security" class="health-grid mt-3"></div></article>
+      <article class="surface-card settings-page" id="ai">
+        <h3>AI Providers</h3>
+        <p class="text-muted" id="ai-settings-state">Loading AI provider status.</p>
+        <div id="settings-ai" class="health-grid mt-3"></div>
+        <form class="settings-form mt-4" id="ai-settings-form">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label" for="ai-provider">AI Provider</label>
+              <select class="form-select" id="ai-provider">
+                <option value="ollama">Ollama</option>
+                <option value="openai">OpenAI</option>
+                <option value="gemini">Gemini</option>
+                <option value="perplexity">Perplexity</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="ai-model">Model</label>
+              <input class="form-control" id="ai-model" value="qwen3:8b">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="ai-temperature">Temperature</label>
+              <input class="form-range" id="ai-temperature" type="range" min="0" max="2" step="0.1">
+              <small class="text-muted" id="ai-temperature-value">0.2</small>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="ai-max-tokens">Max Tokens</label>
+              <input class="form-control" id="ai-max-tokens" type="number" min="1" max="32000" value="1200">
+            </div>
+            <div class="col-md-8">
+              <label class="form-label" for="ollama-endpoint">Ollama Endpoint</label>
+              <input class="form-control" id="ollama-endpoint" value="http://localhost:11434">
+            </div>
+            <div class="col-md-4 d-flex align-items-end">
+              <div class="form-check form-switch mb-2">
+                <input class="form-check-input" type="checkbox" role="switch" id="ai-streaming" checked>
+                <label class="form-check-label" for="ai-streaming">Streaming</label>
+              </div>
+            </div>
+          </div>
+          <div class="d-flex gap-2 mt-3">
+            <button class="btn btn-primary" type="submit"><i class="bi bi-save"></i> Save AI Settings</button>
+            <button class="btn btn-outline-secondary" id="ai-test-connection" type="button"><i class="bi bi-plug"></i> Test Connection</button>
+          </div>
+          <p class="text-muted mt-3 mb-0" id="ai-test-result">Provider status will appear here.</p>
+        </form>
+      </article>
+      <article class="surface-card settings-page" id="notifications"><h3>Notifications</h3><p class="text-muted" id="notification-settings-state">Loading notification settings.</p><div id="settings-notifications" class="health-grid mt-3"></div></article>
+      <article class="surface-card settings-page" id="plugins"><h3>Plugins</h3><div id="settings-plugins" class="health-grid mt-3"></div></article>
+      <article class="surface-card settings-page" id="users"><h3>Users</h3><div id="settings-users" class="admin-list mt-3"></div></article>
+      <article class="surface-card settings-page" id="roles"><h3>Roles</h3><div id="settings-roles" class="admin-list mt-3"></div></article>
+      <article class="surface-card settings-page" id="storage"><h3>Storage</h3><div id="settings-storage" class="health-grid mt-3"></div></article>
+      <article class="surface-card settings-page" id="logs"><h3>Logs</h3><div id="settings-logs" class="health-grid mt-3"></div></article>
+      <article class="surface-card settings-page" id="backups"><h3>Backups</h3><div id="settings-backups" class="admin-list mt-3"></div></article>
+      <article class="surface-card settings-page" id="api-keys"><h3>API Keys</h3><div id="settings-api-keys" class="health-grid mt-3"></div></article>
+      <article class="surface-card settings-page" id="integrations"><h3>Integrations</h3><div id="settings-integrations" class="admin-list mt-3"></div></article>
+    </section>
+  </div>
+</div>
+{% endblock %}

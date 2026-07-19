@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block content %}
+<div data-module="ai-chat">
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow">AI assistance</p>
+      <h2>Investigation chat</h2>
+      <p class="text-muted mb-0">Chat naturally, ask cybersecurity questions, or bring in case context when the investigation needs it.</p>
+    </div>
+  </div>
+
+  <div class="chat-layout ai-chat-layout">
+    <aside class="surface-card chat-sidebar">
+      <div class="card-head"><div><h3>Context</h3><p>Case-scoped session</p></div><button class="btn btn-sm btn-outline-secondary" type="button" data-ui-action="conversation"><i class="bi bi-plus-lg"></i></button></div>
+      <label class="form-label mt-3" for="chat-case">Current case</label>
+      <select class="form-select" id="chat-case"></select>
+      <div class="upload-zone chat-drop-zone mt-3" id="chat-drop-zone">
+        <i class="bi bi-cloud-arrow-up"></i>
+        <div><strong>Drop evidence</strong><small>Files are registered as evidence, hashed, analyzed, and added to chat context.</small></div>
+        <input id="chat-files" type="file" multiple hidden>
+      </div>
+      <div class="compact-list mt-3" id="chat-upload-list"></div>
+      <div class="quick-actions mt-3">
+        <button class="quick-action" type="button" data-chat-prompt="Summarize the current investigation with evidence, timeline, threat score, recommendations, and gaps."><i class="bi bi-card-checklist"></i><span>Summary</span></button>
+        <button class="quick-action" type="button" data-chat-prompt="Explain the most important IOCs and how to validate them safely."><i class="bi bi-bullseye"></i><span>IOCs</span></button>
+        <button class="quick-action" type="button" data-chat-prompt="Map the current findings to MITRE ATT&CK techniques and explain the rationale."><i class="bi bi-diagram-3"></i><span>MITRE</span></button>
+        <button class="quick-action" type="button" data-chat-prompt="Generate a forensic report draft for the current evidence and timeline."><i class="bi bi-file-earmark-text"></i><span>Report</span></button>
+      </div>
+    </aside>
+
+    <article class="surface-card chat-panel ai-chat-panel">
+      <div class="chat-messages" id="chat-messages">
+        <div class="chat-empty"><span class="ai-orb"><i class="bi bi-stars"></i></span><h3>Start a conversation</h3><p>Say hello, ask a cybersecurity question, or request help with evidence, timelines, IOCs, MITRE ATT&CK, and reports.</p></div>
+      </div>
+      <form class="chat-composer" id="ai-chat-form">
+        <button class="btn btn-icon" type="button" data-ui-action="attachment" aria-label="Attach evidence"><i class="bi bi-paperclip"></i></button>
+        <label class="visually-hidden" for="chat-message">Message</label>
+        <textarea id="chat-message" class="form-control" rows="1" placeholder="Message AI Cyber Investigator..."></textarea>
+        <button class="btn btn-primary" type="submit" aria-label="Send message"><i class="bi bi-arrow-up"></i></button>
+      </form>
+    </article>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,4 @@
+rootProject.name = "cyberinvestigator-java"
+
+include "shared", "api", "common"
+include "plugins:apk", "plugins:pdf", "plugins:office", "plugins:logs"

@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block content %}
+<div data-module="cases">
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow">Case management</p>
+      <h2>Investigation cases</h2>
+      <p class="text-muted mb-0">Search, prioritize, assign, annotate, and monitor the lifecycle of every investigation.</p>
+    </div>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#case-modal"><i class="bi bi-plus-lg"></i> Create case</button>
+  </div>
+
+  <article class="surface-card">
+    <div class="toolbar case-toolbar">
+      <div class="input-group search-box">
+        <span class="input-group-text"><i class="bi bi-search"></i></span>
+        <input class="form-control" id="case-search" placeholder="Search cases, owners, tags, notes" aria-label="Search cases">
+      </div>
+      <div class="toolbar-actions case-filter-grid">
+        <select class="form-select" id="case-filter" aria-label="Filter by status"><option value="all">All status</option><option value="active">Active</option><option value="closed">Closed</option><option value="archived">Archived</option></select>
+        <select class="form-select" id="case-priority-filter" aria-label="Filter by priority"><option value="all">All priority</option><option value="critical">Critical</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option><option value="informational">Informational</option></select>
+        <select class="form-select" id="case-severity-filter" aria-label="Filter by severity"><option value="all">All severity</option><option value="critical">Critical</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option><option value="informational">Informational</option></select>
+        <input class="form-control" id="case-owner-filter" placeholder="Owner" aria-label="Filter by owner">
+        <input class="form-control" id="case-tag-filter" placeholder="Tag" aria-label="Filter by tag">
+        <select class="form-select" id="case-sort" aria-label="Sort cases"><option value="opened_at">Newest</option><option value="priority">Priority</option><option value="case_number">Case number</option><option value="title">Title</option><option value="owner">Owner</option><option value="severity">Severity</option><option value="status">Status</option></select>
+      </div>
+    </div>
+    <div id="case-state" class="empty-state large"><i class="bi bi-hourglass-split"></i><h3>Loading cases</h3><p>Fetching investigation cases.</p></div>
+    <div class="table-responsive d-none" id="case-table-wrap">
+      <table class="table align-middle professional-table">
+        <thead><tr><th>Case</th><th>Priority</th><th>Owner</th><th>Status</th><th>Tags</th><th>Attachments</th><th>Opened</th><th class="text-end">Actions</th></tr></thead>
+        <tbody id="case-table"></tbody>
+      </table>
+      <div class="d-flex justify-content-between align-items-center mt-3"><small class="text-muted" id="case-page-label"></small><div><button class="btn btn-sm btn-outline-secondary" id="case-prev">Previous</button><button class="btn btn-sm btn-outline-secondary" id="case-next">Next</button></div></div>
+    </div>
+  </article>
+
+  <article class="surface-card mt-4 case-detail-panel">
+    <div class="card-head"><div><h3>Case details</h3><p>History, notes, relationships, and attachments for the selected case.</p></div><span class="badge text-bg-light" id="case-detail-status">No selection</span></div>
+    <div id="case-detail" class="empty-state compact"><i class="bi bi-kanban"></i><h3>Select a case</h3><p>Use Details on any row to inspect notes, history, relationships, and evidence attachments.</p></div>
+  </article>
+
+  <div class="modal fade" id="case-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+      <form class="modal-content" id="case-form">
+        <div class="modal-header"><h5 class="modal-title">Create case</h5><button class="btn-close" type="button" data-bs-dismiss="modal" aria-label="Close"></button></div>
+        <div class="modal-body">
+          <input type="hidden" id="case-id">
+          <div class="row g-3">
+            <div class="col-md-4"><label class="form-label" for="case-number">Case number</label><input class="form-control" id="case-number" required maxlength="64"></div>
+            <div class="col-md-8"><label class="form-label" for="case-title">Title</label><input class="form-control" id="case-title" required maxlength="255"></div>
+            <div class="col-md-4"><label class="form-label" for="case-severity">Severity</label><select class="form-select" id="case-severity"><option>medium</option><option>critical</option><option>high</option><option>low</option><option>informational</option></select></div>
+            <div class="col-md-4"><label class="form-label" for="case-priority">Priority</label><select class="form-select" id="case-priority"><option>medium</option><option>critical</option><option>high</option><option>low</option><option>informational</option></select></div>
+            <div class="col-md-4"><label class="form-label" for="case-owner">Owner</label><input class="form-control" id="case-owner" maxlength="255" placeholder="Investigator"></div>
+            <div class="col-12"><label class="form-label" for="case-tags">Tags</label><input class="form-control" id="case-tags" placeholder="phishing, endpoint, ctf"></div>
+            <div class="col-12"><label class="form-label" for="case-description">Description</label><textarea class="form-control" id="case-description" rows="3"></textarea></div>
+            <div class="col-md-6"><label class="form-label" for="case-notes">Notes</label><textarea class="form-control" id="case-notes" rows="4"></textarea></div>
+            <div class="col-md-6"><label class="form-label" for="case-relationships">Relationships</label><textarea class="form-control" id="case-relationships" rows="4" placeholder="Linked cases, assets, people, systems"></textarea></div>
+          </div>
+        </div>
+        <div class="modal-footer"><button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary" type="submit">Save case</button></div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

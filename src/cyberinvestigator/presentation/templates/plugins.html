@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+<div data-module="plugins" data-plugin-registry-root>
+  <div class="page-heading">
+    <div><p class="eyebrow">Platform extensions</p><h2>Plugin registry</h2><p class="text-muted mb-0">Upload, install, validate, version, enable, disable, delete, and prepare plugins for marketplace use.</p></div>
+    <div class="dashboard-heading-actions"><button class="btn btn-outline-secondary" id="plugin-validate-all" type="button"><i class="bi bi-shield-check"></i> Validate</button><button class="btn btn-primary" type="button" id="plugin-discover"><i class="bi bi-arrow-repeat"></i> Discover plugins</button></div>
+  </div>
+  <div class="row g-4">
+    <div class="col-xl-8">
+      <article class="surface-card"><div class="card-head"><div><h3>Registered plugins</h3><p>Trusted, validated plugin inventory and lifecycle controls.</p></div><span class="badge text-bg-light" data-plugin-count>0 registered</span></div><div id="plugin-list" class="plugin-grid mt-3"></div></article>
+    </div>
+    <div class="col-xl-4">
+      <article class="surface-card"><div class="card-head"><div><h3>Upload Plugin</h3><p>Install a trusted ZIP containing plugin.toml and module files.</p></div></div><form id="plugin-upload-form" class="mt-3"><div class="upload-zone"><i class="bi bi-cloud-arrow-up"></i><div><strong>Plugin package</strong><small>ZIP packages are validated before activation.</small></div></div><input class="form-control mt-3" id="plugin-upload" name="plugin" type="file" accept=".zip,.toml,.py"><button class="btn btn-primary mt-3 w-100" type="submit"><i class="bi bi-upload"></i> Install Plugin</button></form></article>
+      <article class="surface-card mt-4"><h3>Marketplace Ready</h3><div class="check-list mt-3"><div class="check-list-item"><i class="bi bi-check-circle"></i><span>Manifest identity and version</span></div><div class="check-list-item"><i class="bi bi-check-circle"></i><span>Capabilities and dependencies</span></div><div class="check-list-item"><i class="bi bi-check-circle"></i><span>Validation before enablement</span></div></div></article>
+    </div>
+  </div>
+</div>
+{% endblock %}
