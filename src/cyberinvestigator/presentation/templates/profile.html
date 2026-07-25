@@ -71,32 +71,32 @@
         </form>
       </article>
       <article class="surface-card settings-page" id="notifications">
-        <h3>Notification Preferences</h3>
+        <h3>Notifications</h3>
+        <div class="notification-tools mt-3">
+          <input class="form-control form-control-sm" id="profile-notification-search" type="search" placeholder="Search notifications" aria-label="Search notifications">
+          <select class="form-select form-select-sm" id="profile-notification-filter" aria-label="Filter notifications">
+            <option value="all">All priorities</option><option value="critical">Critical</option><option value="high">High</option><option value="medium">Medium</option><option value="info">Info</option>
+          </select>
+          <button class="btn btn-sm btn-outline-primary" id="profile-notifications-read" type="button">Mark all read</button>
+        </div>
+        <div class="admin-list mt-3" id="profile-notifications-list"><div class="empty-state">Loading notifications.</div></div>
+        <h4 class="mt-4">Notification Preferences</h4>
         <div class="setting-row"><div><strong>Investigation notifications</strong><small>Evidence, report, timeline, and AI analysis updates.</small></div><div class="form-check form-switch"><input class="form-check-input" type="checkbox" checked></div></div>
         <div class="setting-row"><div><strong>Security notifications</strong><small>Password and sign-in notices for your account.</small></div><div class="form-check form-switch"><input class="form-check-input" type="checkbox" checked></div></div>
       </article>
       <article class="surface-card settings-page" id="sessions">
         <h3>Session Management</h3>
-        <div class="health-grid mt-3">
-          <div class="health-item"><small>Current session</small><strong>Active</strong></div>
-          <div class="health-item"><small>Session timeout</small><strong>Policy managed</strong></div>
-          <div class="health-item"><small>Secure cookies</small><strong>Enabled</strong></div>
-        </div>
+        <div class="admin-list mt-3" id="profile-sessions"><div class="skeleton-list"></div></div>
       </article>
       <article class="surface-card settings-page" id="login-history">
         <h3>Login History</h3>
-        {% if profile_user %}
-        <div class="compact-list mt-3">
-          <div class="compact-item"><i class="bi bi-box-arrow-in-right"></i><div><strong>Last successful login</strong><small>{{ profile_user.last_login_at or 'Not recorded' }}</small></div></div>
-          <div class="compact-item"><i class="bi bi-shield-check"></i><div><strong>Account status</strong><small>{{ profile_user.status|title }}</small></div></div>
-        </div>
-        {% endif %}
+        <div class="admin-list mt-3" id="profile-login-history"><div class="skeleton-list"></div></div>
       </article>
       <article class="surface-card settings-page" id="activity">
         <h3>Recent Activity</h3>
         <div class="admin-list" id="profile-activity"><div class="empty-state">Recent account activity appears here after investigation actions.</div></div>
       </article>
-      <article class="surface-card settings-page" id="api-usage"><h3>API Usage</h3><div class="health-grid mt-3"><div class="health-item"><small>AI requests</small><strong>Policy tracked</strong></div><div class="health-item"><small>Exports</small><strong>Available</strong></div></div></article>
+      <article class="surface-card settings-page" id="api-usage"><h3>API Usage</h3><div class="health-grid mt-3" id="profile-api-usage"><div class="skeleton-list"></div></div></article>
       <article class="surface-card settings-page" id="preferences"><h3>Preferences</h3><div class="setting-row"><div><strong>Dark mode</strong><small>Use the professional dark investigation interface.</small></div><div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="theme-toggle"></div></div></article>
     </section>
   </div>

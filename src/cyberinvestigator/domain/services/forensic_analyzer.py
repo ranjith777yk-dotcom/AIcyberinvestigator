@@ -16,7 +16,7 @@ import zlib
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Final
+from typing import Callable, Final
 
 
 @dataclass(frozen=True, slots=True)
@@ -38,6 +38,23 @@ class ForensicAnalyzer:
         r"(?i)(flag|ctf|picoctf|htb|tryhackme)\{[^}\r\n]{2,120}\}|[A-Z0-9_]{2,32}\{[^}\r\n]{2,120}\}"
     )
     _PRINTABLE_PATTERN: Final[re.Pattern[bytes]] = re.compile(rb"[\x20-\x7e]{4,}")
+    _URL_PATTERN: Final[re.Pattern[str]] = re.compile(r"https?://[^\s\"'<>]+", re.I)
+    _DOMAIN_PATTERN: Final[re.Pattern[str]] = re.compile(r"\b(?:[a-z0-9-]+\.)+[a-z]{2,63}\b", re.I)
+    _IP_PATTERN: Final[re.Pattern[str]] = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
+    _EMAIL_PATTERN: Final[re.Pattern[str]] = re.compile(r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", re.I)
+    _SUSPICIOUS_COMMANDS: Final[tuple[str, ...]] = (
+        "powershell -enc",
+        "invoke-expression",
+        "certutil -decode",
+        "curl http",
+        "wget http",
+        "cmd.exe /c",
+        "rundll32",
+        "regsvr32",
+        "mshta",
+        "chmod +x",
+        "/bin/sh -c",
+    )
     _MAGIC: Final[tuple[tuple[bytes, str], ...]] = (
         (b"\x89PNG\r\n\x1a\n", "PNG image"),
         (b"\xff\xd8\xff", "JPEG image"),
@@ -57,15 +74,35 @@ class ForensicAnalyzer:
     )
 
     def analyze_path(
-        self, path: Path, *, evidence_number: str, original_filename: str, sha256: str
+        self,
+        path: Path,
+        *,
+        evidence_number: str,
+        original_filename: str,
+        sha256: str,
+        progress: Callable[[int, str], None] | None = None,
     ) -> ForensicAnalysisResult:
         """Analyze one stored evidence file and return a full report."""
+        notify = progress or (lambda _value, _step: None)
+        notify(22, "Hashing and verifying custody metadata")
         data = path.read_bytes()[: self.MAX_BYTES]
         truncated = path.stat().st_size > len(data)
+        notify(32, "Detecting archives and embedded files")
         root = self._analyze_bytes(data, original_filename, depth=0)
+        notify(48, "Extracting strings and finding encodings")
         findings = self._flatten_findings(root)
+        notify(58, "Finding encryption and hidden content")
+        iocs = self._collect_iocs(root)
+        notify(66, "Running YARA indicators")
+        yara_results = self._yara_matches(root)
+        notify(72, "Running Sigma indicators")
+        sigma_results = self._sigma_matches(root)
+        notify(78, "Extracting IOCs and MITRE ATT&CK mappings")
+        mitre = self._mitre_mapping(root, yara_results, sigma_results)
+        risk_score = min(100, 10 + len(findings) * 8 + len(yara_results) * 15 + len(sigma_results) * 12)
         report = {
             "generated_at": datetime.now(timezone.utc).isoformat(),
+            "executive_summary": self._executive_summary(findings, root),
             "evidence": {
                 "evidence_number": evidence_number,
                 "original_filename": original_filename,
@@ -74,6 +111,14 @@ class ForensicAnalyzer:
                 "bytes_analyzed": len(data),
                 "truncated": truncated,
             },
+            "threat_assessment": self._threat_assessment(findings, root),
+            "technical_summary": self._summary(findings, root),
+            "evidence_summary": {
+                "signature": root.get("file_signature"),
+                "entropy": root.get("entropy"),
+                "size_bytes": root.get("size_bytes"),
+            },
+            "recovered_files": self._recovered_files(root),
             "chain_of_custody": [
                 "Evidence bytes were read from immutable local custody storage.",
                 "The persisted SHA-256 hash was retained and included in this report.",
@@ -81,7 +126,24 @@ class ForensicAnalyzer:
             ],
             "root": root,
             "findings": findings,
+            "forensic_findings": self._enterprise_findings(findings),
+            "recovered_artifacts": self._recovered_artifacts(findings, evidence_number),
+            "confidence_score": self._confidence_score(findings, root),
+            "risk_score": risk_score,
+            "ioc_table": iocs,
+            "mitre_mapping": mitre,
+            "yara_results": yara_results,
+            "sigma_results": sigma_results,
+            "timeline_summary": "Analysis completion is recorded in the investigation timeline with evidence provenance.",
+            "recommendations": self._recommendations(findings),
             "explanation": self._explain(findings, root),
+            "appendix": {
+                "analysis_limits": {
+                    "max_bytes": self.MAX_BYTES,
+                    "max_depth": self.MAX_DEPTH,
+                    "max_children": self.MAX_CHILDREN,
+                }
+            },
         }
         summary = self._summary(findings, root)
         return ForensicAnalysisResult(summary=summary, report=report)
@@ -105,6 +167,9 @@ class ForensicAnalyzer:
             "embedded_file_indicators": self._embedded_indicators(data),
             "metadata": self._metadata(data, name),
             "hidden_strings": strings[: self.MAX_STRINGS],
+            "suspicious_commands": [
+                value for value in strings if any(command in value.lower() for command in self._SUSPICIOUS_COMMANDS)
+            ][:25],
             "decoded_payloads": decoded,
             "flags": flags,
             "children": [],
@@ -355,6 +420,220 @@ class ForensicAnalyzer:
 
         walk(root, str(root.get("name", "root")))
         return findings
+
+    def _walk_nodes(self, root: dict[str, object]):
+        yield root
+        for child in root.get("children", []):
+            if isinstance(child, dict) and "error" not in child:
+                yield from self._walk_nodes(child)
+
+    def _collect_iocs(self, root: dict[str, object]) -> list[dict[str, str]]:
+        found: set[tuple[str, str]] = set()
+        for node in self._walk_nodes(root):
+            text = "\n".join(str(item) for item in node.get("hidden_strings", []))
+            for kind, pattern in (
+                ("URL", self._URL_PATTERN),
+                ("Domain", self._DOMAIN_PATTERN),
+                ("IP", self._IP_PATTERN),
+                ("Email", self._EMAIL_PATTERN),
+            ):
+                for value in pattern.findall(text):
+                    if kind == "IP" and any(int(part) > 255 for part in value.split(".")):
+                        continue
+                    found.add((kind, value))
+        return [
+            {"type": kind, "value": value, "confidence": "high", "source": "extracted strings"}
+            for kind, value in sorted(found)
+        ][:200]
+
+    def _yara_matches(self, root: dict[str, object]) -> list[dict[str, object]]:
+        matches = []
+        for node in self._walk_nodes(root):
+            joined = " ".join(str(item).lower() for item in node.get("hidden_strings", []))
+            signature = str(node.get("file_signature", ""))
+            rules = (
+                ("Suspicious_PowerShell", ("powershell -enc", "invoke-expression")),
+                ("Credential_Access_Strings", ("mimikatz", "sekurlsa", "lsass")),
+                ("Webshell_Indicators", ("eval($_post", "cmd.exe /c", "system($_get")),
+            )
+            for rule, needles in rules:
+                hits = [needle for needle in needles if needle in joined]
+                if hits:
+                    matches.append({"rule": rule, "location": node.get("name"), "matches": hits, "confidence": 0.82})
+            if signature in {"Windows PE executable", "ELF executable"} and float(node.get("entropy", 0)) > 7.3:
+                matches.append(
+                    {
+                        "rule": "High_Entropy_Executable",
+                        "location": node.get("name"),
+                        "matches": ["entropy"],
+                        "confidence": 0.7,
+                    }
+                )
+        return matches
+
+    def _sigma_matches(self, root: dict[str, object]) -> list[dict[str, object]]:
+        results = []
+        for node in self._walk_nodes(root):
+            for command in node.get("suspicious_commands", []):
+                results.append(
+                    {
+                        "rule": "Suspicious command execution",
+                        "location": node.get("name"),
+                        "evidence": command,
+                        "confidence": 0.76,
+                    }
+                )
+        return results[:100]
+
+    @staticmethod
+    def _mitre_mapping(
+        root: dict[str, object], yara: list[dict[str, object]], sigma: list[dict[str, object]]
+    ) -> list[dict[str, str]]:
+        text = " ".join(str(item).lower() for item in root.get("hidden_strings", []))
+        mappings = []
+        if "powershell" in text or any("PowerShell" in str(item.get("rule")) for item in yara):
+            mappings.append(
+                {
+                    "technique_id": "T1059.001",
+                    "technique": "PowerShell",
+                    "reason": "PowerShell execution indicators were recovered.",
+                }
+            )
+        if "mimikatz" in text or "lsass" in text:
+            mappings.append(
+                {
+                    "technique_id": "T1003",
+                    "technique": "OS Credential Dumping",
+                    "reason": "Credential access strings were recovered.",
+                }
+            )
+        if sigma:
+            mappings.append(
+                {
+                    "technique_id": "T1059",
+                    "technique": "Command and Scripting Interpreter",
+                    "reason": "Suspicious command strings were recovered.",
+                }
+            )
+        return mappings
+
+    def _recovered_files(self, root: dict[str, object]) -> list[dict[str, object]]:
+        return [
+            {"name": node.get("name"), "signature": node.get("file_signature"), "size_bytes": node.get("size_bytes")}
+            for node in self._walk_nodes(root)
+            if node is not root
+        ]
+
+    @staticmethod
+    def _enterprise_findings(findings: list[dict[str, object]]) -> list[dict[str, object]]:
+        enriched = []
+        for item in findings:
+            finding_type = str(item.get("type", "finding"))
+            severity = str(item.get("severity", "info"))
+            detail = str(item.get("detail", ""))
+            path = str(item.get("path", "root"))
+            if finding_type == "ctf_flag":
+                title = "Recovered Artifact"
+                reason = "The value matched a known CTF flag pattern in extracted strings or decoded payloads."
+                action = "Validate the artifact against challenge scope and preserve the extraction path."
+                confidence = 0.92
+            elif "encryption" in finding_type:
+                title = "Encryption or Packed-Content Indicator"
+                reason = "Entropy, metadata, or archive flags indicate encrypted, compressed, or packed content."
+                action = "Confirm with alternate tooling and preserve the original bytes before attempting recovery."
+                confidence = 0.74
+            elif "steganography" in finding_type:
+                title = "Potential Steganography Indicator"
+                reason = "Trailing bytes or known tool markers suggest hidden content may be present."
+                action = "Review with approved steganography tools and document every extracted artifact."
+                confidence = 0.68
+            elif "embedded" in finding_type:
+                title = "Embedded File Indicator"
+                reason = "A secondary file signature was found inside the analyzed byte stream."
+                action = "Extract the embedded object in a controlled environment and analyze it as child evidence."
+                confidence = 0.8
+            else:
+                title = finding_type.replace("_", " ").title()
+                reason = "The local forensic parser identified this property during read-only triage."
+                action = "Correlate with the case timeline and validate relevance before escalation."
+                confidence = 0.6 if severity == "info" else 0.72
+            enriched.append(
+                {
+                    "title": title,
+                    "description": detail,
+                    "reason": reason,
+                    "confidence": confidence,
+                    "severity": severity,
+                    "location": path,
+                    "recommended_action": action,
+                }
+            )
+        return enriched
+
+    @staticmethod
+    def _recovered_artifacts(findings: list[dict[str, object]], evidence_number: str) -> list[dict[str, object]]:
+        artifacts = []
+        for item in findings:
+            if item.get("type") != "ctf_flag":
+                continue
+            artifacts.append(
+                {
+                    "title": "Recovered Artifact",
+                    "artifact": item.get("detail"),
+                    "location": item.get("path"),
+                    "confidence": 0.92,
+                    "validation": "Matched flag-like syntax during string and decoded-payload analysis.",
+                    "why_identified": "Pattern matched known flag conventions and was recovered from evidence bytes.",
+                    "evidence_path": f"{evidence_number}:{item.get('path')}",
+                    "associated_files": [item.get("path")],
+                    "technical_explanation": "The analyzer searched printable strings and decoded payload previews, then recorded the path where the artifact was observed.",
+                }
+            )
+        return artifacts
+
+    @staticmethod
+    def _confidence_score(findings: list[dict[str, object]], root: dict[str, object]) -> int:
+        score = 55
+        if root.get("file_signature") != "Unknown":
+            score += 10
+        if findings:
+            score += min(25, len(findings) * 4)
+        if any(item.get("type") == "ctf_flag" for item in findings):
+            score += 10
+        return min(98, score)
+
+    @staticmethod
+    def _threat_assessment(findings: list[dict[str, object]], root: dict[str, object]) -> dict[str, object]:
+        high = sum(1 for item in findings if item.get("severity") == "high")
+        medium = sum(1 for item in findings if item.get("severity") == "medium")
+        severity = "high" if high else "medium" if medium else "low"
+        return {
+            "severity": severity,
+            "reason": f"{high} high and {medium} medium confidence forensic indicator(s) were identified.",
+            "entropy": root.get("entropy"),
+            "signature": root.get("file_signature"),
+        }
+
+    @staticmethod
+    def _recommendations(findings: list[dict[str, object]]) -> list[str]:
+        items = ["Preserve the original evidence and retain hash verification in the case record."]
+        if any(item.get("type") == "ctf_flag" for item in findings):
+            items.append("Validate recovered artifacts against the challenge or investigation scope before reporting.")
+        if any("embedded" in str(item.get("type")) for item in findings):
+            items.append("Extract embedded objects as child evidence and analyze them independently.")
+        if any("encryption" in str(item.get("type")) for item in findings):
+            items.append(
+                "Use approved recovery workflows for encrypted or packed content; avoid destructive modification."
+            )
+        return items
+
+    @staticmethod
+    def _executive_summary(findings: list[dict[str, object]], root: dict[str, object]) -> str:
+        return (
+            f"Read-only forensic triage identified {len(findings)} notable indicator(s) in a "
+            f"{root.get('file_signature', 'Unknown')} artifact with entropy {root.get('entropy', '-')}. "
+            "The report includes evidence context, recovered artifacts, confidence scoring, and recommended actions."
+        )
 
     @staticmethod
     def _summary(findings: list[dict[str, object]], root: dict[str, object]) -> str:

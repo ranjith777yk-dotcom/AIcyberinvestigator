@@ -19,15 +19,18 @@ from cyberinvestigator.infrastructure.database.models.investigation import (
     TimelineEvent,
 )
 from cyberinvestigator.infrastructure.database.models.operations import (
+    AIConversation,
     AIReasoning,
     Plugin,
     PluginExecution,
     Recommendation,
     Report,
     Setting,
+    Upload,
 )
 
 __all__ = [
+    "AIConversation",
     "AIReasoning",
     "AuditLog",
     "Artifact",
@@ -48,4 +51,5 @@ __all__ = [
     "TimelineEvent",
     "User",
     "UserSession",
+    "Upload",
 ]

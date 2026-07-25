@@ -76,7 +76,9 @@ class User(IdentifiedRecord):
     profile_image: Mapped[str | None] = mapped_column(String(1024), nullable=True)
 
     role: Mapped[Role] = relationship(back_populates="users")
-    sessions: Mapped[list[UserSession]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    sessions: Mapped[list[UserSession]] = relationship(
+        back_populates="user", cascade="all, delete-orphan", foreign_keys="UserSession.user_id"
+    )
     audit_logs: Mapped[list[AuditLog]] = relationship(back_populates="user")
 
 
@@ -87,6 +89,12 @@ class UserSession(IdentifiedRecord):
     __table_args__ = (Index("ix_user_sessions_user_active", "user_id", "active"),)
 
     user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    owner_user_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
+    created_by_user_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="active")
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
+    )
     session_token_hash: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
     ip_address: Mapped[str | None] = mapped_column(String(128), nullable=True)
     user_agent: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -94,7 +102,7 @@ class UserSession(IdentifiedRecord):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
 
-    user: Mapped[User] = relationship(back_populates="sessions")
+    user: Mapped[User] = relationship(back_populates="sessions", foreign_keys=[user_id])
 
 
 class AuditLog(IdentifiedRecord):
@@ -141,6 +149,12 @@ class Notification(IdentifiedRecord):
     __table_args__ = (Index("ix_notifications_user_read", "user_id", "read"),)
 
     user_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
+    owner_user_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
+    created_by_user_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="unread")
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
+    )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     message: Mapped[str] = mapped_column(Text, nullable=False)
     category: Mapped[str] = mapped_column(String(64), nullable=False, default="system")

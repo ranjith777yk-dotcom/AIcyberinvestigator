@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
@@ -105,6 +106,10 @@ def register_extensions(app: Flask) -> None:
     coupling the application factory to module-level singleton instances.
     """
     app.extensions.setdefault("cyberinvestigator", {})
+    app.extensions.setdefault(
+        "cyberinvestigator_executor", ThreadPoolExecutor(max_workers=2, thread_name_prefix="ci-bg")
+    )
+    app.extensions.setdefault("cyberinvestigator_jobs", {})
 
 
 def _register_plugin_runtime(app: Flask) -> None:

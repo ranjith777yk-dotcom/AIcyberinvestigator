@@ -24,8 +24,23 @@ class Case(IdentifiedRecord):
     """A top-level cyber investigation case."""
 
     __tablename__ = "cases"
+    __table_args__ = (
+        Index("ix_cases_owner_opened", "owner", "opened_at"),
+        Index("ix_cases_deleted_archived", "deleted_at", "archived_at"),
+    )
 
     case_number: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
+    owner_user_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    created_by_user_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
+    )
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="open")
+    review_status: Mapped[str] = mapped_column(String(32), nullable=False, default="pending")
+    reviewer_user_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    investigation_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     severity: Mapped[str] = mapped_column(String(32), nullable=False, default="medium")
@@ -57,10 +72,19 @@ class Evidence(IdentifiedRecord):
         CheckConstraint("size_bytes >= 0", name="ck_evidence_size_nonnegative"),
         Index("ix_evidence_case_sha256", "case_id", "sha256"),
         Index("ix_evidence_case_acquired", "case_id", "acquired_at"),
+        Index("ix_evidence_case_analysis", "case_id", "analysis_status"),
         CheckConstraint("length(sha256) = 64", name="ck_evidence_sha256_length"),
     )
 
     case_id: Mapped[UUID] = mapped_column(ForeignKey("cases.id", ondelete="CASCADE"), nullable=False)
+    owner_user_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    created_by_user_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
+    )
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="active")
     evidence_number: Mapped[str] = mapped_column(String(64), nullable=False)
     original_filename: Mapped[str] = mapped_column(String(512), nullable=False)
     storage_path: Mapped[str] = mapped_column(String(1024), unique=True, nullable=False)
@@ -116,6 +140,14 @@ class TimelineEvent(IdentifiedRecord):
     )
 
     case_id: Mapped[UUID] = mapped_column(ForeignKey("cases.id", ondelete="CASCADE"), nullable=False)
+    owner_user_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    created_by_user_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
+    )
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="active")
     evidence_id: Mapped[UUID | None] = mapped_column(ForeignKey("evidence.id", ondelete="SET NULL"), nullable=True)
     artifact_id: Mapped[UUID | None] = mapped_column(ForeignKey("artifacts.id", ondelete="SET NULL"), nullable=True)
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import TYPE_CHECKING
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -34,7 +34,10 @@ class PluginExecution(IdentifiedRecord):
     """An auditable execution record for a plugin in a particular case."""
 
     __tablename__ = "plugin_executions"
-    __table_args__ = (Index("ix_plugin_execution_case_started", "case_id", "started_at"),)
+    __table_args__ = (
+        Index("ix_plugin_execution_case_started", "case_id", "started_at"),
+        Index("ix_plugin_execution_status_started", "status", "started_at"),
+    )
 
     case_id: Mapped[UUID] = mapped_column(ForeignKey("cases.id", ondelete="CASCADE"), nullable=False)
     plugin_id: Mapped[UUID] = mapped_column(ForeignKey("plugins.id", ondelete="RESTRICT"), nullable=False)
@@ -63,6 +66,14 @@ class AIReasoning(IdentifiedRecord):
     )
 
     case_id: Mapped[UUID] = mapped_column(ForeignKey("cases.id", ondelete="CASCADE"), nullable=False)
+    owner_user_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    created_by_user_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
+    )
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="completed")
     plugin_execution_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("plugin_executions.id", ondelete="SET NULL"), nullable=True
     )
@@ -107,9 +118,18 @@ class Report(IdentifiedRecord):
     __table_args__ = (
         UniqueConstraint("case_id", "report_type", "version", name="uq_reports_case_type_version"),
         Index("ix_reports_case_created", "case_id", "created_at"),
+        Index("ix_reports_generated", "generated_at"),
     )
 
     case_id: Mapped[UUID] = mapped_column(ForeignKey("cases.id", ondelete="CASCADE"), nullable=False)
+    owner_user_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    created_by_user_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
+    )
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="draft")
     report_type: Mapped[str] = mapped_column(String(128), nullable=False)
     version: Mapped[int] = mapped_column(Integer, nullable=False)
     title: Mapped[str] = mapped_column(String(512), nullable=False)
@@ -117,6 +137,43 @@ class Report(IdentifiedRecord):
     generated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
 
     case: Mapped[Case] = relationship(back_populates="reports")
+
+
+class AIConversation(IdentifiedRecord):
+    """Persisted, user-isolated AI conversation turn."""
+
+    __tablename__ = "ai_conversations"
+    __table_args__ = (Index("ix_ai_conversations_owner_created", "owner_user_id", "created_at"),)
+
+    owner_user_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
+    conversation_id: Mapped[UUID] = mapped_column(default=uuid4, nullable=False, index=True)
+    title: Mapped[str] = mapped_column(String(255), nullable=False, default="New chat")
+    created_by_user_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    case_id: Mapped[UUID | None] = mapped_column(ForeignKey("cases.id", ondelete="SET NULL"), nullable=True)
+    user_message: Mapped[str] = mapped_column(Text, nullable=False)
+    assistant_message: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="completed")
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
+    )
+
+
+class Upload(IdentifiedRecord):
+    """Ownership record for a user upload, including chat attachments."""
+
+    __tablename__ = "uploads"
+    __table_args__ = (Index("ix_uploads_owner_created", "owner_user_id", "created_at"),)
+
+    owner_user_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
+    created_by_user_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    case_id: Mapped[UUID | None] = mapped_column(ForeignKey("cases.id", ondelete="SET NULL"), nullable=True)
+    evidence_id: Mapped[UUID | None] = mapped_column(ForeignKey("evidence.id", ondelete="SET NULL"), nullable=True)
+    filename: Mapped[str] = mapped_column(String(512), nullable=False)
+    storage_path: Mapped[str] = mapped_column(String(1024), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="stored")
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
+    )
 
 
 class Setting(IdentifiedRecord):

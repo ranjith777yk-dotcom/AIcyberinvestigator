@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import time
 from dataclasses import dataclass
 from typing import Iterator
@@ -41,13 +42,17 @@ class ProviderStatus:
     installed_models: tuple[str, ...] = ()
 
 
+logger = logging.getLogger(__name__)
+
+
 class OllamaHTTPProvider(OllamaProviderStrategy):
     """Ollama provider implemented against the local HTTP API."""
 
-    def __init__(self, *, endpoint: str, model: str, timeout: int = 60) -> None:
+    def __init__(self, *, endpoint: str, model: str, timeout: int = 60, keep_alive: str = "10m") -> None:
         self.endpoint = endpoint.rstrip("/")
         self.model = model
         self.timeout = timeout
+        self.keep_alive = keep_alive
 
     @property
     def provider_name(self) -> AIProviderName:
@@ -89,11 +94,7 @@ class OllamaHTTPProvider(OllamaProviderStrategy):
             output_tokens=data.get("eval_count") if isinstance(data, dict) else None,
         )
         latency_ms = round((time.perf_counter() - started_at) * 1000, 2)
-        print(
-            "[AI DEBUG] provider=ollama called=True "
-            f"model={model} latency_ms={latency_ms} "
-            f"input_tokens={usage.input_tokens or 'n/a'} output_tokens={usage.output_tokens or 'n/a'}"
-        )
+        logger.debug("Ollama completion model=%s latency_ms=%s", model, latency_ms)
         return AIResponse(content=content, model=model, provider=self.provider_name, usage=usage)
 
     def stream(self, request: AIRequest) -> Iterator[str]:
@@ -131,6 +132,7 @@ class OllamaHTTPProvider(OllamaProviderStrategy):
             "model": model,
             "messages": [{"role": item.role, "content": item.content} for item in request.messages],
             "stream": stream,
+            "keep_alive": self.keep_alive,
             "options": options,
         }
 
@@ -214,11 +216,7 @@ class OpenAISDKProvider(OpenAIProviderStrategy):
             output_tokens=getattr(raw_usage, "output_tokens", None),
         )
         latency_ms = round((time.perf_counter() - started_at) * 1000, 2)
-        print(
-            "[AI DEBUG] provider=openai called=True "
-            f"model={getattr(response, 'model', request.model or self.model)} latency_ms={latency_ms} "
-            f"input_tokens={usage.input_tokens or 'n/a'} output_tokens={usage.output_tokens or 'n/a'}"
-        )
+        logger.debug("OpenAI completion model=%s latency_ms=%s", request.model or self.model, latency_ms)
         return AIResponse(
             content=content.strip(),
             model=getattr(response, "model", None) or request.model or self.model,
@@ -291,19 +289,25 @@ class AIProviderManager:
 
     def __init__(self, providers: dict[str, AIProviderStrategy] | None = None) -> None:
         self._providers = providers or {}
+        self._status_cache: dict[str, tuple[float, ProviderStatus]] = {}
+        self._failed_until: dict[str, float] = {}
+        self.status_ttl_seconds = 5.0
 
     def select(self, provider_name: AIProviderName | str) -> AIProviderStrategy:
         key = provider_name.value if isinstance(provider_name, AIProviderName) else str(provider_name)
         provider = self._providers.get(key)
-        if provider and self.status(key).available:
+        if provider and not self._temporarily_failed(key) and self.status(key).available:
             return provider
         for fallback_key in self.fallback_order:
             provider = self._providers.get(fallback_key)
-            if provider and self.status(fallback_key).available:
+            if provider and not self._temporarily_failed(fallback_key) and self.status(fallback_key).available:
                 return provider
         raise AIProviderUnavailable("No AI provider available.")
 
     def status(self, provider_name: str) -> ProviderStatus:
+        cached = self._status_cache.get(str(provider_name))
+        if cached and time.time() - cached[0] < self.status_ttl_seconds:
+            return cached[1]
         provider = self._providers.get(str(provider_name))
         if provider is None:
             return ProviderStatus(
@@ -315,20 +319,34 @@ class AIProviderManager:
             )
         status = getattr(provider, "status", None)
         if isinstance(status, ProviderStatus):
+            self._status_cache[str(provider_name)] = (time.time(), status)
             return status
-        return ProviderStatus(
+        fallback = ProviderStatus(
             provider=str(provider_name),
             available=False,
             configured=False,
             model="",
             message="Provider adapter does not expose health status.",
         )
+        self._status_cache[str(provider_name)] = (time.time(), fallback)
+        return fallback
 
     def all_statuses(self) -> dict[str, ProviderStatus]:
         return {name: self.status(name) for name in self.fallback_order}
 
     def test_connection(self, provider_name: str) -> ProviderStatus:
+        self._failed_until.pop(str(provider_name), None)
+        self._status_cache.pop(str(provider_name), None)
         return self.status(provider_name)
+
+    def mark_unavailable(self, provider_name: str, *, retry_after: float = 10.0) -> None:
+        """Temporarily avoid a failed provider so a configured fallback can run."""
+        key = str(provider_name)
+        self._failed_until[key] = time.time() + retry_after
+        self._status_cache.pop(key, None)
+
+    def _temporarily_failed(self, provider_name: str) -> bool:
+        return self._failed_until.get(str(provider_name), 0.0) > time.time()
 
 
 AIProviderRegistry = AIProviderManager
@@ -341,6 +359,7 @@ def build_ai_registry(config: dict) -> AIProviderManager:
         endpoint=str(config.get("OLLAMA_ENDPOINT") or config.get("AI_OLLAMA_ENDPOINT") or "http://localhost:11434"),
         model=str(config.get("OLLAMA_MODEL") or config.get("AI_MODEL") or "qwen3:8b"),
         timeout=int(config.get("AI_TIMEOUT_SECONDS") or 60),
+        keep_alive=str(config.get("OLLAMA_KEEP_ALIVE") or "10m"),
     )
     openai = OpenAISDKProvider(
         api_key=config.get("OPENAI_API_KEY") or config.get("AI_API_KEY"),

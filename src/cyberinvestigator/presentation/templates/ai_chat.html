@@ -20,6 +20,9 @@
         <input id="chat-files" type="file" multiple hidden>
       </div>
       <div class="compact-list mt-3" id="chat-upload-list"></div>
+      <label class="form-label mt-3" for="conversation-search">Recent conversations</label>
+      <input class="form-control form-control-sm" id="conversation-search" type="search" placeholder="Search conversations">
+      <div class="compact-list mt-2 conversation-list" id="conversation-list"><div class="skeleton skeleton-line"></div></div>
       <div class="quick-actions mt-3">
         <button class="quick-action" type="button" data-chat-prompt="Summarize the current investigation with evidence, timeline, threat score, recommendations, and gaps."><i class="bi bi-card-checklist"></i><span>Summary</span></button>
         <button class="quick-action" type="button" data-chat-prompt="Explain the most important IOCs and how to validate them safely."><i class="bi bi-bullseye"></i><span>IOCs</span></button>
@@ -36,6 +39,7 @@
         <button class="btn btn-icon" type="button" data-ui-action="attachment" aria-label="Attach evidence"><i class="bi bi-paperclip"></i></button>
         <label class="visually-hidden" for="chat-message">Message</label>
         <textarea id="chat-message" class="form-control" rows="1" placeholder="Message AI Cyber Investigator..."></textarea>
+        <button class="btn btn-outline-danger d-none" id="stop-generation" type="button" aria-label="Stop generation"><i class="bi bi-stop-fill"></i></button>
         <button class="btn btn-primary" type="submit" aria-label="Send message"><i class="bi bi-arrow-up"></i></button>
       </form>
     </article>

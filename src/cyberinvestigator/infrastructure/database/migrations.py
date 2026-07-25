@@ -6,15 +6,27 @@ from flask import Flask
 from sqlalchemy import inspect, text
 
 INDEXES = (
+    ("ix_cases_owner_opened", "cases", "owner, opened_at"),
+    ("ix_cases_deleted_archived", "cases", "deleted_at, archived_at"),
     ("ix_evidence_case_acquired", "evidence", "case_id, acquired_at"),
+    ("ix_evidence_case_analysis", "evidence", "case_id, analysis_status"),
     ("ix_artifacts_content_hash", "artifacts", "content_hash"),
     ("ix_timeline_case_type", "timeline_events", "case_id, event_type"),
+    ("ix_plugin_execution_status_started", "plugin_executions", "status, started_at"),
     ("ix_ai_reasoning_provider_model", "ai_reasoning", "provider, model"),
     ("ix_recommendations_case_status", "recommendations", "case_id, status"),
+    ("ix_reports_generated", "reports", "generated_at"),
     ("ix_settings_namespace_updated", "settings", "namespace, updated_at"),
 )
 
 ADDITIVE_COLUMNS = (
+    ("cases", "owner_user_id", "CHAR(32)"),
+    ("cases", "created_by_user_id", "CHAR(32)"),
+    ("cases", "updated_at", "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP"),
+    ("cases", "status", "VARCHAR(32) NOT NULL DEFAULT 'open'"),
+    ("cases", "review_status", "VARCHAR(32) NOT NULL DEFAULT 'pending'"),
+    ("cases", "reviewer_user_id", "CHAR(32)"),
+    ("cases", "investigation_notes", "TEXT"),
     ("cases", "priority", "VARCHAR(32) NOT NULL DEFAULT 'medium'"),
     ("cases", "owner", "VARCHAR(255)"),
     ("cases", "tags", "TEXT"),
@@ -23,6 +35,32 @@ ADDITIVE_COLUMNS = (
     ("evidence", "analysis_report", "TEXT"),
     ("evidence", "analysis_summary", "TEXT"),
     ("evidence", "analysis_status", "VARCHAR(32) NOT NULL DEFAULT 'pending'"),
+    ("evidence", "owner_user_id", "CHAR(32)"),
+    ("evidence", "created_by_user_id", "CHAR(32)"),
+    ("evidence", "updated_at", "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP"),
+    ("evidence", "status", "VARCHAR(32) NOT NULL DEFAULT 'active'"),
+    ("timeline_events", "owner_user_id", "CHAR(32)"),
+    ("timeline_events", "created_by_user_id", "CHAR(32)"),
+    ("timeline_events", "updated_at", "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP"),
+    ("timeline_events", "status", "VARCHAR(32) NOT NULL DEFAULT 'active'"),
+    ("reports", "owner_user_id", "CHAR(32)"),
+    ("reports", "created_by_user_id", "CHAR(32)"),
+    ("reports", "updated_at", "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP"),
+    ("reports", "status", "VARCHAR(32) NOT NULL DEFAULT 'draft'"),
+    ("ai_reasoning", "owner_user_id", "CHAR(32)"),
+    ("ai_reasoning", "created_by_user_id", "CHAR(32)"),
+    ("ai_reasoning", "updated_at", "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP"),
+    ("ai_reasoning", "status", "VARCHAR(32) NOT NULL DEFAULT 'completed'"),
+    ("notifications", "owner_user_id", "CHAR(32)"),
+    ("notifications", "created_by_user_id", "CHAR(32)"),
+    ("notifications", "updated_at", "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP"),
+    ("notifications", "status", "VARCHAR(32) NOT NULL DEFAULT 'unread'"),
+    ("user_sessions", "owner_user_id", "CHAR(32)"),
+    ("user_sessions", "created_by_user_id", "CHAR(32)"),
+    ("user_sessions", "updated_at", "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP"),
+    ("user_sessions", "status", "VARCHAR(32) NOT NULL DEFAULT 'active'"),
+    ("ai_conversations", "conversation_id", "CHAR(32)"),
+    ("ai_conversations", "title", "VARCHAR(255) NOT NULL DEFAULT 'New chat'"),
 )
 
 
@@ -40,10 +78,57 @@ def run_lightweight_migrations(app: Flask) -> None:
         _repair_user_foreign_key_targets(database)
         for table_name, column_name, column_type in ADDITIVE_COLUMNS:
             if not _column_exists(database, table_name, column_name):
-                database.session.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}"))
+                effective_type = column_type
+                if database.engine.dialect.name == "sqlite" and "DEFAULT CURRENT_TIMESTAMP" in effective_type:
+                    # SQLite only permits constant defaults when adding a column to a populated table.
+                    effective_type = "TIMESTAMP"
+                database.session.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {effective_type}"))
+        _backfill_ownership(database)
         for index_name, table_name, columns in INDEXES:
             database.session.execute(text(f"CREATE INDEX IF NOT EXISTS {index_name} ON {table_name} ({columns})"))
         database.session.commit()
+
+
+def _backfill_ownership(database) -> None:
+    """Populate durable ownership for legacy rows without changing visible owners."""
+    database.session.execute(
+        text(
+            "UPDATE cases SET owner_user_id = (SELECT id FROM users WHERE lower(users.username) = lower(cases.owner) LIMIT 1) WHERE owner_user_id IS NULL"
+        )
+    )
+    database.session.execute(
+        text("UPDATE cases SET created_by_user_id = owner_user_id WHERE created_by_user_id IS NULL")
+    )
+    for table_name in ("evidence", "timeline_events", "reports", "ai_reasoning"):
+        database.session.execute(
+            text(
+                f"UPDATE {table_name} SET owner_user_id = (SELECT owner_user_id FROM cases WHERE cases.id = {table_name}.case_id) WHERE owner_user_id IS NULL"
+            )
+        )
+        database.session.execute(
+            text(f"UPDATE {table_name} SET created_by_user_id = owner_user_id WHERE created_by_user_id IS NULL")
+        )
+    database.session.execute(text("UPDATE notifications SET owner_user_id = user_id WHERE owner_user_id IS NULL"))
+    database.session.execute(
+        text("UPDATE notifications SET created_by_user_id = owner_user_id WHERE created_by_user_id IS NULL")
+    )
+    database.session.execute(text("UPDATE user_sessions SET owner_user_id = user_id WHERE owner_user_id IS NULL"))
+    database.session.execute(
+        text("UPDATE user_sessions SET created_by_user_id = user_id WHERE created_by_user_id IS NULL")
+    )
+    for table_name in (
+        "cases",
+        "evidence",
+        "timeline_events",
+        "reports",
+        "ai_reasoning",
+        "notifications",
+        "user_sessions",
+    ):
+        database.session.execute(
+            text(f"UPDATE {table_name} SET updated_at = CURRENT_TIMESTAMP WHERE updated_at IS NULL")
+        )
+    database.session.execute(text("UPDATE ai_conversations SET conversation_id = id WHERE conversation_id IS NULL"))
 
 
 def _column_exists(database, table_name: str, column_name: str) -> bool:

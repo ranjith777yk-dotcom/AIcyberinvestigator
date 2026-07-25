@@ -5,12 +5,13 @@ from __future__ import annotations
 import csv
 import html
 import json
+import re
 import shutil
 import time
 import zipfile
 from io import BytesIO, StringIO
 from pathlib import Path
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from flask import Blueprint, Response, current_app, g, jsonify, request, stream_with_context
 from sqlalchemy import func, select, text
@@ -25,6 +26,7 @@ from cyberinvestigator.infrastructure.ai import AIProviderUnavailable, build_ai_
 from cyberinvestigator.infrastructure.ai import messages as ai_messages
 from cyberinvestigator.infrastructure.database.base import utc_now
 from cyberinvestigator.infrastructure.database.models import (
+    AIConversation,
     AIReasoning,
     AuditLog,
     Case,
@@ -38,6 +40,7 @@ from cyberinvestigator.infrastructure.database.models import (
     SecurityAlert,
     Setting,
     TimelineEvent,
+    Upload,
     User,
     UserSession,
 )
@@ -115,32 +118,50 @@ def _stored_json(value) -> object | None:
         return {"raw": str(value)}
 
 
-def _case_json(case):
+def _request_cache(name: str) -> dict[object, object]:
+    cache = getattr(g, name, None)
+    if cache is None:
+        cache = {}
+        setattr(g, name, cache)
+    return cache
+
+
+def _cached_model(model, model_id):
+    if model_id is None:
+        return None
+    cache = _request_cache(f"_cache_{model.__tablename__}")
+    if model_id not in cache:
+        cache[model_id] = _db().session.get(model, model_id)
+    return cache[model_id]
+
+
+def _case_json(case, *, include_related: bool = True):
     case_id = case.id
     attachments = []
     history = []
-    try:
-        session = _db().session
-        attachments = [
-            _evidence_json(item)
-            for item in session.scalars(
-                select(Evidence)
-                .where(Evidence.case_id == case_id, Evidence.deleted_at.is_(None))
-                .order_by(Evidence.acquired_at.desc())
-                .limit(8)
-            )
-        ]
-        history = [
-            _timeline_json(item)
-            for item in session.scalars(
-                select(TimelineEvent)
-                .where(TimelineEvent.case_id == case_id)
-                .order_by(TimelineEvent.occurred_at.desc())
-                .limit(8)
-            )
-        ]
-    except RuntimeError as error:
-        current_app.logger.debug("Case related records could not be loaded for %s: %s", case_id, error)
+    if include_related:
+        try:
+            session = _db().session
+            attachments = [
+                _evidence_json(item)
+                for item in session.scalars(
+                    select(Evidence)
+                    .where(Evidence.case_id == case_id, Evidence.deleted_at.is_(None))
+                    .order_by(Evidence.acquired_at.desc())
+                    .limit(8)
+                )
+            ]
+            history = [
+                _timeline_json(item)
+                for item in session.scalars(
+                    select(TimelineEvent)
+                    .where(TimelineEvent.case_id == case_id)
+                    .order_by(TimelineEvent.occurred_at.desc())
+                    .limit(8)
+                )
+            ]
+        except RuntimeError as error:
+            current_app.logger.debug("Case related records could not be loaded for %s: %s", case_id, error)
     return {
         "id": str(case.id),
         "case_number": case.case_number,
@@ -149,9 +170,16 @@ def _case_json(case):
         "severity": case.severity,
         "priority": getattr(case, "priority", None) or case.severity,
         "owner": getattr(case, "owner", None),
+        "owner_user_id": str(case.owner_user_id) if getattr(case, "owner_user_id", None) else None,
+        "created_by": str(case.created_by_user_id) if getattr(case, "created_by_user_id", None) else None,
+        "created_at": _iso(case.created_at),
+        "updated_at": _iso(case.updated_at),
         "tags": _json_list(getattr(case, "tags", None)),
         "notes": _json_list(getattr(case, "notes", None)),
         "relationships": _json_list(getattr(case, "relationships", None)),
+        "review_status": case.review_status,
+        "reviewer_user_id": str(case.reviewer_user_id) if case.reviewer_user_id else None,
+        "investigation_notes": case.investigation_notes,
         "attachments": attachments,
         "history": history,
         "opened_at": _iso(case.opened_at),
@@ -172,6 +200,11 @@ def _evidence_json(evidence):
     return {
         "id": str(evidence.id),
         "case_id": str(evidence.case_id),
+        "owner_user_id": str(evidence.owner_user_id) if evidence.owner_user_id else None,
+        "created_by": str(evidence.created_by_user_id) if evidence.created_by_user_id else None,
+        "created_at": _iso(evidence.created_at),
+        "updated_at": _iso(evidence.updated_at),
+        "status": evidence.status,
         "evidence_number": evidence.evidence_number,
         "original_filename": evidence.original_filename,
         "storage_path": evidence.storage_path,
@@ -188,8 +221,8 @@ def _evidence_json(evidence):
 
 
 def _timeline_json(event):
-    case = _db().session.get(Case, event.case_id)
-    evidence = _db().session.get(Evidence, event.evidence_id) if event.evidence_id else None
+    case = _cached_model(Case, event.case_id)
+    evidence = _cached_model(Evidence, event.evidence_id)
     event_type = event.event_type or ""
     threat_weight = (
         15 if "evidence" in event_type else 12 if "report" in event_type else 10 if "observation" in event_type else 6
@@ -197,6 +230,11 @@ def _timeline_json(event):
     return {
         "id": str(event.id),
         "case_id": str(event.case_id),
+        "owner_user_id": str(event.owner_user_id) if event.owner_user_id else None,
+        "created_by": str(event.created_by_user_id) if event.created_by_user_id else None,
+        "created_at": _iso(event.created_at),
+        "updated_at": _iso(event.updated_at),
+        "status": event.status,
         "case_number": case.case_number if case else None,
         "evidence_id": str(event.evidence_id) if event.evidence_id else None,
         "evidence_number": evidence.evidence_number if evidence else None,
@@ -215,6 +253,11 @@ def _report_json(report):
     return {
         "id": str(report.id),
         "case_id": str(report.case_id),
+        "owner_user_id": str(report.owner_user_id) if report.owner_user_id else None,
+        "created_by": str(report.created_by_user_id) if report.created_by_user_id else None,
+        "created_at": _iso(report.created_at),
+        "updated_at": _iso(report.updated_at),
+        "status": report.status,
         "report_type": report.report_type,
         "version": report.version,
         "title": report.title,
@@ -296,21 +339,71 @@ def _is_admin() -> bool:
 def _owned_case_ids() -> set[UUID]:
     if _is_admin():
         return set()
-    return set(
-        _db().session.scalars(
-            select(Case.id).where(
-                Case.deleted_at.is_(None),
-                func.lower(Case.owner) == _current_username().lower(),
-            )
-        )
-    )
+    user_id = _current_user_id()
+    if user_id is None:
+        return set()
+    return set(_db().session.scalars(select(Case.id).where(Case.deleted_at.is_(None), Case.owner_user_id == user_id)))
 
 
 def _case_accessible(case_id: UUID) -> bool:
     if _is_admin():
         return True
     case = _db().session.get(Case, case_id)
-    return bool(case and (case.owner or "").lower() == _current_username().lower())
+    return bool(case and _current_user_id() is not None and case.owner_user_id == _current_user_id())
+
+
+def _stamp_owned(record, *, owner_user_id: UUID | None = None) -> None:
+    """Apply immutable creator and current owner metadata to a new record."""
+    actor = _current_user_id()
+    record.owner_user_id = owner_user_id or actor
+    record.created_by_user_id = actor
+    record.updated_at = utc_now()
+
+
+def _stamp_case_children(case_id: UUID) -> None:
+    """Stamp service-created evidence/timeline records from their parent case."""
+    session = _db().session
+    case = session.get(Case, case_id)
+    if case is None:
+        return
+    for model in (Evidence, TimelineEvent, Report, AIReasoning):
+        for record in session.scalars(select(model).where(model.case_id == case_id, model.owner_user_id.is_(None))):
+            _stamp_owned(record, owner_user_id=case.owner_user_id)
+    session.commit()
+
+
+def _save_conversation(
+    user_message: str, assistant_message: str, case_id: object = None, conversation_id: object = None
+) -> AIConversation:
+    parsed_case_id = None
+    try:
+        parsed_case_id = _uuid(str(case_id), "case_id") if case_id else None
+    except ValueError:
+        parsed_case_id = None
+    if parsed_case_id and not _case_accessible(parsed_case_id):
+        parsed_case_id = None
+    try:
+        thread_id = _uuid(str(conversation_id), "conversation_id") if conversation_id else uuid4()
+    except ValueError:
+        thread_id = uuid4()
+    existing = _db().session.scalar(
+        select(AIConversation)
+        .where(AIConversation.conversation_id == thread_id, AIConversation.owner_user_id == _current_user_id())
+        .limit(1)
+    )
+    title = existing.title if existing else (user_message.strip()[:80] or "New chat")
+    record = AIConversation(
+        owner_user_id=_current_user_id(),
+        conversation_id=thread_id,
+        title=title,
+        created_by_user_id=_current_user_id(),
+        case_id=parsed_case_id,
+        user_message=user_message,
+        assistant_message=assistant_message,
+    )
+    _db().session.add(record)
+    _db().session.commit()
+    return record
 
 
 def _forbidden(message: str = "You do not have access to this resource."):
@@ -349,8 +442,22 @@ def _apply_case_workspace_fields(case_id: UUID, data: dict[str, object]) -> Case
         if priority not in {"critical", "high", "medium", "low", "informational"}:
             raise ValueError("Case priority must be critical, high, medium, low, or informational.")
         case.priority = priority
-    if "owner" in data:
-        case.owner = _normalize_text(data.get("owner"), limit=255)
+    actor = _current_user_id()
+    if case.created_by_user_id is None:
+        case.created_by_user_id = actor
+    if case.owner_user_id is None:
+        case.owner_user_id = actor
+    if "owner" in data and _is_admin():
+        owner_name = _normalize_text(data.get("owner"), limit=255)
+        owner = _db().session.scalar(select(User).where(func.lower(User.username) == str(owner_name or "").lower()))
+        if owner_name and owner is None:
+            raise ValueError("Assigned owner was not found.")
+        case.owner = owner.username if owner else None
+        case.owner_user_id = owner.id if owner else None
+    elif not _is_admin():
+        case.owner = _current_username()
+        case.owner_user_id = actor
+    case.updated_at = utc_now()
     if "tags" in data:
         case.tags = _normalize_list(data.get("tags"))
     if "notes" in data:
@@ -413,7 +520,9 @@ def _set_setting(namespace: str, key: str, value: str, value_type: str = "string
 
 
 def _invalidate_dashboard_cache() -> None:
-    current_app.extensions.pop("cyberinvestigator_dashboard_cache", None)
+    for key in list(current_app.extensions):
+        if key.startswith(("cyberinvestigator_dashboard_cache", "cyberinvestigator_context_cache")):
+            current_app.extensions.pop(key, None)
 
 
 def _ai_runtime():
@@ -515,11 +624,18 @@ def _chat_system_prompt(route: str) -> str:
             + " Use the supplied current case, evidence, timeline, reports, threat score, conversation history, and uploads only as needed."
         )
     if route == "cybersecurity":
-        return base + " Answer the cybersecurity question directly without assuming a specific case unless the user asks."
-    return base + " Treat this as normal conversation. Do not force an investigation summary or mention case context unless asked."
+        return (
+            base + " Answer the cybersecurity question directly without assuming a specific case unless the user asks."
+        )
+    return (
+        base
+        + " Treat this as normal conversation. Do not force an investigation summary or mention case context unless asked."
+    )
 
 
-def _chat_user_payload(user_message: str, context: dict[str, object], history: list[dict[str, object]], route: str) -> str:
+def _chat_user_payload(
+    user_message: str, context: dict[str, object], history: list[dict[str, object]], route: str
+) -> str:
     clean_history = [
         {"role": str(item.get("role", ""))[:20], "content": str(item.get("content", ""))[:2000]}
         for item in history[-12:]
@@ -529,17 +645,59 @@ def _chat_user_payload(user_message: str, context: dict[str, object], history: l
         return json.dumps({"message": user_message, "history": clean_history}, default=str)
     if route == "cybersecurity":
         return json.dumps({"question": user_message, "history": clean_history}, default=str)
-    scoped = {
-        "case_id": context.get("case_id"),
-        "case_number": context.get("case_number"),
-        "title": context.get("title"),
-        "evidence": context.get("evidence", []),
-        "timeline": context.get("timeline", []),
-        "reports": context.get("reports", []),
+    scoped = _relevant_investigation_context(context, user_message)
+    return json.dumps({"request": user_message, "history": clean_history, "context": scoped}, default=str)
+
+
+def _relevant_investigation_context(context: dict[str, object], query: str) -> dict[str, object]:
+    """Compress case context and retain the records most relevant to the request."""
+    terms = {
+        term for term in re.findall(r"[a-z0-9_.:-]{3,}", query.lower()) if term not in {"the", "and", "for", "with"}
+    }
+    full_requested = any(phrase in query.lower() for phrase in ("all evidence", "entire timeline", "full report"))
+
+    def ranked(name: str, limit: int, fields: tuple[str, ...]) -> list[dict[str, object]]:
+        records = [item for item in context.get(name, []) if isinstance(item, dict)]
+        selected = records
+        if not full_requested:
+            scored = []
+            for index, item in enumerate(records):
+                searchable = " ".join(str(item.get(field) or "") for field in fields).lower()
+                score = sum(searchable.count(term) for term in terms)
+                scored.append((score, -index, item))
+            scored.sort(key=lambda item: (item[0], item[1]), reverse=True)
+            selected = [item[2] for item in scored[:limit]]
+        return [
+            {
+                field: (str(item.get(field))[:1200] if isinstance(item.get(field), str) else item.get(field))
+                for field in fields
+            }
+            for item in selected
+        ]
+
+    case = context.get("case") if isinstance(context.get("case"), dict) else {}
+    return {
+        "case": {
+            key: case.get(key)
+            for key in ("id", "case_number", "title", "description", "severity", "priority", "status")
+        },
+        "evidence": ranked(
+            "evidence", 8, ("evidence_number", "original_filename", "source_description", "analysis_summary", "sha256")
+        ),
+        "timeline": ranked("timeline", 12, ("event_type", "summary", "details")),
+        "reports": ranked("reports", 5, ("title", "report_type", "status")),
         "threat_score": context.get("threat_score"),
         "uploaded_evidence": context.get("uploaded_evidence", []),
     }
-    return json.dumps({"request": user_message, "history": clean_history, "context": scoped}, default=str)
+
+
+def _instant_chat_reply(message: str) -> str | None:
+    normalized = re.sub(r"[^a-z ]", "", message.lower()).strip()
+    if normalized in {"hi", "hello", "hey", "good morning", "good afternoon", "good evening"}:
+        return "Hello! How can I help with your investigation or cybersecurity question today?"
+    if normalized in {"thanks", "thank you", "thankyou"}:
+        return "You're welcome. Let me know what you'd like to investigate next."
+    return None
 
 
 def _chat_payload_from_request() -> tuple[dict[str, object], list[dict[str, object]] | None]:
@@ -552,6 +710,7 @@ def _chat_payload_from_request() -> tuple[dict[str, object], list[dict[str, obje
         document = {
             "message": request.form.get("message", ""),
             "case_id": request.form.get("case_id", ""),
+            "conversation_id": request.form.get("conversation_id", ""),
             "history": history,
         }
         uploads = []
@@ -590,6 +749,17 @@ def _register_chat_upload(upload, case_id: str) -> dict[str, object]:
         summary=f"Chat evidence {created.evidence_number} uploaded",
         details=created.original_filename,
     )
+    _stamp_case_children(parsed_case_id)
+    upload_record = Upload(
+        owner_user_id=_current_user_id(),
+        created_by_user_id=_current_user_id(),
+        case_id=parsed_case_id,
+        evidence_id=created.id,
+        filename=created.original_filename,
+        storage_path=created.storage_path,
+    )
+    _db().session.add(upload_record)
+    _db().session.commit()
     analysis_response = _analyze_evidence_record(str(created.id))
     analysis = analysis_response.get_json() if hasattr(analysis_response, "get_json") else None
     return {"evidence": _evidence_json(created), "analysis": analysis}
@@ -602,23 +772,25 @@ def _generate_chat_reply(
     uploads: list[dict[str, object]] | None = None,
 ) -> tuple[str | None, dict[str, object]]:
     registry, _, _ = _ai_runtime()
-    status = _provider_status()
     selected_provider = str(current_app.config.get("AI_PROVIDER", "ollama"))
-    selected_model = str(current_app.config.get("AI_MODEL") or status.get("model") or "qwen3:8b")
     route = _chat_route(user_message, uploads)
-    safe_message = user_message.replace("\r", " ").replace("\n", " ")[:500]
-    print(
-        "[AI DEBUG] Incoming User Message="
-        f"{safe_message!r} route={route} selected_provider={selected_provider} selected_model={selected_model}"
-    )
+    instant = _instant_chat_reply(user_message) if route == "general" else None
+    if instant:
+        return instant, {
+            "provider": "local",
+            "model": "instant",
+            "available": True,
+            "provider_called": False,
+            "route": route,
+            "response_id": None,
+            "usage": None,
+            "finish_reason": "completed",
+        }
+    status = _provider_status()
+    selected_model = str(current_app.config.get("AI_MODEL") or status.get("model") or "qwen3:8b")
     ai_disabled = not bool(current_app.config.get("AI_ENABLED", True))
     test_live_ai_disabled = bool(current_app.config.get("TESTING")) and not bool(current_app.config.get("AI_ENABLED"))
     if registry is None or ai_disabled or test_live_ai_disabled:
-        print(
-            "[AI DEBUG] provider_call=False "
-            f"provider={selected_provider} model={selected_model} response_id=n/a "
-            "input_tokens=n/a output_tokens=n/a latency_ms=0 finish_reason=not_configured_or_disabled"
-        )
         return (
             "No AI provider available. Ollama is not reachable, and no configured cloud provider can be used.",
             {
@@ -665,13 +837,14 @@ def _generate_chat_reply(
             },
         )
     except AIProviderUnavailable as error:
-        latency_ms = round((time.perf_counter() - started_at) * 1000, 2) if "started_at" in locals() else "n/a"
+        if registry is not None and "provider" in locals():
+            failed_name = (
+                provider.provider_name.value
+                if hasattr(provider.provider_name, "value")
+                else str(provider.provider_name)
+            )
+            registry.mark_unavailable(failed_name)
         current_app.logger.warning("AI chat provider failed: %s", error)
-        print(
-            "[AI DEBUG] provider_call=True "
-            f"provider={selected_provider} model={selected_model} response_id=n/a "
-            f"input_tokens=n/a output_tokens=n/a latency_ms={latency_ms} finish_reason=error"
-        )
         unavailable = "No AI provider available. Start Ollama locally or configure OpenAI, Gemini, or Perplexity."
         return unavailable, {
             **status,
@@ -684,13 +857,7 @@ def _generate_chat_reply(
             "message": "Configured AI provider could not complete the request.",
         }
     except Exception as error:
-        latency_ms = round((time.perf_counter() - started_at) * 1000, 2) if "started_at" in locals() else "n/a"
         current_app.logger.warning("AI chat provider failed: %s", error)
-        print(
-            "[AI DEBUG] provider_call=True "
-            f"provider={selected_provider} model={selected_model} response_id=n/a "
-            f"input_tokens=n/a output_tokens=n/a latency_ms={latency_ms} finish_reason=error"
-        )
         return (
             "I could not reach the configured AI provider for this request. "
             "Your case data and uploads were preserved. Check AI Provider settings or start Ollama locally.",
@@ -709,6 +876,61 @@ def _generate_chat_reply(
 
 def _sse(payload: dict[str, object]) -> str:
     return f"data: {json.dumps(payload, default=str)}\n\n"
+
+
+def _stream_provider_reply(
+    message: str,
+    context: dict[str, object],
+    history: list[dict[str, object]],
+    uploads: list[dict[str, object]] | None,
+):
+    registry, _, _ = _ai_runtime()
+    selected_provider = str(current_app.config.get("AI_PROVIDER", "ollama"))
+    route = _chat_route(message, uploads)
+    instant = _instant_chat_reply(message) if route == "general" else None
+    if instant:
+        return iter((instant,)), {
+            "provider": "local",
+            "model": "instant",
+            "available": True,
+            "provider_called": False,
+            "route": route,
+        }
+    status = _provider_status()
+    if registry is None or not bool(current_app.config.get("AI_ENABLED", True)):
+        raise AIProviderUnavailable("No AI provider available.")
+    provider = registry.select(selected_provider)
+    model = str(
+        getattr(provider, "model", None) or current_app.config.get("AI_MODEL") or status.get("model") or "qwen3:8b"
+    )
+    request_payload = AIRequest(
+        model=model,
+        messages=ai_messages(_chat_system_prompt(route), _chat_user_payload(message, context, history, route)),
+        temperature=float(current_app.config.get("AI_TEMPERATURE") or 0.2),
+        max_output_tokens=int(current_app.config.get("AI_MAX_TOKENS") or 1200),
+        stream=True,
+        metadata={"case_id": str(context.get("case_id") or "")},
+    )
+    provider_name = (
+        provider.provider_name.value if hasattr(provider.provider_name, "value") else str(provider.provider_name)
+    )
+    stream_status = {
+        **status,
+        "provider": provider_name,
+        "model": model,
+        "available": True,
+        "provider_called": True,
+        "route": route,
+    }
+
+    def resilient_stream():
+        try:
+            yield from provider.stream(request_payload)
+        except AIProviderUnavailable:
+            registry.mark_unavailable(provider_name)
+            raise
+
+    return resilient_stream(), stream_status
 
 
 def _tail_file(path: Path, *, lines: int = 80) -> list[str]:
@@ -871,7 +1093,11 @@ def _ai_completion(task: str, payload: dict[str, object], *, max_tokens: int = 7
         current_app.logger.warning("AI enrichment failed for %s; details suppressed.", task)
         return {
             "available": False,
-            "provider": {**status, "available": False, "message": "AI provider enrichment failed. Local fallback was used."},
+            "provider": {
+                **status,
+                "available": False,
+                "message": "AI provider enrichment failed. Local fallback was used.",
+            },
             "content": "AI enrichment is temporarily unavailable. Local deterministic analysis is available.",
         }
 
@@ -928,16 +1154,22 @@ def _investigation_context(case_id: str | None = None) -> dict[str, object]:
             parsed_case_id = _uuid(case_id, "case_id")
         except ValueError:
             parsed_case_id = None
+    cache_key = (
+        f"cyberinvestigator_context_cache:{_current_user_role()}:{_current_user_id()}:{parsed_case_id or 'latest'}"
+    )
+    cached = current_app.extensions.get(cache_key)
+    if cached and time.time() - cached["created_at"] < 10:
+        return json.loads(json.dumps(cached["payload"]))
     context_scope = [Case.deleted_at.is_(None)]
     if not _is_admin():
-        context_scope.append(func.lower(Case.owner) == _current_username().lower())
+        context_scope.append(Case.owner_user_id == _current_user_id())
     case = (
         session.get(Case, parsed_case_id)
         if parsed_case_id
         else session.scalar(select(Case).where(*context_scope).order_by(Case.opened_at.desc()).limit(1))
     )
     if case is None or not _case_accessible(case.id):
-        return {
+        empty = {
             "case_id": None,
             "case_number": None,
             "case": None,
@@ -946,6 +1178,8 @@ def _investigation_context(case_id: str | None = None) -> dict[str, object]:
             "reports": [],
             "plugins": [],
         }
+        current_app.extensions[cache_key] = {"created_at": time.time(), "payload": empty}
+        return empty
     evidence = [
         _evidence_json(item)
         for item in session.scalars(
@@ -972,15 +1206,18 @@ def _investigation_context(case_id: str | None = None) -> dict[str, object]:
         if _is_admin() and current_app.extensions.get("cyberinvestigator_plugin_registry")
         else []
     )
-    return {
+    payload = {
         "case_id": str(case.id),
         "case_number": case.case_number,
         "case": _case_json(case),
         "evidence": evidence,
         "timeline": timeline,
         "reports": reports,
+        "threat_score": min(100, len(timeline) * 10),
         "plugins": plugins,
     }
+    current_app.extensions[cache_key] = {"created_at": time.time(), "payload": payload}
+    return json.loads(json.dumps(payload))
 
 
 def _build_report_document(case_id: UUID, report_type: str, ai_summary: dict[str, object]) -> dict[str, object]:
@@ -1184,11 +1421,24 @@ def _simple_pdf(text: str) -> bytes:
 def _analyze_evidence_record(evidence_id: str):
     """Analyze one persisted evidence record and record the analysis event."""
     try:
-        evidence = _db().session.get(Evidence, _uuid(str(evidence_id), "evidence_id"))
+        payload = _run_evidence_analysis(evidence_id)
     except ValueError as error:
         return _json_error(str(error), 400)
+    except FileNotFoundError as error:
+        return _json_error(f"Evidence file could not be read: {error}", 400)
+    return jsonify(payload)
+
+
+def _run_evidence_analysis(evidence_id: str, job_id: str | None = None) -> dict[str, object]:
+    """Run the full forensic evidence analysis and return a JSON-safe payload."""
+    _update_analysis_job(job_id, 8, "Loading evidence record")
+    try:
+        evidence = _db().session.get(Evidence, _uuid(str(evidence_id), "evidence_id"))
+    except ValueError as error:
+        raise ValueError(str(error)) from error
     if evidence is None or evidence.deleted_at is not None:
-        return _json_error("Evidence was not found.", 404)
+        raise ValueError("Evidence was not found.")
+    _update_analysis_job(job_id, 16, "Reading custody file")
     path = Path(current_app.config["UPLOAD_FOLDER"]) / evidence.storage_path
     try:
         result = ForensicAnalyzer().analyze_path(
@@ -1196,9 +1446,11 @@ def _analyze_evidence_record(evidence_id: str):
             evidence_number=evidence.evidence_number,
             original_filename=evidence.original_filename,
             sha256=evidence.sha256,
+            progress=lambda value, step: _update_analysis_job(job_id, value, step),
         )
     except OSError as error:
-        return _json_error(f"Evidence file could not be read: {error}", 400)
+        raise FileNotFoundError(str(error)) from error
+    _update_analysis_job(job_id, 72, "Saving forensic findings")
     evidence.analysis_status = "completed"
     evidence.analysis_summary = result.summary
     evidence.analysis_report = json.dumps(result.report, default=str, indent=2)
@@ -1212,11 +1464,99 @@ def _analyze_evidence_record(evidence_id: str):
     )
     _invalidate_dashboard_cache()
     payload = {"summary": result.summary, "report": result.report}
+    _update_analysis_job(job_id, 88, "Generating AI report")
     payload["ai_explanation"] = _ai_completion(
         "Explain forensic evidence findings, encoding, compression, archive contents, hidden strings, flags, metadata, entropy, and next steps.",
         payload,
     )
-    return jsonify(payload)
+    _update_analysis_job(job_id, 100, "Completed")
+    return payload
+
+
+def _analysis_jobs() -> dict[str, dict[str, object]]:
+    return current_app.extensions.setdefault("cyberinvestigator_jobs", {})
+
+
+def _update_analysis_job(job_id: str | None, progress: int, step: str, **extra: object) -> None:
+    if not job_id:
+        return
+    job = _analysis_jobs().setdefault(job_id, {})
+    job.update({"progress": progress, "step": step, "updated_at": time.time(), **extra})
+
+
+def _start_evidence_analysis_job(evidence_id: str) -> dict[str, object]:
+    job_id = str(uuid4())
+    app = current_app._get_current_object()
+    _analysis_jobs()[job_id] = {
+        "id": job_id,
+        "type": "evidence_analysis",
+        "evidence_id": evidence_id,
+        "status": "queued",
+        "progress": 0,
+        "step": "Queued",
+        "created_at": time.time(),
+        "updated_at": time.time(),
+    }
+
+    def run() -> None:
+        with app.app_context():
+            try:
+                _update_analysis_job(job_id, 3, "Uploading", status="running")
+                payload = _run_evidence_analysis(evidence_id, job_id)
+                _update_analysis_job(job_id, 100, "Completed", status="completed", result=payload)
+            except Exception as error:
+                current_app.logger.warning("Evidence analysis job failed: %s", error)
+                _update_analysis_job(job_id, 100, "Failed", status="failed", error=str(error))
+
+    executor = current_app.extensions["cyberinvestigator_executor"]
+    executor.submit(run)
+    return _analysis_jobs()[job_id]
+
+
+def _start_report_enrichment_job(report_id: str, report_file: Path, context: dict[str, object]) -> dict[str, object]:
+    """Enrich an already-created local report without blocking its request."""
+    job_id = str(uuid4())
+    app = current_app._get_current_object()
+    _analysis_jobs()[job_id] = {
+        "id": job_id,
+        "type": "report_generation",
+        "report_id": report_id,
+        "status": "queued",
+        "progress": 0,
+        "step": "Queued",
+        "created_at": time.time(),
+        "updated_at": time.time(),
+    }
+
+    def run() -> None:
+        with app.app_context():
+            try:
+                _update_analysis_job(job_id, 15, "Generating AI narrative", status="running")
+                ai_summary = _ai_completion(
+                    "Create an investigation report narrative with executive summary, investigation summary, "
+                    "evidence, timeline, threat score, IOCs, MITRE ATT&CK, recommendations, appendix, and charts.",
+                    context,
+                    max_tokens=1200,
+                )
+                document = json.loads(report_file.read_text(encoding="utf-8"))
+                document["ai_explanation"] = ai_summary
+                document["ai_summary"] = ai_summary
+                report_file.write_text(json.dumps(document, indent=2, default=str), encoding="utf-8")
+                report = _db().session.get(Report, UUID(report_id))
+                if report:
+                    report.status = "completed"
+                    _db().session.commit()
+                _update_analysis_job(job_id, 100, "Completed", status="completed")
+            except Exception as error:
+                current_app.logger.warning("Report enrichment job failed: %s", error)
+                report = _db().session.get(Report, UUID(report_id))
+                if report:
+                    report.status = "completed_local"
+                    _db().session.commit()
+                _update_analysis_job(job_id, 100, "Failed", status="failed", error=str(error))
+
+    current_app.extensions["cyberinvestigator_executor"].submit(run)
+    return _analysis_jobs()[job_id]
 
 
 @api_v1_blueprint.get("/ai/status")
@@ -1274,12 +1614,18 @@ def ai_chat():  # type: ignore[no-untyped-def]
     registry, assistant, _ = _ai_runtime()
     if assistant is None:
         response = "The local investigation assistant is unavailable, but the application remains operational."
+        _save_conversation(user_message, response, document.get("case_id"), document.get("conversation_id"))
         return jsonify({"available": False, "reply": response, "message": response, "analysis": {}})
 
     history = document.get("history", [])
     if not isinstance(history, list):
         history = []
-    context = _investigation_context(str(document.get("case_id") or "") or None)
+    route = _chat_route(user_message, uploads)
+    context = (
+        _investigation_context(str(document.get("case_id") or "") or None)
+        if route == "investigation"
+        else {"case_id": None, "evidence": [], "timeline": [], "reports": [], "plugins": []}
+    )
     if uploads:
         context["uploaded_evidence"] = uploads
         context["evidence"] = _investigation_context(str(context.get("case_id") or "") or None).get(
@@ -1293,6 +1639,9 @@ def ai_chat():  # type: ignore[no-untyped-def]
         provider_reply=provider_reply,
         provider_status=status,
     )
+    conversation = _save_conversation(
+        user_message, str(payload["reply"]), context.get("case_id"), document.get("conversation_id")
+    )
     return jsonify(
         {
             "available": bool(status.get("available")),
@@ -1303,8 +1652,111 @@ def ai_chat():  # type: ignore[no-untyped-def]
             "context": context,
             "uploads": uploads or [],
             "provider_status": status,
+            "conversation_id": str(conversation.id),
         }
     )
+
+
+@api_v1_blueprint.get("/ai/conversations")
+def list_ai_conversations():  # type: ignore[no-untyped-def]
+    statement = select(AIConversation).order_by(AIConversation.created_at.desc())
+    if not _is_admin():
+        statement = statement.where(AIConversation.owner_user_id == _current_user_id())
+    owner = request.args.get("owner_user_id")
+    if owner and _is_admin():
+        try:
+            statement = statement.where(AIConversation.owner_user_id == _uuid(owner, "owner_user_id"))
+        except ValueError as error:
+            return _json_error(str(error), 400)
+    search = _query_text()
+    turns = list(_db().session.scalars(statement.limit(500)))
+    grouped: dict[UUID, dict[str, object]] = {}
+    for item in turns:
+        if search and search not in f"{item.title} {item.user_message} {item.assistant_message}".lower():
+            continue
+        thread = grouped.setdefault(
+            item.conversation_id,
+            {
+                "id": str(item.conversation_id),
+                "title": item.title,
+                "owner_user_id": str(item.owner_user_id) if item.owner_user_id else None,
+                "case_id": str(item.case_id) if item.case_id else None,
+                "created_at": _iso(item.created_at),
+                "updated_at": _iso(item.updated_at),
+                "message_count": 0,
+            },
+        )
+        thread["message_count"] = int(thread["message_count"]) + 2
+        if str(item.updated_at) > str(thread["updated_at"]):
+            thread["updated_at"] = _iso(item.updated_at)
+    items = sorted(grouped.values(), key=lambda item: str(item["updated_at"]), reverse=True)
+    return jsonify({"items": items})
+
+
+def _conversation_scope(conversation_id: str):
+    parsed = _uuid(conversation_id, "conversation_id")
+    statement = select(AIConversation).where(AIConversation.conversation_id == parsed)
+    if not _is_admin():
+        statement = statement.where(AIConversation.owner_user_id == _current_user_id())
+    return parsed, statement
+
+
+@api_v1_blueprint.get("/ai/conversations/<conversation_id>")
+def get_ai_conversation(conversation_id: str):  # type: ignore[no-untyped-def]
+    try:
+        parsed, statement = _conversation_scope(conversation_id)
+    except ValueError as error:
+        return _json_error(str(error), 400)
+    turns = list(_db().session.scalars(statement.order_by(AIConversation.created_at.asc())))
+    if not turns:
+        return _json_error("Conversation was not found.", 404)
+    messages = []
+    for turn in turns:
+        messages.extend(
+            ({"role": "user", "content": turn.user_message}, {"role": "assistant", "content": turn.assistant_message})
+        )
+    return jsonify(
+        {
+            "id": str(parsed),
+            "title": turns[0].title,
+            "case_id": str(turns[-1].case_id) if turns[-1].case_id else None,
+            "messages": messages,
+        }
+    )
+
+
+@api_v1_blueprint.patch("/ai/conversations/<conversation_id>")
+def rename_ai_conversation(conversation_id: str):  # type: ignore[no-untyped-def]
+    try:
+        _, statement = _conversation_scope(conversation_id)
+    except ValueError as error:
+        return _json_error(str(error), 400)
+    title = _normalize_text((request.get_json(silent=True) or {}).get("title"), limit=255)
+    if not title:
+        return _json_error("A conversation title is required.", 400)
+    turns = list(_db().session.scalars(statement))
+    if not turns:
+        return _json_error("Conversation was not found.", 404)
+    for turn in turns:
+        turn.title = title
+        turn.updated_at = utc_now()
+    _db().session.commit()
+    return jsonify({"id": conversation_id, "title": title})
+
+
+@api_v1_blueprint.delete("/ai/conversations/<conversation_id>")
+def delete_ai_conversation(conversation_id: str):  # type: ignore[no-untyped-def]
+    try:
+        _, statement = _conversation_scope(conversation_id)
+    except ValueError as error:
+        return _json_error(str(error), 400)
+    turns = list(_db().session.scalars(statement))
+    if not turns:
+        return _json_error("Conversation was not found.", 404)
+    for turn in turns:
+        _db().session.delete(turn)
+    _db().session.commit()
+    return jsonify({"deleted": True})
 
 
 @api_v1_blueprint.post("/ai/chat/stream")
@@ -1320,29 +1772,47 @@ def ai_chat_stream():  # type: ignore[no-untyped-def]
                 return
             history = document.get("history", [])
             history = history if isinstance(history, list) else []
-            context = _investigation_context(str(document.get("case_id") or "") or None)
+            route = _chat_route(message, uploads)
+            context = (
+                _investigation_context(str(document.get("case_id") or "") or None)
+                if route == "investigation"
+                else {"case_id": None, "evidence": [], "timeline": [], "reports": [], "plugins": []}
+            )
             if uploads:
                 context["uploaded_evidence"] = uploads
                 context["evidence"] = _investigation_context(str(context.get("case_id") or "") or None).get(
                     "evidence", context.get("evidence", [])
                 )
-            registry, assistant, _ = _ai_runtime()
-            provider_reply, status = _generate_chat_reply(message, context, history, uploads)
-            if assistant is None:
-                reply = provider_reply or "AI assistant is unavailable, but the application remains operational."
-            else:
-                payload = assistant.respond(
-                    message=message, case_context=context, provider_reply=provider_reply, provider_status=status
-                )
-                reply = payload["reply"]
-            for index in range(0, len(reply), 80):
-                yield _sse({"type": "token", "content": reply[index : index + 80]})
+            _, assistant, _ = _ai_runtime()
+            reply = ""
+            try:
+                chunks, status = _stream_provider_reply(message, context, history, uploads)
+                for chunk in chunks:
+                    reply += chunk
+                    yield _sse({"type": "token", "content": chunk})
+                if assistant is not None:
+                    assistant.respond(
+                        message=message, case_context=context, provider_reply=reply, provider_status=status
+                    )
+            except AIProviderUnavailable:
+                provider_reply, status = _generate_chat_reply(message, context, history, uploads)
+                if assistant is None:
+                    reply = provider_reply or "AI assistant is unavailable, but the application remains operational."
+                else:
+                    payload = assistant.respond(
+                        message=message, case_context=context, provider_reply=provider_reply, provider_status=status
+                    )
+                    reply = payload["reply"]
+                for index in range(0, len(reply), 80):
+                    yield _sse({"type": "token", "content": reply[index : index + 80]})
+            conversation = _save_conversation(message, reply, context.get("case_id"), document.get("conversation_id"))
             yield _sse(
                 {
                     "type": "done",
                     "available": bool(status.get("available")),
                     "provider_status": status,
                     "uploads": uploads or [],
+                    "conversation_id": str(conversation.conversation_id),
                 }
             )
         except Exception as error:
@@ -1544,7 +2014,7 @@ def upload_plugin():  # type: ignore[no-untyped-def]
             with zipfile.ZipFile(BytesIO(upload.read())) as archive:
                 for member in archive.infolist():
                     target = (destination / member.filename).resolve()
-                    if not str(target).startswith(str(destination)):
+                    if not target.is_relative_to(destination):
                         return _json_error("Plugin archive contains an unsafe path.", 400)
                 archive.extractall(destination)
         except zipfile.BadZipFile:
@@ -1574,6 +2044,8 @@ def plugin_lifecycle(plugin_id: str, action: str):  # type: ignore[no-untyped-de
             record = loader._get_loaded(plugin_id)
             loader.validate_manifest(record.manifest)
             loader.validate_plugin(record.plugin, record.manifest)
+        elif action == "update":
+            loader.reload(plugin_id)
         elif action == "delete":
             record = loader._get_loaded(plugin_id)
             plugin_dir = record.manifest.module_file.parent.resolve()
@@ -1590,10 +2062,23 @@ def plugin_lifecycle(plugin_id: str, action: str):  # type: ignore[no-untyped-de
 
 @api_v1_blueprint.get("/cases")
 def list_cases():  # type: ignore[no-untyped-def]
-    cases = [_case_json(case) for case in _case_service().list_cases(include_archived=True)]
+    include_related = request.args.get("include_related") == "true"
+    statement = select(Case).where(Case.deleted_at.is_(None)).order_by(Case.opened_at.desc())
     if not _is_admin():
-        username = _current_username().lower()
-        cases = [case for case in cases if (case.get("owner") or "").lower() == username]
+        statement = statement.where(Case.owner_user_id == _current_user_id())
+    records = list(_db().session.scalars(statement))
+    cases = [_case_json(case, include_related=include_related) for case in records]
+    case_ids = [case.id for case in records]
+    counts: dict[str, dict[UUID, int]] = {"evidence_count": {}, "timeline_count": {}, "report_count": {}}
+    if case_ids:
+        for key, model in (("evidence_count", Evidence), ("timeline_count", TimelineEvent), ("report_count", Report)):
+            rows = _db().session.execute(
+                select(model.case_id, func.count()).where(model.case_id.in_(case_ids)).group_by(model.case_id)
+            )
+            counts[key] = {case_id: int(total) for case_id, total in rows}
+    for item, record in zip(cases, records, strict=True):
+        for key in counts:
+            item[key] = counts[key].get(record.id, 0)
     query = _query_text()
     status = request.args.get("status", "all")
     priority = request.args.get("priority", "all")
@@ -1649,6 +2134,7 @@ def create_case():  # type: ignore[no-untyped-def]
             summary=f"Case {created.case_number} created",
             details=created.title,
         )
+        _stamp_case_children(created.id)
         _invalidate_dashboard_cache()
         return jsonify(_case_json(case_record)), 201
     except (ValueError, CaseManagementError) as error:
@@ -1683,6 +2169,7 @@ def update_case(case_id: str):  # type: ignore[no-untyped-def]
             summary=f"Case {case_record.case_number} updated",
             details="Case details, owner, priority, tags, notes, or relationships were updated.",
         )
+        _stamp_case_children(parsed_case_id)
         _invalidate_dashboard_cache()
         return jsonify(_case_json(case_record))
     except (ValueError, CaseManagementError) as error:
@@ -1699,15 +2186,25 @@ def case_action(case_id: str, action: str):  # type: ignore[no-untyped-def]
         if action == "delete" and not _is_admin():
             return _forbidden("Only administrators can delete investigations.")
         if action == "close":
-            case = service.close_case(parsed)
+            service.close_case(parsed)
+            record = _db().session.get(Case, parsed)
+            if record:
+                record.status = "closed"
         elif action == "archive":
-            case = service.archive_case(parsed)
+            service.archive_case(parsed)
+            record = _db().session.get(Case, parsed)
+            if record:
+                record.status = "archived"
         elif action == "delete":
-            case = service.delete_case(parsed)
+            service.delete_case(parsed)
+            record = _db().session.get(Case, parsed)
+            if record:
+                record.status = "deleted"
         else:
             return _json_error("Unsupported case action.", 404)
         _invalidate_dashboard_cache()
-        return jsonify(_case_json(case))
+        _db().session.commit()
+        return jsonify(_case_json(_db().session.get(Case, parsed)))
     except (ValueError, CaseManagementError) as error:
         return _json_error(str(error), 400)
 
@@ -1790,8 +2287,9 @@ def create_evidence():  # type: ignore[no-untyped-def]
             summary=f"Evidence {created.evidence_number} added",
             details=created.original_filename,
         )
+        _stamp_case_children(created.case_id)
         _invalidate_dashboard_cache()
-        return jsonify(_evidence_json(created)), 201
+        return jsonify(_evidence_json(_db().session.get(Evidence, created.id))), 201
     except (ValueError, CaseManagementError, EvidenceManagementError) as error:
         return _json_error(str(error), 400)
 
@@ -1819,6 +2317,30 @@ def evidence_analysis(evidence_id: str):  # type: ignore[no-untyped-def]
     if evidence is None or not _case_accessible(evidence.case_id):
         return _forbidden()
     return _analyze_evidence_record(evidence_id)
+
+
+@api_v1_blueprint.post("/evidence/<evidence_id>/analysis-jobs")
+def start_evidence_analysis(evidence_id: str):  # type: ignore[no-untyped-def]
+    """Queue evidence analysis and immediately return progress metadata."""
+    try:
+        evidence = _db().session.get(Evidence, _uuid(evidence_id, "evidence_id"))
+    except ValueError as error:
+        return _json_error(str(error), 400)
+    if evidence is None or not _case_accessible(evidence.case_id):
+        return _forbidden()
+    evidence.analysis_status = "running"
+    _db().session.commit()
+    job = _start_evidence_analysis_job(evidence_id)
+    return jsonify(job), 202
+
+
+@api_v1_blueprint.get("/evidence/analysis-jobs/<job_id>")
+def evidence_analysis_job(job_id: str):  # type: ignore[no-untyped-def]
+    """Return current progress for an evidence-analysis background job."""
+    job = _analysis_jobs().get(job_id)
+    if job is None:
+        return _json_error("Analysis job was not found.", 404)
+    return jsonify(job)
 
 
 @api_v1_blueprint.get("/evidence/export")
@@ -1946,8 +2468,9 @@ def create_timeline_event():  # type: ignore[no-untyped-def]
             summary=str(data.get("summary", "")),
             details=data.get("details"),
         )
+        _stamp_case_children(parsed_case_id)
         _invalidate_dashboard_cache()
-        return jsonify(_timeline_json(event)), 201
+        return jsonify(_timeline_json(_db().session.get(TimelineEvent, event.id))), 201
     except (ValueError, Exception) as error:
         return _json_error(str(error), 400)
 
@@ -1998,20 +2521,23 @@ def create_report():  # type: ignore[no-untyped-def]
         )
         report = Report(
             case_id=case_id,
+            owner_user_id=case.owner_user_id,
+            created_by_user_id=_current_user_id(),
             report_type=report_type,
             version=version,
             title=str(data.get("title") or f"{case.case_number} {report_type.title()} Report v{version}"),
             storage_path=storage_path,
+            status="generating",
         )
         session.add(report)
         session.commit()
         report_file = Path(current_app.config["REPORTS_FOLDER"]) / storage_path
         context = _investigation_context(str(case_id))
-        ai_summary = _ai_completion(
-            "Create an investigation report narrative with executive summary, investigation summary, evidence, timeline, threat score, IOCs, MITRE ATT&CK, recommendations, appendix, and charts.",
-            context,
-            max_tokens=1200,
-        )
+        ai_summary = {
+            "available": False,
+            "provider": {"provider": "pending", "message": "AI enrichment is queued."},
+            "content": "AI enrichment is queued. The deterministic forensic report is ready now.",
+        }
         document = _build_report_document(case_id, report_type, ai_summary)
         document["report"] = _report_json(report)
         document["ai_summary"] = ai_summary
@@ -2023,8 +2549,12 @@ def create_report():  # type: ignore[no-untyped-def]
             storage_path=storage_path,
             event_type="report.generated",
         )
+        _stamp_case_children(case_id)
         _invalidate_dashboard_cache()
-        return jsonify(_report_json(report)), 201
+        job = _start_report_enrichment_job(str(report.id), report_file, context)
+        payload = _report_json(report)
+        payload["generation_job"] = job
+        return jsonify(payload), 201
     except ValueError as error:
         return _json_error(str(error), 400)
 
@@ -2131,6 +2661,29 @@ def export_report(report_id: str):  # type: ignore[no-untyped-def]
             _simple_pdf(_report_markdown(document)),
             mimetype="application/pdf",
             headers={"Content-Disposition": f"attachment; filename={base_name}.pdf"},
+        )
+    if export_format == "zip":
+        package = BytesIO()
+        with zipfile.ZipFile(package, "w", zipfile.ZIP_DEFLATED) as archive:
+            archive.writestr(f"{base_name}.json", json.dumps(document, indent=2, default=str))
+            archive.writestr(f"{base_name}.md", _report_markdown(document))
+            archive.writestr(f"{base_name}.html", _report_html(document))
+            archive.writestr(
+                "manifest.json",
+                json.dumps(
+                    {
+                        "report_id": str(report.id),
+                        "case_id": str(report.case_id),
+                        "generated_at": _iso(report.generated_at),
+                        "contents": [f"{base_name}.json", f"{base_name}.md", f"{base_name}.html"],
+                    },
+                    indent=2,
+                ),
+            )
+        return Response(
+            package.getvalue(),
+            mimetype="application/zip",
+            headers={"Content-Disposition": f"attachment; filename={base_name}.zip"},
         )
     return Response(
         json.dumps(document, indent=2, default=str),
@@ -2490,31 +3043,95 @@ def secrets_inventory():  # type: ignore[no-untyped-def]
     return jsonify({"configured": configured, "external_references": refs, "values_exposed": False})
 
 
+@api_v1_blueprint.get("/admin/investigations")
+@require_role("admin")
+def admin_investigations():  # type: ignore[no-untyped-def]
+    """List every investigation with optional durable owner/reviewer filters."""
+    statement = select(Case).where(Case.deleted_at.is_(None)).order_by(Case.opened_at.desc())
+    for argument, column in (("owner_user_id", Case.owner_user_id), ("reviewer_user_id", Case.reviewer_user_id)):
+        value = request.args.get(argument)
+        if value:
+            try:
+                statement = statement.where(column == _uuid(value, argument))
+            except ValueError as error:
+                return _json_error(str(error), 400)
+    review_status = request.args.get("review_status")
+    if review_status:
+        statement = statement.where(Case.review_status == review_status)
+    items = [_case_json(item, include_related=False) for item in _db().session.scalars(statement)]
+    return jsonify(_page(items, total=len(items)))
+
+
+@api_v1_blueprint.patch("/admin/investigations/<case_id>/review")
+@require_role("admin")
+def review_investigation(case_id: str):  # type: ignore[no-untyped-def]
+    """Approve/reject an investigation, assign its reviewer, and retain review notes."""
+    try:
+        case = _db().session.get(Case, _uuid(case_id, "case_id"))
+    except ValueError as error:
+        return _json_error(str(error), 400)
+    if case is None or case.deleted_at is not None:
+        return _json_error("Case was not found.", 404)
+    data = request.get_json(silent=True) or {}
+    decision = str(data.get("decision", case.review_status)).lower()
+    if decision not in {"pending", "in_review", "approved", "rejected"}:
+        return _json_error("decision must be pending, in_review, approved, or rejected.", 400)
+    reviewer_id = data.get("reviewer_user_id")
+    if reviewer_id is not None:
+        try:
+            reviewer = _db().session.get(User, _uuid(str(reviewer_id), "reviewer_user_id")) if reviewer_id else None
+        except ValueError as error:
+            return _json_error(str(error), 400)
+        if reviewer_id and reviewer is None:
+            return _json_error("Reviewer was not found.", 404)
+        case.reviewer_user_id = reviewer.id if reviewer else None
+    if "notes" in data:
+        case.investigation_notes = _normalize_text(data.get("notes"), limit=20_000)
+    case.review_status = decision
+    case.updated_at = utc_now()
+    _db().session.add(
+        AuditLog(
+            user_id=_current_user_id(),
+            username=_current_username(),
+            role="admin",
+            action=f"investigation.review.{decision}",
+            result="success",
+            affected_object=case.case_number,
+            reason=case.investigation_notes,
+        )
+    )
+    _db().session.commit()
+    return jsonify(_case_json(case, include_related=False))
+
+
 @api_v1_blueprint.get("/notifications")
 def list_notifications():  # type: ignore[no-untyped-def]
     session = _db().session
     q = _query_text()
     category = request.args.get("category", "all")
-    items = list(
-        session.scalars(
-            select(Notification)
-            .where(Notification.archived.is_(False))
-            .where(
-                True
-                if _is_admin()
-                else (
-                    (Notification.user_id.is_(None) & Notification.category.not_in(["security", "database", "plugins"]))
-                    | (Notification.user_id == _current_user_id())
-                )
-            )
-            .order_by(Notification.pinned.desc(), Notification.created_at.desc())
-            .limit(200)
-        )
+    include_archived = request.args.get("archived", "false").lower() in {"1", "true", "yes"}
+    priority = request.args.get("priority", "all")
+    statement = (
+        select(Notification)
+        .where(Notification.archived.is_(include_archived))
+        .order_by(Notification.pinned.desc(), Notification.created_at.desc())
+        .limit(200)
     )
+    if not _is_admin():
+        statement = statement.where(Notification.owner_user_id == _current_user_id())
+    owner = request.args.get("owner_user_id")
+    if owner and _is_admin():
+        try:
+            statement = statement.where(Notification.owner_user_id == _uuid(owner, "owner_user_id"))
+        except ValueError as error:
+            return _json_error(str(error), 400)
+    items = list(session.scalars(statement))
     if category != "all":
         items = [item for item in items if item.category == category]
     if q:
         items = [item for item in items if q in f"{item.title} {item.message}".lower()]
+    if priority != "all":
+        items = [item for item in items if item.priority == priority]
     payload = [
         {
             "id": str(item.id),
@@ -2524,20 +3141,115 @@ def list_notifications():  # type: ignore[no-untyped-def]
             "priority": item.priority,
             "read": item.read,
             "pinned": item.pinned,
+            "archived": item.archived,
+            "status": item.status,
+            "owner_user_id": str(item.owner_user_id) if item.owner_user_id else None,
+            "created_by": str(item.created_by_user_id) if item.created_by_user_id else None,
             "created_at": _iso(item.created_at),
+            "updated_at": _iso(item.updated_at),
         }
         for item in items
     ]
     return jsonify({"unread_count": sum(1 for item in items if not item.read), "items": payload})
 
 
+@api_v1_blueprint.get("/account")
+def account_workspace():  # type: ignore[no-untyped-def]
+    """Return only the authenticated user's settings, sessions, history, and usage."""
+    user_id = _current_user_id()
+    if user_id is None:
+        return _json_error("Authenticated user account was not found.", 401)
+    session = _db().session
+    account = session.get(User, user_id)
+    if account is None:
+        return _json_error("Authenticated user account was not found.", 404)
+    sessions = list(
+        session.scalars(
+            select(UserSession)
+            .where(UserSession.owner_user_id == user_id)
+            .order_by(UserSession.created_at.desc())
+            .limit(100)
+        )
+    )
+    activity = list(
+        session.scalars(
+            select(AuditLog).where(AuditLog.user_id == user_id).order_by(AuditLog.created_at.desc()).limit(100)
+        )
+    )
+    conversations = (
+        session.scalar(select(func.count()).select_from(AIConversation).where(AIConversation.owner_user_id == user_id))
+        or 0
+    )
+    exports = sum(1 for item in activity if "export" in item.action)
+    namespace = f"user:{user_id}"
+    preferences = {
+        item.key: item.value for item in session.scalars(select(Setting).where(Setting.namespace == namespace))
+    }
+    return jsonify(
+        {
+            "profile": _user_json(account),
+            "sessions": [
+                {
+                    "id": str(item.id),
+                    "status": item.status,
+                    "active": item.active,
+                    "ip_address": item.ip_address,
+                    "user_agent": item.user_agent,
+                    "created_at": _iso(item.created_at),
+                    "updated_at": _iso(item.updated_at),
+                    "last_seen_at": _iso(item.last_seen_at),
+                    "expires_at": _iso(item.expires_at),
+                }
+                for item in sessions
+            ],
+            "login_history": [_audit_log_json(item) for item in activity if item.action.startswith("auth.")],
+            "recent_activity": [_audit_log_json(item) for item in activity],
+            "api_usage": {"ai_conversations": conversations, "exports": exports, "requests_recorded": len(activity)},
+            "preferences": preferences,
+        }
+    )
+
+
+@api_v1_blueprint.patch("/account/preferences")
+def update_account_preferences():  # type: ignore[no-untyped-def]
+    user_id = _current_user_id()
+    if user_id is None:
+        return _json_error("Authenticated user account was not found.", 401)
+    data = request.get_json(silent=True) or {}
+    allowed = {"theme", "investigation_notifications", "security_notifications", "timezone", "locale"}
+    for key, value in data.items():
+        if key not in allowed:
+            return _json_error(f"Unsupported preference: {key}.", 400)
+        _set_setting(f"user:{user_id}", key, json.dumps(value), "json")
+    _db().session.commit()
+    return account_workspace()
+
+
+@api_v1_blueprint.delete("/account/sessions/<session_id>")
+def revoke_account_session(session_id: str):  # type: ignore[no-untyped-def]
+    try:
+        record = _db().session.get(UserSession, _uuid(session_id, "session_id"))
+    except ValueError as error:
+        return _json_error(str(error), 400)
+    if record is None:
+        return _json_error("Session was not found.", 404)
+    if not _is_admin() and record.owner_user_id != _current_user_id():
+        return _forbidden()
+    record.active = False
+    record.status = "revoked"
+    record.updated_at = utc_now()
+    _db().session.commit()
+    return account_workspace()
+
+
 @api_v1_blueprint.post("/notifications/read")
 def mark_notifications_read():  # type: ignore[no-untyped-def]
     statement = select(Notification).where(Notification.read.is_(False))
     if not _is_admin():
-        statement = statement.where(Notification.user_id == _current_user_id())
+        statement = statement.where(Notification.owner_user_id == _current_user_id())
     for item in _db().session.scalars(statement):
         item.read = True
+        item.status = "read"
     _db().session.commit()
     return list_notifications()
 
@@ -2551,9 +3263,41 @@ def archive_notification(notification_id: str):  # type: ignore[no-untyped-def]
     item = _db().session.get(Notification, parsed_id)
     if item is None:
         return _json_error("Notification was not found.", 404)
-    if not _is_admin() and item.user_id not in {None, _current_user_id()}:
+    if not _is_admin() and item.owner_user_id != _current_user_id():
         return _forbidden()
     item.archived = True
+    item.status = "archived"
+    _db().session.commit()
+    return list_notifications()
+
+
+@api_v1_blueprint.post("/notifications/<notification_id>/read")
+def mark_notification_read(notification_id: str):  # type: ignore[no-untyped-def]
+    try:
+        item = _db().session.get(Notification, _uuid(notification_id, "notification_id"))
+    except ValueError as error:
+        return _json_error(str(error), 400)
+    if item is None:
+        return _json_error("Notification was not found.", 404)
+    if not _is_admin() and item.owner_user_id != _current_user_id():
+        return _forbidden()
+    item.read = True
+    item.status = "read"
+    _db().session.commit()
+    return list_notifications()
+
+
+@api_v1_blueprint.delete("/notifications/<notification_id>")
+def delete_notification(notification_id: str):  # type: ignore[no-untyped-def]
+    try:
+        item = _db().session.get(Notification, _uuid(notification_id, "notification_id"))
+    except ValueError as error:
+        return _json_error(str(error), 400)
+    if item is None:
+        return _json_error("Notification was not found.", 404)
+    if not _is_admin() and item.owner_user_id != _current_user_id():
+        return _forbidden()
+    _db().session.delete(item)
     _db().session.commit()
     return list_notifications()
 
@@ -2626,7 +3370,7 @@ def dashboard_snapshot():  # type: ignore[no-untyped-def]
 
     case_scope = [Case.deleted_at.is_(None)]
     if not _is_admin():
-        case_scope.append(func.lower(Case.owner) == _current_username().lower())
+        case_scope.append(Case.owner_user_id == _current_user_id())
 
     newest_case = session.scalar(select(Case).where(*case_scope).order_by(Case.opened_at.desc()).limit(1))
     active_cases = list(

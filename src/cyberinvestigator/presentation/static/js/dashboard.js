@@ -71,6 +71,42 @@ function initialiseEnterpriseUi() {
     });
   });
   refreshResponsiveTableLabels();
+  initialiseTableContextMenus();
+}
+
+function initialiseTableContextMenus() {
+  const menu = document.createElement("div");
+  menu.className = "soc-context-menu d-none";
+  menu.setAttribute("role", "menu");
+  document.body.append(menu);
+  const close = () => menu.classList.add("d-none");
+  document.addEventListener("click", close);
+  document.addEventListener("scroll", close, true);
+  document.addEventListener("contextmenu", (event) => {
+    const row = event.target.closest(".professional-table tbody tr");
+    if (!row || !row.children.length) return;
+    event.preventDefault();
+    const label = row.children[0]?.innerText?.trim() || "Selected row";
+    const actions = [...row.querySelectorAll("button, a")].filter((item) => !item.disabled);
+    const heading = document.createElement("div");
+    heading.className = "soc-context-heading";
+    heading.textContent = label;
+    const copy = document.createElement("button");
+    copy.type = "button"; copy.className = "soc-context-action";
+    copy.innerHTML = "<i class='bi bi-copy'></i><span>Copy row details</span>";
+    copy.addEventListener("click", async () => { await navigator.clipboard.writeText(row.innerText.trim()); showToast("Row details copied.", "success"); });
+    const available = actions.slice(0, 4).map((source) => {
+      const action = document.createElement("button");
+      action.type = "button"; action.className = "soc-context-action";
+      action.innerHTML = `<i class="bi bi-lightning-charge"></i><span>${source.textContent.trim() || source.title || "Open"}</span>`;
+      action.addEventListener("click", () => source.click());
+      return action;
+    });
+    menu.replaceChildren(heading, copy, ...available);
+    menu.style.left = `${Math.min(event.clientX, window.innerWidth - 230)}px`;
+    menu.style.top = `${Math.min(event.clientY, window.innerHeight - 220)}px`;
+    menu.classList.remove("d-none");
+  });
 }
 
 function refreshResponsiveTableLabels(root = document) {
@@ -164,8 +200,37 @@ async function initialiseNotifications() {
           showToast(error.message, "danger");
         }
       });
+      const read = document.createElement("button");
+      read.type = "button";
+      read.className = "btn btn-sm btn-link notification-read";
+      read.setAttribute("aria-label", `Mark ${item.title} read`);
+      read.innerHTML = "<i class='bi bi-check2'></i>";
+      read.disabled = Boolean(item.read);
+      read.addEventListener("click", async (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        try {
+          render(await api(`/api/v1/notifications/${item.id}/read`, { method: "POST" }));
+        } catch (error) {
+          showToast(error.message, "danger");
+        }
+      });
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "btn btn-sm btn-link text-danger notification-delete";
+      remove.setAttribute("aria-label", `Delete ${item.title}`);
+      remove.innerHTML = "<i class='bi bi-trash'></i>";
+      remove.addEventListener("click", async (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        try {
+          render(await api(`/api/v1/notifications/${item.id}`, { method: "DELETE" }));
+        } catch (error) {
+          showToast(error.message, "danger");
+        }
+      });
       body.append(title, message, meta);
-      row.append(icon, body, archive);
+      row.append(icon, body, read, archive, remove);
       return row;
       })];
     }));
@@ -234,7 +299,7 @@ function notificationIcon(category) {
 }
 
 async function initialisePreferences() {
-  applyTheme(localStorage.getItem("cyberinvestigator.theme") || "light");
+  applyTheme(localStorage.getItem("cyberinvestigator.theme") || "dark");
   document.querySelectorAll("#theme-toggle-top, #theme-toggle-profile").forEach((toggle) => toggle.addEventListener("click", () => {
     const nextTheme = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
     applyTheme(nextTheme);
@@ -345,9 +410,58 @@ async function initialiseAiChat() {
   const dropZone = document.querySelector("#chat-drop-zone");
   const uploadList = document.querySelector("#chat-upload-list");
   const conversationButton = document.querySelector("[data-ui-action='conversation']");
+  const conversationList = document.querySelector("#conversation-list");
+  const conversationSearch = document.querySelector("#conversation-search");
+  const stopButton = document.querySelector("#stop-generation");
   const attachmentButton = document.querySelector("[data-ui-action='attachment']");
-  const history = [];
+  let history = [];
+  let conversationId = crypto.randomUUID();
+  let generationController = null;
   let pendingFiles = [];
+
+  const loadConversations = async () => {
+    if (!conversationList) return;
+    const data = await api(`/api/v1/ai/conversations?q=${encodeURIComponent(conversationSearch?.value || "")}`);
+    if (!data.items.length) {
+      conversationList.innerHTML = "<div class='text-muted small'>No recent conversations.</div>";
+      return;
+    }
+    conversationList.replaceChildren(...data.items.map((item) => {
+      const row = document.createElement("div");
+      row.className = "compact-item conversation-item";
+      const open = document.createElement("button");
+      open.type = "button";
+      open.className = "btn btn-link text-start flex-grow-1";
+      open.textContent = item.title;
+      open.addEventListener("click", async () => {
+        const detail = await api(`/api/v1/ai/conversations/${item.id}`);
+        conversationId = detail.id;
+        history = detail.messages || [];
+        messages.replaceChildren();
+        history.forEach((entry) => appendChatMessage(messages, entry.role, entry.content));
+        if (detail.case_id && caseSelect) caseSelect.value = detail.case_id;
+      });
+      const rename = document.createElement("button");
+      rename.type = "button"; rename.className = "btn btn-sm btn-link"; rename.title = "Rename";
+      rename.innerHTML = "<i class='bi bi-pencil'></i>";
+      rename.addEventListener("click", async () => {
+        const title = window.prompt("Rename conversation", item.title);
+        if (!title?.trim()) return;
+        await api(`/api/v1/ai/conversations/${item.id}`, { method: "PATCH", body: JSON.stringify({ title: title.trim() }) });
+        await loadConversations();
+      });
+      const remove = document.createElement("button");
+      remove.type = "button"; remove.className = "btn btn-sm btn-link text-danger"; remove.title = "Delete";
+      remove.innerHTML = "<i class='bi bi-trash'></i>";
+      remove.addEventListener("click", async () => {
+        await api(`/api/v1/ai/conversations/${item.id}`, { method: "DELETE" });
+        if (conversationId === item.id) conversationButton?.click();
+        await loadConversations();
+      });
+      row.append(open, rename, remove);
+      return row;
+    }));
+  };
 
   try {
     await api("/api/v1/ai/status");
@@ -365,12 +479,15 @@ async function initialiseAiChat() {
   }
 
   conversationButton?.addEventListener("click", () => {
-    history.length = 0;
+    history = [];
+    conversationId = crypto.randomUUID();
     pendingFiles = [];
     renderChatUploads(uploadList, pendingFiles);
     renderChatState(messages, "bi bi-chat-square-text", "New conversation", "Send a message to begin.");
     showToast("New conversation started.", "success");
   });
+  conversationSearch?.addEventListener("input", () => loadConversations().catch(() => {}));
+  stopButton?.addEventListener("click", () => generationController?.abort());
   attachmentButton?.addEventListener("click", () => fileInput?.click());
   fileInput?.addEventListener("change", () => {
     pendingFiles = [...pendingFiles, ...Array.from(fileInput.files || [])];
@@ -405,16 +522,28 @@ async function initialiseAiChat() {
     appendChatMessage(messages, "user", message);
     input.value = "";
     const bubble = appendChatMessage(messages, "assistant", "_..._");
+    generationController = new AbortController();
+    stopButton?.classList.remove("d-none");
     try {
-      const reply = await streamChat(message, caseSelect?.value || "", history, pendingFiles, bubble);
-      history.push({ role: "user", content: message }, { role: "assistant", content: reply });
+      const result = await streamChat(message, caseSelect?.value || "", conversationId, history, pendingFiles, bubble, generationController.signal);
+      conversationId = result.conversationId || conversationId;
+      history.push({ role: "user", content: message }, { role: "assistant", content: result.reply });
+      addChatResponseActions(bubble, result.reply, () => { input.value = message; form.requestSubmit(); });
       pendingFiles = [];
       renderChatUploads(uploadList, pendingFiles);
+      await loadConversations();
     } catch (error) {
-      bubble.replaceChildren(markdownToFragment(`**Chat error:** ${error.message}`));
-      showToast(error.message, "danger");
+      if (error.name === "AbortError") showToast("Generation stopped.", "warning");
+      else {
+        bubble.replaceChildren(markdownToFragment(`**Chat error:** ${error.message}`));
+        showToast(error.message, "danger");
+      }
+    } finally {
+      generationController = null;
+      stopButton?.classList.add("d-none");
     }
   });
+  await loadConversations().catch(() => {});
 }
 
 function renderChatState(container, iconClass, titleText, bodyText) {
@@ -447,21 +576,23 @@ function appendChatMessage(container, role, markdown) {
   return bubble;
 }
 
-async function streamChat(message, caseId, history, files, target) {
+async function streamChat(message, caseId, conversationId, history, files, target, signal) {
   const body = new FormData();
   body.append("message", message);
   body.append("case_id", caseId);
+  body.append("conversation_id", conversationId);
   body.append("history", JSON.stringify(history));
   files.forEach((file) => body.append("files", file));
   const csrfToken = document.querySelector("meta[name='csrf-token']")?.content;
   const headers = { Accept: "text/event-stream" };
   if (csrfToken) headers["X-CSRF-Token"] = csrfToken;
-  const response = await fetch("/api/v1/ai/chat/stream", { method: "POST", headers, body });
+  const response = await fetch("/api/v1/ai/chat/stream", { method: "POST", headers, body, signal });
   if (!response.ok || !response.body) throw new Error(`Chat API returned HTTP ${response.status}`);
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
   let reply = "";
+  let persistedConversationId = conversationId;
   for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
@@ -476,10 +607,25 @@ async function streamChat(message, caseId, history, files, target) {
         target.replaceChildren(markdownToFragment(reply));
       } else if (payload.type === "error") {
         throw new Error(payload.message || "AI Chat failed.");
+      } else if (payload.type === "done") {
+        persistedConversationId = payload.conversation_id || persistedConversationId;
       }
     }
   }
-  return reply;
+  return { reply, conversationId: persistedConversationId };
+}
+
+function addChatResponseActions(bubble, reply, regenerate) {
+  const actions = document.createElement("div");
+  actions.className = "chat-response-actions";
+  const copy = document.createElement("button");
+  copy.type = "button"; copy.className = "btn btn-sm btn-link"; copy.innerHTML = "<i class='bi bi-copy'></i> Copy";
+  copy.addEventListener("click", async () => { await navigator.clipboard.writeText(reply); showToast("Response copied.", "success"); });
+  const retry = document.createElement("button");
+  retry.type = "button"; retry.className = "btn btn-sm btn-link"; retry.innerHTML = "<i class='bi bi-arrow-clockwise'></i> Regenerate";
+  retry.addEventListener("click", regenerate);
+  actions.append(copy, retry);
+  bubble.append(actions);
 }
 
 function renderChatUploads(target, files) {

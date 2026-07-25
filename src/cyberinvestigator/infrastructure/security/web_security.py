@@ -102,6 +102,10 @@ ENDPOINT_PERMISSIONS = {
     "api_v1.ai_status": ("ai.chat",),
     "api_v1.ai_chat": ("ai.chat",),
     "api_v1.ai_chat_stream": ("ai.chat",),
+    "api_v1.list_ai_conversations": ("ai.chat",),
+    "api_v1.get_ai_conversation": ("ai.chat",),
+    "api_v1.rename_ai_conversation": ("ai.chat",),
+    "api_v1.delete_ai_conversation": ("ai.chat",),
     "api_v1.ai_analyze": ("ai.chat",),
     "api_v1.ai_timeline_summary": ("ai.chat",),
     "api_v1.ai_explain_ioc": ("ai.chat",),
@@ -141,9 +145,16 @@ ENDPOINT_PERMISSIONS = {
     "api_v1.create_user": ("users.manage",),
     "api_v1.update_user": ("users.manage",),
     "api_v1.secrets_inventory": ("admin.access",),
+    "api_v1.admin_investigations": ("admin.access",),
+    "api_v1.review_investigation": ("admin.access",),
     "api_v1.list_notifications": ("dashboard.read",),
+    "api_v1.account_workspace": ("dashboard.read",),
+    "api_v1.update_account_preferences": ("dashboard.read",),
+    "api_v1.revoke_account_session": ("dashboard.read",),
     "api_v1.mark_notifications_read": ("dashboard.read",),
     "api_v1.archive_notification": ("dashboard.read",),
+    "api_v1.mark_notification_read": ("dashboard.read",),
+    "api_v1.delete_notification": ("dashboard.read",),
     "api_v1.security_soc": ("security.monitor",),
     "api_v1.security_alerts": ("security.monitor",),
     "api_v1.security_report": ("security.monitor",),
@@ -221,7 +232,8 @@ def register_web_security(app: Flask) -> None:
         response.headers.setdefault("X-Request-ID", getattr(g, "request_id", str(uuid4())))
         response.headers.setdefault("X-RateLimit-Limit", str(app.config.get("RATE_LIMIT_REQUESTS", 300)))
         response.headers.setdefault("X-RateLimit-Remaining", str(getattr(g, "rate_limit_remaining", 0)))
-        _audit(app, "request.completed", status=response.status_code)
+        if request.method not in SAFE_METHODS or response.status_code >= 400 or request.path.startswith("/admin"):
+            _audit(app, "request.completed", status=response.status_code)
         return response
 
     @app.context_processor
@@ -266,7 +278,18 @@ def _resolve_user(app: Flask) -> UserPrincipal:
     if bool(app.config.get("TESTING", False)) and request.headers.get("X-CI-Role"):
         role = _normalize_role(request.headers.get("X-CI-Role"))
         username = str(request.headers.get("X-CI-User") or "test-user")
-        return UserPrincipal(username, role, permissions=frozenset(SYSTEM_PERMISSIONS.get(role, set())))
+        database = app.extensions.get("cyberinvestigator_database")
+        account = (
+            database.session.scalar(select(User).where(func.lower(User.username) == username.lower()))
+            if database
+            else None
+        )
+        return UserPrincipal(
+            username,
+            role,
+            str(account.id) if account else None,
+            frozenset(SYSTEM_PERMISSIONS.get(role, set())),
+        )
     if bool(app.config.get("TESTING", False)) and not bool(app.config.get("AUTH_REQUIRED", True)):
         return UserPrincipal("investigator", "admin", permissions=frozenset(SYSTEM_PERMISSIONS["admin"]))
     database = app.extensions.get("cyberinvestigator_database")
@@ -522,6 +545,8 @@ def _open_user_session(app: Flask, user: User, *, remember: bool, action: str) -
     app.extensions["cyberinvestigator_database"].session.add(
         UserSession(
             user_id=user.id,
+            owner_user_id=user.id,
+            created_by_user_id=user.id,
             session_token_hash=_token_hash(token),
             ip_address=request.remote_addr,
             user_agent=request.headers.get("User-Agent"),
@@ -552,6 +577,8 @@ def logout_user(app: Flask) -> None:
         )
         if active:
             active.active = False
+            active.status = "closed"
+            active.updated_at = utc_now()
         user = database.session.get(User, _session_uuid(user_id)) if user_id else None
         database.session.add(
             AuditLog(
@@ -579,8 +606,12 @@ def _touch_session(app: Flask) -> bool:
     if not active or not active.active or expires_at <= now:
         session.clear()
         return False
-    active.last_seen_at = now
-    database.session.commit()
+    last_seen = _aware_utc(active.last_seen_at) if active.last_seen_at else None
+    if last_seen is None or (now - last_seen).total_seconds() >= 60:
+        active.last_seen_at = now
+        active.updated_at = now
+        active.status = "active"
+        database.session.commit()
     return True
 
 
