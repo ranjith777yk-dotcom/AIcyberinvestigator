@@ -16,7 +16,7 @@ dependencies = [
     "python-dotenv>=1.0,<2.0",
     "bcrypt>=4.2,<5.0",
     "cryptography>=48.0.1,<49.0",
-    "gunicorn>=23.0,<24.0; platform_system != 'Windows'",
+    "gunicorn>=23.0,<27.0; platform_system != 'Windows'",
 ]
 
 [project.optional-dependencies]
