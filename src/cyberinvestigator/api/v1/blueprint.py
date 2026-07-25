@@ -545,6 +545,18 @@ def _provider_status() -> dict[str, object]:
             "message": "AI runtime is unavailable.",
         }
     status = registry.status(provider)
+    if current_app.config.get("AI_ENABLED") and not status.available:
+        try:
+            selected = registry.select(provider)
+        except AIProviderUnavailable:
+            pass
+        else:
+            selected_name = (
+                selected.provider_name.value
+                if hasattr(selected.provider_name, "value")
+                else str(selected.provider_name)
+            )
+            status = registry.status(selected_name)
     test_live_ai_disabled = bool(current_app.config.get("TESTING")) and not bool(current_app.config.get("AI_ENABLED"))
     return {
         "provider": status.provider,
