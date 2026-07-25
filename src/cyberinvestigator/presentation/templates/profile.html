@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% block page_styles %}<link href="{{ url_for('static', filename='css/history_workspace.css') }}" rel="stylesheet">{% endblock %}
 {% block content %}
 <div data-module="profile">
   <div class="page-heading">
@@ -21,6 +22,7 @@
       <a href="#security" data-profile-page="security"><i class="bi bi-shield-lock"></i> Security</a>
       <a href="#change-password" data-profile-page="change-password"><i class="bi bi-key"></i> Password</a>
       <a href="#notifications" data-profile-page="notifications"><i class="bi bi-bell"></i> Notifications</a>
+      <a href="#history" data-profile-page="history"><i class="bi bi-journal-check"></i> History &amp; Audit</a>
       <a href="#sessions" data-profile-page="sessions"><i class="bi bi-display"></i> Sessions</a>
       <a href="#login-history" data-profile-page="login-history"><i class="bi bi-clock"></i> Login History</a>
       <a href="#activity" data-profile-page="activity"><i class="bi bi-clock-history"></i> Recent Activity</a>
@@ -87,6 +89,22 @@
       <article class="surface-card settings-page" id="sessions">
         <h3>Session Management</h3>
         <div class="admin-list mt-3" id="profile-sessions"><div class="skeleton-list"></div></div>
+      </article>
+      <article class="surface-card settings-page history-workspace" id="history">
+        <div class="card-head"><div><p class="eyebrow">Recorded events only</p><h3>Notification, Audit Trail &amp; Investigation History</h3><p>Ownership-scoped activity with actor, source, result, and timestamp traceability.</p></div><span class="badge text-bg-light" id="history-integrity">Integrity protected</span></div>
+        <div class="history-filters mt-3">
+          <input class="form-control" id="history-search" type="search" placeholder="Search activity, objects, actors, and results">
+          <select class="form-select" id="history-case" aria-label="Filter by investigation"></select>
+          <select class="form-select" id="history-result" aria-label="Filter by result"><option value="all">All results</option><option value="success">Success</option><option value="failure">Failure</option><option value="blocked">Blocked</option></select>
+          <button class="btn btn-outline-secondary" id="history-refresh" type="button"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+        </div>
+        <div class="history-grid mt-3">
+          <section class="history-section history-critical"><div class="history-heading"><h4>Critical notifications</h4><span id="history-critical-count">0</span></div><div class="history-list" id="history-critical"></div></section>
+          <section class="history-section history-activity"><div class="history-heading"><h4>Investigation activity</h4><span id="history-activity-count">0</span></div><div class="history-list" id="history-activity"></div></section>
+          <section class="history-section history-security"><div class="history-heading"><h4>Security events</h4><span id="history-security-count">0</span></div><div class="history-list" id="history-security"></div></section>
+          <section class="history-section history-audit"><div class="history-heading"><h4>Audit trail</h4><span id="history-audit-count">0</span></div><div class="history-list" id="history-audit"></div></section>
+          <section class="history-section history-settings"><div class="history-heading"><h4>Notification settings</h4></div><div class="setting-row"><div><strong>Investigation activity</strong><small>Evidence, timeline, AI, intelligence, and report lifecycle events.</small></div><div class="form-check form-switch"><input class="form-check-input" id="history-investigation-notifications" type="checkbox"></div></div><div class="setting-row"><div><strong>Security activity</strong><small>Authentication and account-protection events.</small></div><div class="form-check form-switch"><input class="form-check-input" id="history-security-notifications" type="checkbox"></div></div><button class="btn btn-primary w-100 mt-2" id="history-save-settings" type="button">Save notification settings</button></section>
+        </div>
       </article>
       <article class="surface-card settings-page" id="login-history">
         <h3>Login History</h3>

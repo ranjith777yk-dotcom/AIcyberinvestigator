@@ -161,6 +161,7 @@ async function initialiseNotifications() {
       return matchesSearch && matchesSeverity;
     });
     dot.classList.toggle("d-none", state.unread_count === 0);
+    document.querySelectorAll(".nav-attention-dot").forEach((node) => node.classList.toggle("d-none", state.unread_count === 0));
     count.textContent = state.unread_count ? `${state.unread_count} unread` : "All caught up";
     if (!visibleItems.length) {
       const empty = document.createElement("div");
@@ -314,6 +315,7 @@ async function initialisePreferences() {
         ? `Provider ${settings.config.ai_provider} is enabled.`
         : `Provider ${settings.config.ai_provider} is configured but disabled.`;
       initialiseAiSettingsForm(settings.config);
+      await loadAiManagement();
       document.querySelector("#notification-settings-state").textContent = "Notification state is synchronized with the backend.";
     } catch (error) {
       showToast("Unable to load settings.", "danger");
@@ -345,6 +347,7 @@ function initialiseAiSettingsForm(config) {
   const maxTokens = document.querySelector("#ai-max-tokens");
   const streaming = document.querySelector("#ai-streaming");
   const endpoint = document.querySelector("#ollama-endpoint");
+  const credential = document.querySelector("#ai-provider-credential");
   const test = document.querySelector("#ai-test-connection");
   const result = document.querySelector("#ai-test-result");
 
@@ -377,7 +380,16 @@ function initialiseAiSettingsForm(config) {
           },
         }),
       });
+      const providerUpdate = { model: model.value.trim() };
+      if (provider.value === "ollama") providerUpdate.endpoint = endpoint.value.trim();
+      if (credential.value) providerUpdate.credential = credential.value;
+      await api(`/api/v1/admin/ai/providers/${provider.value}`, {
+        method: "PATCH",
+        body: JSON.stringify(providerUpdate),
+      });
+      credential.value = "";
       showToast("AI settings saved.", "success");
+      await loadAiManagement();
     } catch (error) {
       showToast(error.message, "danger");
     }
@@ -400,6 +412,167 @@ function initialiseAiSettingsForm(config) {
   });
 }
 
+function aiManagementRecord(title, detail, state = "") {
+  const article = document.createElement("article");
+  article.className = "ai-admin-record";
+  const header = document.createElement("header");
+  const strong = document.createElement("strong");
+  strong.textContent = title;
+  const badge = document.createElement("span");
+  badge.className = `ai-admin-state ${state}`;
+  badge.textContent = state;
+  header.append(strong, badge);
+  const small = document.createElement("small");
+  small.textContent = detail;
+  article.append(header, small);
+  return article;
+}
+
+function renderAiManagementList(target, records, emptyMessage) {
+  if (!target) return;
+  if (!records.length) {
+    const empty = document.createElement("div");
+    empty.className = "operations-empty";
+    empty.textContent = emptyMessage;
+    target.replaceChildren(empty);
+    return;
+  }
+  target.replaceChildren(...records);
+}
+
+async function loadAiManagement() {
+  if (!document.querySelector("#ai-management-providers")) return;
+  const data = await api("/api/v1/admin/ai/management");
+  window.cyberInvestigatorAiManagement = data;
+  renderAiManagementList(
+    document.querySelector("#ai-management-providers"),
+    data.providers.map((provider) => aiManagementRecord(
+      provider.provider,
+      `${provider.model || "No model selected"} · ${provider.message} · credential ${provider.credential_configured ? "configured" : "not configured"}`,
+      provider.available ? "available" : "unavailable",
+    )),
+    "No provider adapters are registered.",
+  );
+  renderAiManagementList(
+    document.querySelector("#ai-management-workloads"),
+    Object.entries(data.workloads).map(([workload, assignment]) => aiManagementRecord(
+      workload,
+      `${assignment.provider} · ${assignment.model}`,
+      "",
+    )),
+    "No workload assignments are configured.",
+  );
+  const health = document.querySelector("#ai-management-health");
+  if (health) {
+    health.replaceChildren(
+      ...data.providers.map((provider) => aiManagementRecord(
+        provider.provider,
+        provider.available ? "Adapter reported available." : provider.message,
+        provider.available ? "available" : "unavailable",
+      )),
+    );
+  }
+  renderAiManagementList(
+    document.querySelector("#ai-management-usage"),
+    data.usage.map((usage) => aiManagementRecord(
+      `${usage.provider} · ${usage.model}`,
+      `${usage.requests_recorded} recorded request(s) · input ${usage.token_usage_status === "unavailable" ? "unavailable" : usage.input_tokens} · output ${usage.token_usage_status === "unavailable" ? "unavailable" : usage.output_tokens}`,
+      "",
+    )),
+    "No provider-reported usage has been recorded.",
+  );
+  renderAiManagementList(
+    document.querySelector("#ai-management-prompts"),
+    data.prompt_versions.map((prompt) => aiManagementRecord(
+      `${prompt.workload} · ${prompt.version}`,
+      `${prompt.active ? "Active" : "Inactive"} · ${prompt.description || "No description"} · created by ${prompt.created_by || "unknown"}`,
+      prompt.active ? "available" : "",
+    )),
+    "No managed prompt versions exist; built-in safety prompts remain active.",
+  );
+  document.querySelector("#ai-failover-enabled").checked = Boolean(data.failover.enabled);
+  document.querySelector("#ai-failover-order").value = (data.failover.order || []).join(", ");
+  const workloads = Object.keys(data.workloads);
+  ["#ai-workload", "#ai-prompt-workload"].forEach((selector) => {
+    const select = document.querySelector(selector);
+    select.replaceChildren(...workloads.map((workload) => {
+      const option = document.createElement("option");
+      option.value = workload;
+      option.textContent = workload;
+      return option;
+    }));
+  });
+  ["#ai-workload-provider"].forEach((selector) => {
+    const select = document.querySelector(selector);
+    select.replaceChildren(...data.providers.map((provider) => {
+      const option = document.createElement("option");
+      option.value = provider.provider;
+      option.textContent = provider.provider;
+      return option;
+    }));
+  });
+  const selectedWorkload = document.querySelector("#ai-workload").value;
+  if (selectedWorkload && data.workloads[selectedWorkload]) {
+    document.querySelector("#ai-workload-provider").value = data.workloads[selectedWorkload].provider;
+    document.querySelector("#ai-workload-model").value = data.workloads[selectedWorkload].model;
+  }
+}
+
+document.querySelector("#ai-management-refresh")?.addEventListener("click", () => loadAiManagement().catch((error) => showToast(error.message, "danger")));
+document.querySelector("#ai-workload")?.addEventListener("change", (event) => {
+  const assignment = window.cyberInvestigatorAiManagement?.workloads?.[event.target.value];
+  if (!assignment) return;
+  document.querySelector("#ai-workload-provider").value = assignment.provider;
+  document.querySelector("#ai-workload-model").value = assignment.model;
+});
+document.querySelector("#ai-workload-form")?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const workload = document.querySelector("#ai-workload").value;
+  try {
+    await api(`/api/v1/admin/ai/workloads/${workload}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        provider: document.querySelector("#ai-workload-provider").value,
+        model: document.querySelector("#ai-workload-model").value,
+      }),
+    });
+    showToast("Workload assignment updated and audited.", "success");
+    await loadAiManagement();
+  } catch (error) { showToast(error.message, "danger"); }
+});
+document.querySelector("#ai-prompt-form")?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  try {
+    await api("/api/v1/admin/ai/prompts", {
+      method: "POST",
+      body: JSON.stringify({
+        workload: document.querySelector("#ai-prompt-workload").value,
+        version: document.querySelector("#ai-prompt-version").value,
+        content: document.querySelector("#ai-prompt-content").value,
+        activate: document.querySelector("#ai-prompt-activate").checked,
+      }),
+    });
+    event.target.reset();
+    document.querySelector("#ai-prompt-activate").checked = true;
+    showToast("Immutable prompt version created and audited.", "success");
+    await loadAiManagement();
+  } catch (error) { showToast(error.message, "danger"); }
+});
+document.querySelector("#ai-failover-form")?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  try {
+    await api("/api/v1/admin/ai/failover", {
+      method: "PATCH",
+      body: JSON.stringify({
+        enabled: document.querySelector("#ai-failover-enabled").checked,
+        order: document.querySelector("#ai-failover-order").value.split(",").map((item) => item.trim()).filter(Boolean),
+      }),
+    });
+    showToast("Failover policy updated and audited.", "success");
+    await loadAiManagement();
+  } catch (error) { showToast(error.message, "danger"); }
+});
+
 async function initialiseAiChat() {
   const form = document.querySelector("#ai-chat-form");
   if (!form) return;
@@ -418,6 +591,56 @@ async function initialiseAiChat() {
   let conversationId = crypto.randomUUID();
   let generationController = null;
   let pendingFiles = [];
+  const renderGrounding = (grounding = {}, caseRecord = null) => {
+    const counts = grounding.counts || {};
+    const confidence = grounding.confidence || {};
+    const sources = grounding.sources || [];
+    const setText = (selector, value) => { const node = document.querySelector(selector); if (node) node.textContent = value; };
+    setText("#ai-summary-title", caseRecord ? `${caseRecord.case_number} · ${caseRecord.title}` : "No investigation selected");
+    setText("#ai-summary-copy", confidence.rationale || "Select an investigation to ground responses in its recorded evidence.");
+    setText("#ai-count-evidence", counts.evidence ?? "—");
+    setText("#ai-count-timeline", counts.timeline ?? "—");
+    setText("#ai-count-reports", counts.reports ?? "—");
+    setText("#ai-confidence-level", confidence.level ? confidence.level[0].toUpperCase() + confidence.level.slice(1) : "Insufficient");
+    setText("#ai-source-count", String(sources.length));
+    const sourceList = document.querySelector("#ai-source-list");
+    if (!sourceList) return;
+    if (!sources.length) {
+      const empty = document.createElement("p");
+      empty.textContent = "No source records loaded.";
+      sourceList.replaceChildren(empty);
+      return;
+    }
+    sourceList.replaceChildren(...sources.slice(0, 20).map((source) => {
+      const row = document.createElement("div");
+      row.className = "ai-source-item";
+      const title = document.createElement("strong");
+      title.textContent = source.id || source.label || "Source record";
+      const detail = document.createElement("small");
+      detail.textContent = source.summary || source.sha256 || source.type || "Recorded investigation source";
+      row.append(title, detail);
+      return row;
+    }));
+  };
+  const loadCaseContext = async () => {
+    if (!caseSelect?.value) { renderGrounding(); return; }
+    const workspace = await api(`/api/v1/cases/${encodeURIComponent(caseSelect.value)}/workspace`);
+    const sources = [
+      { id: `CASE:${workspace.case.case_number}`, type: "case", label: workspace.case.case_number, summary: workspace.case.title },
+      ...(workspace.evidence || []).map((item) => ({ id: `EVIDENCE:${item.evidence_number || item.id}`, type: "evidence", summary: item.original_filename, sha256: item.sha256 })),
+      ...(workspace.timeline || []).map((item) => ({ id: `TIMELINE:${item.id}`, type: "timeline", summary: item.summary || item.event_type })),
+      ...(workspace.reports || []).map((item) => ({ id: `REPORT:${item.id}`, type: "report", summary: item.title || item.report_type })),
+    ];
+    const supportingCategories = ["evidence", "timeline", "reports"].filter((key) => Number(workspace.counts?.[key]) > 0).length;
+    renderGrounding({
+      counts: workspace.counts,
+      sources,
+      confidence: {
+        level: supportingCategories >= 2 && workspace.counts?.evidence ? "moderate" : "limited",
+        rationale: sources.length > 1 ? "Available records will be supplied to the assistant; analyst validation remains required." : "Only the investigation record is available; collect supporting evidence before drawing conclusions.",
+      },
+    }, workspace.case);
+  };
 
   const loadConversations = async () => {
     if (!conversationList) return;
@@ -439,7 +662,10 @@ async function initialiseAiChat() {
         history = detail.messages || [];
         messages.replaceChildren();
         history.forEach((entry) => appendChatMessage(messages, entry.role, entry.content));
-        if (detail.case_id && caseSelect) caseSelect.value = detail.case_id;
+        if (detail.case_id && caseSelect) {
+          caseSelect.value = detail.case_id;
+          await loadCaseContext();
+        }
       });
       const rename = document.createElement("button");
       rename.type = "button"; rename.className = "btn btn-sm btn-link"; rename.title = "Rename";
@@ -464,19 +690,28 @@ async function initialiseAiChat() {
   };
 
   try {
-    await api("/api/v1/ai/status");
-    status?.remove();
+    const provider = await api("/api/v1/ai/status");
+    if (status) {
+      status.lastChild.textContent = provider.available ? `${provider.provider} · ${provider.model || "configured"}` : "Local analysis fallback";
+      status.classList.toggle("is-live", Boolean(provider.available));
+    }
   } catch {
-    status?.remove();
+    if (status) status.lastChild.textContent = "Provider status unavailable";
   }
   try {
     const cases = await api("/api/v1/cases?per_page=100&sort=opened_at");
     const options = [new Option("Latest active case", "")];
     cases.items.forEach((item) => options.push(new Option(`${item.case_number} - ${item.title}`, item.id)));
     caseSelect?.replaceChildren(...options);
+    const requestedCase = new URLSearchParams(window.location.search).get("case_id");
+    if (requestedCase && caseSelect?.querySelector(`option[value="${CSS.escape(requestedCase)}"]`)) {
+      caseSelect.value = requestedCase;
+    }
+    await loadCaseContext();
   } catch {
     showToast("Unable to load case context.", "danger");
   }
+  caseSelect?.addEventListener("change", () => loadCaseContext().catch((error) => showToast(error.message, "danger")));
 
   conversationButton?.addEventListener("click", () => {
     history = [];
@@ -529,6 +764,8 @@ async function initialiseAiChat() {
       conversationId = result.conversationId || conversationId;
       history.push({ role: "user", content: message }, { role: "assistant", content: result.reply });
       addChatResponseActions(bubble, result.reply, () => { input.value = message; form.requestSubmit(); });
+      const caseSource = result.grounding?.sources?.find((item) => item.type === "case");
+      renderGrounding(result.grounding, caseSource ? { case_number: caseSource.label, title: caseSource.summary } : null);
       pendingFiles = [];
       renderChatUploads(uploadList, pendingFiles);
       await loadConversations();
@@ -593,6 +830,7 @@ async function streamChat(message, caseId, conversationId, history, files, targe
   let buffer = "";
   let reply = "";
   let persistedConversationId = conversationId;
+  let grounding = null;
   for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
@@ -609,10 +847,11 @@ async function streamChat(message, caseId, conversationId, history, files, targe
         throw new Error(payload.message || "AI Chat failed.");
       } else if (payload.type === "done") {
         persistedConversationId = payload.conversation_id || persistedConversationId;
+        grounding = payload.grounding || grounding;
       }
     }
   }
-  return { reply, conversationId: persistedConversationId };
+  return { reply, conversationId: persistedConversationId, grounding };
 }
 
 function addChatResponseActions(bubble, reply, regenerate) {

@@ -10,9 +10,15 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
   <link href="{{ url_for('static', filename='css/dashboard.css') }}" rel="stylesheet">
   <link href="{{ url_for('static', filename='css/dashboard_polish.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='css/design_system.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='css/enterprise_shell.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='css/responsive.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='css/navigation.css') }}" rel="stylesheet">
+  {% block page_styles %}{% endblock %}
 </head>
 <body>
   <a class="skip-link" href="#main-content">Skip to main content</a>
+  <div class="page-progress" id="page-progress" aria-hidden="true"></div>
   <div class="app-shell">
     <aside class="sidebar offcanvas-lg offcanvas-start" tabindex="-1" id="navigation" aria-label="Primary navigation">
       <div class="sidebar-head">
@@ -22,32 +28,59 @@
         </a>
         <button type="button" class="btn-close btn-close-white d-lg-none" data-bs-dismiss="offcanvas" data-bs-target="#navigation" aria-label="Close navigation"></button>
       </div>
+      <div class="mobile-nav-actions d-lg-none" aria-label="Priority actions">
+        {% if can('cases.write') %}<a href="{{ url_for('web.cases') }}"><i class="bi bi-plus-lg"></i><span>New case</span></a>{% endif %}
+        {% if can('evidence.write') %}<a href="{{ url_for('web.evidence') }}"><i class="bi bi-cloud-arrow-up"></i><span>Add evidence</span></a>{% endif %}
+        {% if can('ai.chat') %}<a href="{{ url_for('web.ai_chat') }}"><i class="bi bi-stars"></i><span>Ask AI</span></a>{% endif %}
+      </div>
       <nav class="sidebar-nav" aria-label="Investigation navigation">
-        <p class="nav-caption">{{ 'Administration' if current_user.role == 'admin' else 'Investigation' }}</p>
-        <a class="nav-link {% if active_page == 'dashboard' %}active{% endif %}" href="{{ url_for('web.dashboard') }}" aria-label="Dashboard"><i class="bi bi-grid-1x2"></i><span>Dashboard</span></a>
-        {% if can('admin.access') %}<a class="nav-link {% if active_page == 'admin' %}active{% endif %}" href="{{ url_for('web.admin') }}" aria-label="Admin"><i class="bi bi-speedometer2"></i><span>Admin</span></a>{% endif %}
-        {% if can('admin.access') %}<a class="nav-link" href="{{ url_for('web.admin') }}#admin-security-pane" aria-label="Security Center"><i class="bi bi-shield-check"></i><span>Security Center</span></a>{% endif %}
-        {% if can('admin.access') %}<a class="nav-link" href="{{ url_for('web.admin') }}#admin-monitoring-pane" aria-label="Monitoring"><i class="bi bi-activity"></i><span>Monitoring</span></a>{% endif %}
-        {% if can('admin.access') %}<a class="nav-link" href="{{ url_for('web.admin') }}#admin-users-pane" aria-label="User Management"><i class="bi bi-people"></i><span>User Management</span></a>{% endif %}
-        {% if can('cases.read') %}<a class="nav-link {% if active_page == 'cases' %}active{% endif %}" href="{{ url_for('web.cases') }}" aria-label="Cases"><i class="bi bi-briefcase"></i><span>Cases</span></a>{% endif %}
-        {% if can('evidence.read') %}<a class="nav-link {% if active_page == 'evidence' %}active{% endif %}" href="{{ url_for('web.evidence') }}" aria-label="Evidence"><i class="bi bi-folder2-open"></i><span>Evidence</span></a>{% endif %}
-        {% if can('timeline.read') %}<a class="nav-link {% if active_page == 'timeline' %}active{% endif %}" href="{{ url_for('web.timeline') }}" aria-label="Timeline"><i class="bi bi-clock-history"></i><span>Timeline</span></a>{% endif %}
-        {% if can('plugins.read') %}<a class="nav-link {% if active_page == 'plugins' %}active{% endif %}" href="{{ url_for('web.plugins') }}" aria-label="Plugins"><i class="bi bi-puzzle"></i><span>Plugins</span></a>{% endif %}
-        {% if can('reports.read') %}<a class="nav-link {% if active_page == 'reports' %}active{% endif %}" href="{{ url_for('web.reports') }}" aria-label="Reports"><i class="bi bi-file-earmark-bar-graph"></i><span>Reports</span></a>{% endif %}
-        {% if can('ai.chat') %}<a class="nav-link {% if active_page == 'ai_chat' %}active{% endif %}" href="{{ url_for('web.ai_chat') }}" aria-label="AI Chat"><i class="bi bi-stars"></i><span>AI Chat</span></a>{% endif %}
-        <a class="nav-link {% if active_page == 'profile' %}active{% endif %}" href="{{ url_for('web.profile') }}" aria-label="Profile"><i class="bi bi-person-circle"></i><span>Profile</span></a>
-        {% if can('settings.manage') %}<a class="nav-link {% if active_page == 'settings' %}active{% endif %}" href="{{ url_for('web.settings') }}" aria-label="Settings"><i class="bi bi-sliders"></i><span>Settings</span></a>{% endif %}
-        {% if current_user.role != 'admin' %}<a class="nav-link" href="{{ url_for('web.profile') }}#preferences" aria-label="Settings"><i class="bi bi-sliders"></i><span>Settings</span></a>{% endif %}
-        {% if current_user.role != 'admin' %}<a class="nav-link" href="{{ url_for('web.profile') }}#notifications" aria-label="Notifications"><i class="bi bi-bell"></i><span>Notifications</span></a>{% endif %}
+        <div class="nav-group">
+          <p class="nav-caption">Command</p>
+          <a class="nav-link {% if active_page == 'dashboard' %}active{% endif %}" href="{{ url_for('web.dashboard') }}" {% if active_page == 'dashboard' %}aria-current="page"{% endif %}><i class="bi bi-grid-1x2"></i><span>Command center</span></a>
+        </div>
+        <div class="nav-group nav-lifecycle">
+          <p class="nav-caption">Investigation lifecycle</p>
+          {% if can('cases.read') %}<a class="nav-link {% if active_page == 'cases' %}active{% endif %}" href="{{ url_for('web.cases') }}" {% if active_page == 'cases' %}aria-current="page"{% endif %}><i class="bi bi-briefcase"></i><span>Cases</span><small class="nav-stage">01</small></a>{% endif %}
+          {% if can('evidence.read') %}<a class="nav-link {% if active_page == 'evidence' %}active{% endif %}" href="{{ url_for('web.evidence') }}" {% if active_page == 'evidence' %}aria-current="page"{% endif %}><i class="bi bi-fingerprint"></i><span>Evidence</span><small class="nav-stage">02</small></a>{% endif %}
+          {% if can('timeline.read') %}<a class="nav-link {% if active_page == 'timeline' %}active{% endif %}" href="{{ url_for('web.timeline') }}" {% if active_page == 'timeline' %}aria-current="page"{% endif %}><i class="bi bi-clock-history"></i><span>Timeline</span><small class="nav-stage">03</small></a>{% endif %}
+          {% if can('ai.chat') %}<a class="nav-link {% if active_page == 'ai_chat' %}active{% endif %}" href="{{ url_for('web.ai_chat') }}" {% if active_page == 'ai_chat' %}aria-current="page"{% endif %}><i class="bi bi-stars"></i><span>AI investigation</span><small class="nav-stage">04</small></a>{% endif %}
+          {% if can('reports.read') %}<a class="nav-link {% if active_page == 'reports' %}active{% endif %}" href="{{ url_for('web.reports') }}" {% if active_page == 'reports' %}aria-current="page"{% endif %}><i class="bi bi-file-earmark-bar-graph"></i><span>Reports</span><small class="nav-stage">05</small></a>{% endif %}
+        </div>
+        {% if can('admin.access') or can('plugins.read') %}
+        <div class="nav-group">
+          <p class="nav-caption">Platform operations</p>
+          {% if can('admin.access') %}<a class="nav-link {% if active_page == 'admin' %}active{% endif %}" href="{{ url_for('web.admin') }}" {% if active_page == 'admin' %}aria-current="page"{% endif %}><i class="bi bi-speedometer2"></i><span>Operations</span></a>{% endif %}
+          {% if can('admin.access') %}<a class="nav-link" href="{{ url_for('web.admin') }}#admin-security-pane"><i class="bi bi-shield-check"></i><span>Security center</span></a>{% endif %}
+          {% if can('admin.access') %}<a class="nav-link" href="{{ url_for('web.admin') }}#admin-monitoring-pane"><i class="bi bi-activity"></i><span>Monitoring</span></a>{% endif %}
+          {% if can('admin.access') %}<a class="nav-link" href="{{ url_for('web.admin') }}#admin-users-pane"><i class="bi bi-people"></i><span>User management</span></a>{% endif %}
+          {% if can('plugins.read') %}<a class="nav-link {% if active_page == 'plugins' %}active{% endif %}" href="{{ url_for('web.plugins') }}" {% if active_page == 'plugins' %}aria-current="page"{% endif %}><i class="bi bi-puzzle"></i><span>Integrations</span></a>{% endif %}
+          {% if can('settings.manage') %}<a class="nav-link {% if active_page == 'settings' %}active{% endif %}" href="{{ url_for('web.settings') }}" {% if active_page == 'settings' %}aria-current="page"{% endif %}><i class="bi bi-sliders"></i><span>Platform settings</span></a>{% endif %}
+        </div>
+        {% endif %}
+        <div class="nav-group">
+          <p class="nav-caption">Account</p>
+          <a class="nav-link {% if active_page == 'profile' %}active{% endif %}" href="{{ url_for('web.profile') }}" {% if active_page == 'profile' %}aria-current="page"{% endif %}><i class="bi bi-person-circle"></i><span>Profile &amp; activity</span></a>
+          {% if current_user.role != 'admin' %}<a class="nav-link" href="{{ url_for('web.profile') }}#preferences"><i class="bi bi-sliders"></i><span>Preferences</span></a>{% endif %}
+          {% if current_user.role != 'admin' %}<a class="nav-link nav-attention-link" href="{{ url_for('web.profile') }}#notifications"><i class="bi bi-bell"></i><span>Notifications</span><i class="nav-attention-dot d-none" aria-hidden="true"></i></a>{% endif %}
+        </div>
       </nav>
-      <div class="sidebar-foot"><span class="status-dot"></span> Platform secure</div>
+      <div class="sidebar-foot"><span class="status-dot"></span><span><strong>All systems operational</strong><small>Protected workspace</small></span></div>
     </aside>
     <main class="main-content" id="main-content" tabindex="-1">
       <header class="topbar">
         <button class="btn btn-icon d-lg-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#navigation" aria-label="Open navigation"><i class="bi bi-list"></i></button>
         <button class="btn btn-icon d-none d-lg-inline-grid" id="sidebar-collapse-toggle" type="button" aria-label="Collapse navigation" title="Collapse navigation"><i class="bi bi-layout-sidebar-inset"></i></button>
-        <div class="breadcrumb-wrap"><span class="eyebrow">{{ 'Administration Workspace' if current_user.role == 'admin' else 'Investigation Workspace' }}</span><h1>{{ page_title }}</h1></div>
+        <div class="breadcrumb-wrap">
+          <nav class="app-breadcrumb" aria-label="Breadcrumb">
+            <a href="{{ url_for('web.dashboard') }}">Workspace</a><i class="bi bi-chevron-right" aria-hidden="true"></i>
+            {% if active_page in ['cases', 'evidence', 'timeline', 'ai_chat', 'reports'] %}<span>Investigations</span><i class="bi bi-chevron-right" aria-hidden="true"></i>{% elif active_page in ['admin', 'plugins', 'settings'] %}<span>Platform</span><i class="bi bi-chevron-right" aria-hidden="true"></i>{% endif %}
+            <span aria-current="page">{{ page_title }}</span>
+          </nav>
+          <h1>{{ page_title }}</h1>
+        </div>
         <div class="topbar-actions">
+          <button class="command-trigger d-none d-md-flex" id="command-trigger" type="button" aria-label="Open command center" aria-keyshortcuts="Control+K Meta+K" aria-controls="command-backdrop" aria-expanded="false"><i class="bi bi-search"></i><span>Search workspace</span><kbd>Ctrl K</kbd></button>
+          <span class="security-context d-none d-xl-inline-flex"><i class="bi bi-shield-check"></i> Secure session</span>
           <button class="btn btn-icon theme-control" id="theme-toggle-top" type="button" aria-label="Switch between light and dark mode" title="Toggle light and dark mode"><i class="bi bi-moon-stars"></i></button>
           <div class="dropdown">
             <button class="btn btn-icon" id="notification-button" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Notifications"><i class="bi bi-bell"></i><span class="notification-dot" id="notification-dot"></span></button>
@@ -76,8 +109,30 @@
       <section class="page-content">{% block content %}{% endblock %}</section>
     </main>
   </div>
+  <div class="command-backdrop" id="command-backdrop" hidden>
+    <section class="command-palette" role="dialog" aria-modal="true" aria-labelledby="command-title">
+      <header><i class="bi bi-search"></i><label class="visually-hidden" for="command-search" id="command-title">Search workspace</label><input id="command-search" type="search" autocomplete="off" placeholder="Search navigation and actions…"><kbd>ESC</kbd></header>
+      <div class="command-results" id="command-results">
+        <p class="command-section-label">Navigate</p>
+        <a href="{{ url_for('web.dashboard') }}" data-command="dashboard overview home"><i class="bi bi-grid-1x2"></i><span><strong>Dashboard</strong><small>Security operations overview</small></span><kbd>G D</kbd></a>
+        {% if can('cases.read') %}<a href="{{ url_for('web.cases') }}" data-command="cases investigations incidents create"><i class="bi bi-briefcase"></i><span><strong>Cases</strong><small>Manage investigation lifecycle</small></span><kbd>G C</kbd></a>{% endif %}
+        {% if can('evidence.read') %}<a href="{{ url_for('web.evidence') }}" data-command="evidence upload custody artifacts"><i class="bi bi-folder2-open"></i><span><strong>Evidence</strong><small>Preserve and analyze artifacts</small></span><kbd>G E</kbd></a>{% endif %}
+        {% if can('timeline.read') %}<a href="{{ url_for('web.timeline') }}" data-command="timeline events chronology"><i class="bi bi-clock-history"></i><span><strong>Timeline</strong><small>Reconstruct incident activity</small></span><kbd>G T</kbd></a>{% endif %}
+        {% if can('ai.chat') %}<a href="{{ url_for('web.ai_chat') }}" data-command="ai assistant chat analyze investigate"><i class="bi bi-stars"></i><span><strong>AI Assistant</strong><small>Ask investigation questions</small></span><kbd>G A</kbd></a>{% endif %}
+        {% if can('reports.read') %}<a href="{{ url_for('web.reports') }}" data-command="reports export findings"><i class="bi bi-file-earmark-bar-graph"></i><span><strong>Reports</strong><small>Build investigation deliverables</small></span><kbd>G R</kbd></a>{% endif %}
+        <div class="command-entity-results" id="command-entity-results" aria-live="polite"
+             data-cases="{{ 'true' if can('cases.read') else 'false' }}"
+             data-evidence="{{ 'true' if can('evidence.read') else 'false' }}"
+             data-timeline="{{ 'true' if can('timeline.read') else 'false' }}"
+             data-reports="{{ 'true' if can('reports.read') else 'false' }}"></div>
+      </div>
+      <footer><span>Enter to open</span><span>Arrows to navigate</span><span>Esc to close</span></footer>
+    </section>
+  </div>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
   <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
   <script src="{{ url_for('static', filename='js/dashboard_extras.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/enterprise_shell.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/responsive.js') }}"></script>
 </body>
 </html>

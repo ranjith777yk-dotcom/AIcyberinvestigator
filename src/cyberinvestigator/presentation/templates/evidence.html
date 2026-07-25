@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
+<link href="{{ url_for('static', filename='css/evidence_workspace.css') }}" rel="stylesheet">
 <div data-module="evidence">
   <div class="page-heading">
     <div>
@@ -17,7 +18,7 @@
         <div class="toolbar evidence-toolbar">
           <select class="form-select" id="evidence-case-filter" aria-label="Filter by case"></select>
           <input class="form-control" id="evidence-search" placeholder="Search evidence, filename, hash, findings">
-          <select class="form-select" id="evidence-analysis-filter" aria-label="Filter by analysis status"><option value="all">All analysis</option><option value="pending">Pending</option><option value="completed">Completed</option></select>
+          <select class="form-select" id="evidence-analysis-filter" aria-label="Filter by analysis status"><option value="all">All analysis</option><option value="pending">Pending</option><option value="running">Running</option><option value="completed">Completed</option><option value="failed">Failed</option></select>
           <select class="form-select" id="evidence-sort" aria-label="Sort evidence"><option value="acquired_at">Newest</option><option value="evidence_number">Evidence number</option><option value="original_filename">Filename</option><option value="size_bytes">Size</option><option value="analysis_status">Analysis</option></select>
         </div>
         <div id="evidence-state" class="empty-state large"><i class="bi bi-hourglass-split"></i><h3>Loading evidence</h3><p>Fetching custody records.</p></div>
@@ -30,21 +31,63 @@
       </article>
     </div>
     <div class="col-xl-4">
-      <article class="surface-card">
-        <div class="card-head"><div><h3>Forensic report</h3><p>Detailed findings from the selected analysis.</p></div><span class="badge text-bg-light" id="evidence-report-status">Idle</span></div>
-        <div id="evidence-report" class="empty-state compact"><i class="bi bi-search"></i><h3>No report selected</h3><p>Click Analyze on an evidence row to inspect encodings, archives, entropy, strings, metadata, and flags.</p></div>
+      <article class="surface-card evidence-analysis-workspace">
+        <div class="card-head"><div><h3>Evidence analysis workspace</h3><p>Read-only static findings and custody context.</p></div><span class="badge text-bg-light" id="evidence-report-status">Idle</span></div>
+        <div id="evidence-report" class="empty-state compact"><i class="bi bi-search"></i><h3>No evidence selected</h3><p>Inspect a completed record or start bounded, non-executing static analysis.</p></div>
+        <div id="evidence-workspace-content" class="d-none">
+          <section class="evidence-workspace-section evidence-summary-section">
+            <div class="evidence-section-label">Evidence summary</div>
+            <div id="evidence-workspace-summary"></div>
+          </section>
+          <section class="evidence-workspace-section">
+            <div class="evidence-section-label">Analysis status</div>
+            <div id="evidence-workspace-analysis"></div>
+          </section>
+          <section class="evidence-workspace-section">
+            <div class="evidence-section-label">AI summary</div>
+            <div id="evidence-workspace-ai"></div>
+          </section>
+          <section class="evidence-workspace-section">
+            <div class="evidence-section-label">Threat matches</div>
+            <div id="evidence-workspace-threats"></div>
+          </section>
+          <section class="evidence-workspace-section">
+            <div class="evidence-section-label">Timeline integration</div>
+            <div id="evidence-workspace-timeline"></div>
+          </section>
+          <section class="evidence-workspace-section">
+            <div class="evidence-section-label">Metadata</div>
+            <div id="evidence-workspace-metadata"></div>
+          </section>
+        </div>
       </article>
       <article class="surface-card mt-4">
-        <h3>Custody checklist</h3>
+        <h3>Custody controls</h3>
         <ul class="check-list">
           <li><i class="bi bi-check-circle"></i> Link to an investigation case</li>
           <li><i class="bi bi-check-circle"></i> Record source and acquisition time</li>
           <li><i class="bi bi-check-circle"></i> Preserve SHA-256 integrity hash</li>
-          <li><i class="bi bi-check-circle"></i> Analyze bytes read-only</li>
+          <li><i class="bi bi-check-circle"></i> Quarantine before analysis</li>
+          <li><i class="bi bi-check-circle"></i> Analyze bytes without execution</li>
         </ul>
+        <div class="evidence-isolation-note"><i class="bi bi-box-seam"></i><span><strong>Static analysis boundary</strong>Current analysis is bounded and non-executing. Dynamic analysis requires a future isolated container or VM runner.</span></div>
       </article>
     </div>
   </div>
+
+  <section class="surface-card threat-intelligence-engine mt-4" aria-labelledby="threat-intelligence-title">
+    <div class="card-head">
+      <div><p class="eyebrow">Provider-backed correlation</p><h3 id="threat-intelligence-title">Threat Intelligence Correlation Engine</h3><p>Normalized indicators, evidence provenance, external reputation, and supported ATT&amp;CK mappings.</p></div>
+      <button class="btn btn-sm btn-primary" id="threat-intelligence-enrich" type="button"><i class="bi bi-arrow-repeat"></i> Enrich indicators</button>
+    </div>
+    <div class="threat-intelligence-grid mt-3">
+      <section class="threat-summary" aria-labelledby="threat-summary-title"><h4 id="threat-summary-title">Summary</h4><div class="threat-metrics" id="threat-intelligence-summary"><div class="skeleton skeleton-line"></div></div><p class="threat-explainer" id="threat-intelligence-explainer">Select an investigation to inspect extracted indicators.</p></section>
+      <section class="threat-risk" aria-labelledby="threat-risk-title"><h4 id="threat-risk-title">High-risk indicators</h4><div id="threat-intelligence-risk" class="threat-list"></div></section>
+      <section class="threat-ai" aria-labelledby="threat-ai-title"><h4 id="threat-ai-title">AI summary</h4><div id="threat-intelligence-ai" class="threat-empty">AI has not asserted intelligence findings. Provider results remain the source of truth.</div></section>
+      <section class="threat-details" aria-labelledby="threat-details-title"><h4 id="threat-details-title">Indicator details</h4><div id="threat-intelligence-indicators" class="threat-list"></div></section>
+      <section class="threat-attack" aria-labelledby="threat-attack-title"><h4 id="threat-attack-title">ATT&amp;CK mapping</h4><div id="threat-intelligence-attack" class="threat-list"></div></section>
+    </div>
+  </section>
 
   <div class="modal fade" id="evidence-modal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg">
@@ -53,7 +96,7 @@
         <div class="modal-body">
           <div class="upload-zone mb-3">
             <i class="bi bi-cloud-arrow-up"></i>
-            <div><strong>Professional upload</strong><small>Select a file or register a manual text artifact. Hashing is calculated during custody storage.</small></div>
+            <div><strong>Quarantine ingestion</strong><small>Files are treated as untrusted, size-validated, hashed during storage, and never executed by the web application.</small></div>
           </div>
           <div class="row g-3">
             <div class="col-md-6"><label class="form-label" for="evidence-case">Case</label><select class="form-select" id="evidence-case" required></select></div>

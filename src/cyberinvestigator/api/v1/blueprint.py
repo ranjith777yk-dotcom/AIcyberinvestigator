@@ -3,27 +3,31 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import html
 import json
 import re
 import shutil
+import stat
 import time
+import tomllib
 import zipfile
 from io import BytesIO, StringIO
 from pathlib import Path
+from urllib.parse import urlparse
 from uuid import UUID, uuid4
 
-from flask import Blueprint, Response, current_app, g, jsonify, request, stream_with_context
+from flask import Blueprint, Response, current_app, g, has_request_context, jsonify, request, stream_with_context
 from sqlalchemy import func, select, text
 
 from cyberinvestigator.api.v1.openapi import build_openapi_spec
 from cyberinvestigator.application.dto import CaseCreateRequest, CaseUpdateRequest, EvidenceAddRequest
 from cyberinvestigator.application.ports.ai_provider import AIRequest
-from cyberinvestigator.application.services import CaseManagementService, EvidenceService
-from cyberinvestigator.application.services.timeline_service import TimelineService
+from cyberinvestigator.application.ports.threat_intelligence import normalize_indicator
 from cyberinvestigator.domain.services.forensic_analyzer import ForensicAnalyzer
 from cyberinvestigator.infrastructure.ai import AIProviderUnavailable, build_ai_registry
 from cyberinvestigator.infrastructure.ai import messages as ai_messages
+from cyberinvestigator.infrastructure.ai_management import hydrate_ai_config
 from cyberinvestigator.infrastructure.database.base import utc_now
 from cyberinvestigator.infrastructure.database.models import (
     AIConversation,
@@ -32,11 +36,13 @@ from cyberinvestigator.infrastructure.database.models import (
     Case,
     Evidence,
     Notification,
+    Permission,
     Plugin,
     PluginExecution,
     Recommendation,
     Report,
     Role,
+    RolePermission,
     SecurityAlert,
     Setting,
     TimelineEvent,
@@ -44,12 +50,14 @@ from cyberinvestigator.infrastructure.database.models import (
     User,
     UserSession,
 )
-from cyberinvestigator.infrastructure.evidence_storage import LocalEvidenceStorage
+from cyberinvestigator.infrastructure.integrations import ConnectorCategory, ConnectorHealth, ConnectorSyncResult
+from cyberinvestigator.infrastructure.observability import redact_text
 from cyberinvestigator.infrastructure.plugins.loader import PluginLoadError
 from cyberinvestigator.infrastructure.plugins.registry import PluginMetadata
-from cyberinvestigator.infrastructure.repositories import SQLAlchemyCaseRepository, SQLAlchemyEvidenceRepository
-from cyberinvestigator.infrastructure.repositories.timeline_repository import SQLAlchemyTimelineRepository
+from cyberinvestigator.infrastructure.security.credential_vault import CredentialVault, CredentialVaultUnavailable
+from cyberinvestigator.infrastructure.security.plugin_runtime_security import PLUGIN_RUNTIME_PERMISSIONS
 from cyberinvestigator.infrastructure.security.web_security import hash_password, require_role
+from cyberinvestigator.infrastructure.storage_management import StorageOperationError
 from cyberinvestigator.shared.exceptions import (
     CaseManagementError,
     EvidenceManagementError,
@@ -63,23 +71,28 @@ def _db():
     return current_app.extensions["cyberinvestigator_database"]
 
 
-def _case_service() -> CaseManagementService:
-    return CaseManagementService(SQLAlchemyCaseRepository(_db().session), current_app.logger)
+def _features():
+    return current_app.extensions["cyberinvestigator_features"]
 
 
-def _evidence_service() -> EvidenceService:
-    session = _db().session
-    storage = LocalEvidenceStorage(Path(current_app.config["UPLOAD_FOLDER"]))
-    return EvidenceService(
-        SQLAlchemyCaseRepository(session),
-        SQLAlchemyEvidenceRepository(session),
-        storage,
-        current_app.logger,
-    )
+def _storage_manager():
+    return current_app.extensions["cyberinvestigator_storage_manager"]
 
 
-def _timeline_service() -> TimelineService:
-    return TimelineService(SQLAlchemyTimelineRepository(_db().session), current_app.logger)
+def _deployment_inspector():
+    return current_app.extensions["cyberinvestigator_deployment_inspector"]
+
+
+def _case_service():
+    return _features().cases.service(_db().session, current_app.logger)
+
+
+def _evidence_service():
+    return _features().evidence.service(_db().session, current_app.logger)
+
+
+def _timeline_service():
+    return _features().timeline.service(_db().session, current_app.logger)
 
 
 def _json_error(message: str, status: int = 400):
@@ -224,9 +237,6 @@ def _timeline_json(event):
     case = _cached_model(Case, event.case_id)
     evidence = _cached_model(Evidence, event.evidence_id)
     event_type = event.event_type or ""
-    threat_weight = (
-        15 if "evidence" in event_type else 12 if "report" in event_type else 10 if "observation" in event_type else 6
-    )
     return {
         "id": str(event.id),
         "case_id": str(event.case_id),
@@ -242,8 +252,9 @@ def _timeline_json(event):
         "occurred_at": _iso(event.occurred_at),
         "event_type": event_type,
         "group": event_type.split(".", 1)[0] if "." in event_type else event_type,
-        "threat_weight": threat_weight,
-        "threat_level": "high" if threat_weight >= 15 else "medium" if threat_weight >= 10 else "low",
+        "threat_weight": 0,
+        "threat_level": "unassessed",
+        "certainty": "confirmed",
         "summary": event.summary,
         "details": event.details,
     }
@@ -350,6 +361,124 @@ def _case_accessible(case_id: UUID) -> bool:
         return True
     case = _db().session.get(Case, case_id)
     return bool(case and _current_user_id() is not None and case.owner_user_id == _current_user_id())
+
+
+def _record_case_audit(action: str, case: Case, *, reason: str | None = None) -> None:
+    """Persist one semantic, actor-attributed case lifecycle audit event."""
+
+    _db().session.add(
+        AuditLog(
+            user_id=_current_user_id(),
+            username=_current_username(),
+            role=_current_user_role(),
+            action=action,
+            result="success",
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get("User-Agent"),
+            affected_object=f"case:{case.id}",
+            reason=reason or f"{case.case_number} · {case.title}",
+        )
+    )
+    _db().session.commit()
+
+
+def _record_evidence_audit(
+    action: str,
+    evidence: Evidence,
+    *,
+    actor_id: UUID | None = None,
+    username: str | None = None,
+    role: str | None = None,
+    result: str = "success",
+    reason: str | None = None,
+) -> None:
+    """Persist an actor-attributed custody or analysis audit event."""
+
+    _db().session.add(
+        AuditLog(
+            user_id=actor_id if actor_id is not None else _current_user_id(),
+            username=username or _current_username(),
+            role=role or _current_user_role(),
+            action=action,
+            result=result,
+            ip_address=request.remote_addr if has_request_context() else None,
+            user_agent=request.headers.get("User-Agent") if has_request_context() else None,
+            affected_object=f"evidence:{evidence.id}",
+            reason=reason or f"{evidence.evidence_number} · case:{evidence.case_id}",
+        )
+    )
+    _db().session.commit()
+
+
+def _record_intelligence_audit(case: Case, *, result: str, reason: str) -> None:
+    """Record enrichment without logging indicators or provider credentials."""
+    _db().session.add(
+        AuditLog(
+            user_id=_current_user_id(),
+            username=_current_username(),
+            role=_current_user_role(),
+            action="threat_intelligence.enriched",
+            result=result,
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get("User-Agent"),
+            affected_object=f"case:{case.id}",
+            reason=reason,
+        )
+    )
+    _db().session.commit()
+
+
+def _record_timeline_audit(event: TimelineEvent, *, action: str = "timeline.manual_event.created") -> None:
+    """Record actor and provenance for a manual timeline mutation."""
+    _db().session.add(
+        AuditLog(
+            user_id=_current_user_id(),
+            username=_current_username(),
+            role=_current_user_role(),
+            action=action,
+            result="success",
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get("User-Agent"),
+            affected_object=f"timeline_event:{event.id}",
+            reason=f"case:{event.case_id} · event_type:{event.event_type}",
+        )
+    )
+    _db().session.commit()
+
+
+def _record_report_audit(report: Report, action: str, *, reason: str | None = None) -> None:
+    """Record report lifecycle activity without embedding report contents."""
+    _db().session.add(
+        AuditLog(
+            user_id=_current_user_id(),
+            username=_current_username(),
+            role=_current_user_role(),
+            action=action,
+            result="success",
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get("User-Agent"),
+            affected_object=f"report:{report.id}",
+            reason=reason or f"case:{report.case_id} · {report.report_type} v{report.version}",
+        )
+    )
+    _db().session.commit()
+
+
+def _record_account_audit(action: str, affected_object: str, *, reason: str | None = None) -> None:
+    _db().session.add(
+        AuditLog(
+            user_id=_current_user_id(),
+            username=_current_username(),
+            role=_current_user_role(),
+            action=action,
+            result="success",
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get("User-Agent"),
+            affected_object=affected_object,
+            reason=reason,
+        )
+    )
+    _db().session.commit()
 
 
 def _stamp_owned(record, *, owner_user_id: UUID | None = None) -> None:
@@ -526,8 +655,11 @@ def _invalidate_dashboard_cache() -> None:
 
 
 def _ai_runtime():
+    registry = current_app.extensions.get("cyberinvestigator_ai_registry")
+    if registry is not None and hasattr(registry, "configure_failover"):
+        _configure_ai_failover(registry)
     return (
-        current_app.extensions.get("cyberinvestigator_ai_registry"),
+        registry,
         current_app.extensions.get("cyberinvestigator_investigation_assistant"),
         current_app.extensions.get("cyberinvestigator_analysis_engine"),
     )
@@ -566,6 +698,8 @@ def _provider_status() -> dict[str, object]:
         "message": status.message,
         "endpoint": status.endpoint,
         "installed_models": list(status.installed_models),
+        "health_source": status.health_source,
+        "checked_at": status.checked_at,
     }
 
 
@@ -581,9 +715,87 @@ def _provider_status_payload() -> dict[str, object]:
             "message": status.message,
             "endpoint": status.endpoint,
             "installed_models": list(status.installed_models),
+            "health_source": status.health_source,
+            "checked_at": status.checked_at,
         }
         for name, status in statuses.items()
     }
+
+
+AI_WORKLOADS = {
+    "chat.general",
+    "chat.cybersecurity",
+    "chat.investigation",
+    "evidence.analysis",
+    "timeline.summary",
+    "report.analysis",
+    "threat_intelligence.summary",
+}
+
+
+def _setting_json(namespace: str, key: str, default: object) -> object:
+    raw = _setting_value(namespace, key)
+    if not raw:
+        return default
+    try:
+        return json.loads(raw)
+    except (TypeError, json.JSONDecodeError):
+        return default
+
+
+def _validated_ai_endpoint(value: object) -> str:
+    endpoint = str(value or "").strip().rstrip("/")
+    parsed = urlparse(endpoint)
+    hostname = (parsed.hostname or "").lower()
+    configured_hostname = (urlparse(str(current_app.config.get("OLLAMA_ENDPOINT") or "")).hostname or "").lower()
+    allowed = {
+        item.strip().lower()
+        for item in str(current_app.config.get("AI_ALLOWED_PROVIDER_HOSTS") or "").split(",")
+        if item.strip()
+    }
+    if configured_hostname:
+        allowed.add(configured_hostname)
+    if parsed.scheme not in {"http", "https"} or not hostname or parsed.username or parsed.password:
+        raise ValueError("Endpoint must be an HTTP(S) URL without embedded credentials.")
+    if hostname not in allowed:
+        raise ValueError("Provider endpoint host is not in AI_ALLOWED_PROVIDER_HOSTS.")
+    return endpoint
+
+
+def _workload_assignment(workload: str) -> dict[str, str]:
+    configured = _setting_json("ai.workloads", workload, {})
+    document = configured if isinstance(configured, dict) else {}
+    return {
+        "provider": str(document.get("provider") or current_app.config.get("AI_PROVIDER", "ollama")),
+        "model": str(document.get("model") or current_app.config.get("AI_MODEL", "qwen3:8b")),
+    }
+
+
+def _managed_prompt(workload: str) -> tuple[str | None, str | None]:
+    version = str(_setting_json("ai.prompt.active", workload, "") or "")
+    if not version:
+        return None, None
+    document = _setting_json("ai.prompt.versions", f"{workload}:{version}", {})
+    if not isinstance(document, dict):
+        return None, None
+    content = str(document.get("content") or "").strip()
+    return (content or None), version
+
+
+def _configure_ai_failover(registry) -> dict[str, object]:
+    document = _setting_json(
+        "ai.platform",
+        "failover",
+        {"enabled": True, "order": ["ollama", "openai", "gemini", "perplexity"]},
+    )
+    policy = document if isinstance(document, dict) else {}
+    enabled = bool(policy.get("enabled", True))
+    order = policy.get("order", [])
+    normalized = [str(item) for item in order] if isinstance(order, list) else []
+    if registry is not None and hasattr(registry, "configure_failover"):
+        registry.configure_failover(enabled=enabled, order=normalized)
+        return registry.routing_policy
+    return {"enabled": enabled, "order": normalized}
 
 
 def _chat_route(message: str, uploads: list[dict[str, object]] | None = None) -> str:
@@ -628,21 +840,30 @@ def _chat_system_prompt(route: str) -> str:
         "and adapt depth to the user's question. Answer in Markdown. "
         "Use tables when comparing evidence, IOCs, MITRE ATT&CK techniques, timelines, or recommendations. "
         "Use fenced code blocks for commands, logs, JSON, regexes, and scripts. "
-        "Do not invent facts; clearly mark uncertainty and recommend verification steps."
+        "Never invent evidence, malware families, threat actors, or intelligence. Clearly distinguish recorded facts "
+        "from hypotheses and recommend collection or verification when the supplied record is insufficient."
     )
     if route == "investigation":
-        return (
+        prompt = (
             base
-            + " Use the supplied current case, evidence, timeline, reports, threat score, conversation history, and uploads only as needed."
+            + " Use only the supplied case, evidence, timeline, reports, source catalog, conversation history, and "
+            "uploads. Structure substantive answers with Assessment, Supporting evidence, Hypotheses, Confidence, "
+            "and Recommended next steps. Prefix inferences with 'Hypothesis:'. Cite records with their supplied "
+            "source IDs (for example [EVIDENCE:EV-001]); if no record supports a claim, say so explicitly."
         )
-    if route == "cybersecurity":
-        return (
+    elif route == "cybersecurity":
+        prompt = (
             base + " Answer the cybersecurity question directly without assuming a specific case unless the user asks."
         )
-    return (
-        base
-        + " Treat this as normal conversation. Do not force an investigation summary or mention case context unless asked."
-    )
+    else:
+        prompt = (
+            base
+            + " Treat this as normal conversation. Do not force an investigation summary or mention case context unless asked."
+        )
+    managed, version = _managed_prompt(f"chat.{route}")
+    if managed:
+        prompt += f"\nManaged workload instructions ({version}): {managed}"
+    return prompt
 
 
 def _chat_user_payload(
@@ -698,8 +919,98 @@ def _relevant_investigation_context(context: dict[str, object], query: str) -> d
         ),
         "timeline": ranked("timeline", 12, ("event_type", "summary", "details")),
         "reports": ranked("reports", 5, ("title", "report_type", "status")),
-        "threat_score": context.get("threat_score"),
+        "source_catalog": _ai_grounding(context)["sources"],
         "uploaded_evidence": context.get("uploaded_evidence", []),
+    }
+
+
+def _ai_grounding(context: dict[str, object]) -> dict[str, object]:
+    """Describe the real records available to the assistant without scoring truth."""
+    case = context.get("case") if isinstance(context.get("case"), dict) else {}
+    evidence = [item for item in context.get("evidence", []) if isinstance(item, dict)]
+    timeline = [item for item in context.get("timeline", []) if isinstance(item, dict)]
+    reports = [item for item in context.get("reports", []) if isinstance(item, dict)]
+    sources: list[dict[str, object]] = []
+    if case:
+        case_number = str(case.get("case_number") or context.get("case_number") or "CASE")
+        sources.append(
+            {
+                "id": f"CASE:{case_number}",
+                "type": "case",
+                "entity_id": case.get("id"),
+                "label": case_number,
+                "summary": case.get("title"),
+            }
+        )
+    for item in evidence:
+        number = str(item.get("evidence_number") or item.get("id") or "record")
+        sources.append(
+            {
+                "id": f"EVIDENCE:{number}",
+                "type": "evidence",
+                "entity_id": item.get("id"),
+                "label": number,
+                "summary": item.get("original_filename"),
+                "sha256": item.get("sha256"),
+            }
+        )
+    for item in timeline:
+        identifier = str(item.get("id") or "record")
+        sources.append(
+            {
+                "id": f"TIMELINE:{identifier}",
+                "type": "timeline",
+                "entity_id": item.get("id"),
+                "label": item.get("event_type") or "Timeline event",
+                "summary": item.get("summary"),
+                "occurred_at": item.get("occurred_at"),
+            }
+        )
+    for item in reports:
+        identifier = str(item.get("id") or "record")
+        sources.append(
+            {
+                "id": f"REPORT:{identifier}",
+                "type": "report",
+                "entity_id": item.get("id"),
+                "label": item.get("title") or item.get("report_type") or "Report",
+                "summary": item.get("status"),
+            }
+        )
+    categories = sum(bool(records) for records in (evidence, timeline, reports))
+    if not case:
+        level, rationale = "insufficient", "No accessible investigation is attached to this conversation."
+    elif not sources[1:]:
+        level, rationale = (
+            "limited",
+            "Only the investigation record is available; no supporting artifacts are recorded.",
+        )
+    elif categories >= 2 and evidence:
+        level, rationale = (
+            "moderate",
+            "Multiple investigation record types are available; analyst validation is still required.",
+        )
+    else:
+        level, rationale = "limited", "The response is grounded in a single supporting record category."
+    next_steps: list[str] = []
+    if case and not evidence:
+        next_steps.append("Collect and preserve relevant evidence with hashes and acquisition details.")
+    if evidence and not timeline:
+        next_steps.append("Reconstruct a timeline from validated evidence and recorded activity.")
+    if evidence and not reports:
+        next_steps.append("Validate findings before creating an investigation report.")
+    if not case:
+        next_steps.append("Select an accessible investigation to enable evidence-grounded assistance.")
+    return {
+        "confidence": {
+            "level": level,
+            "basis": "available investigation data coverage",
+            "rationale": rationale,
+        },
+        "counts": {"evidence": len(evidence), "timeline": len(timeline), "reports": len(reports)},
+        "sources": sources,
+        "recommended_next_steps": next_steps,
+        "disclaimer": "Confidence describes source coverage, not the probability that a conclusion is correct.",
     }
 
 
@@ -784,8 +1095,9 @@ def _generate_chat_reply(
     uploads: list[dict[str, object]] | None = None,
 ) -> tuple[str | None, dict[str, object]]:
     registry, _, _ = _ai_runtime()
-    selected_provider = str(current_app.config.get("AI_PROVIDER", "ollama"))
     route = _chat_route(user_message, uploads)
+    assignment = _workload_assignment(f"chat.{route}")
+    selected_provider = assignment["provider"]
     instant = _instant_chat_reply(user_message) if route == "general" else None
     if instant:
         return instant, {
@@ -799,7 +1111,7 @@ def _generate_chat_reply(
             "finish_reason": "completed",
         }
     status = _provider_status()
-    selected_model = str(current_app.config.get("AI_MODEL") or status.get("model") or "qwen3:8b")
+    selected_model = assignment["model"]
     ai_disabled = not bool(current_app.config.get("AI_ENABLED", True))
     test_live_ai_disabled = bool(current_app.config.get("TESTING")) and not bool(current_app.config.get("AI_ENABLED"))
     if registry is None or ai_disabled or test_live_ai_disabled:
@@ -817,7 +1129,14 @@ def _generate_chat_reply(
     try:
         started_at = time.perf_counter()
         provider = registry.select(selected_provider)
-        actual_model = str(getattr(provider, "model", None) or selected_model)
+        resolved_provider = (
+            provider.provider_name.value if hasattr(provider.provider_name, "value") else str(provider.provider_name)
+        )
+        actual_model = (
+            selected_model
+            if resolved_provider == selected_provider
+            else str(getattr(provider, "model", None) or selected_model)
+        )
         response = provider.generate(
             AIRequest(
                 model=actual_model,
@@ -897,8 +1216,9 @@ def _stream_provider_reply(
     uploads: list[dict[str, object]] | None,
 ):
     registry, _, _ = _ai_runtime()
-    selected_provider = str(current_app.config.get("AI_PROVIDER", "ollama"))
     route = _chat_route(message, uploads)
+    assignment = _workload_assignment(f"chat.{route}")
+    selected_provider = assignment["provider"]
     instant = _instant_chat_reply(message) if route == "general" else None
     if instant:
         return iter((instant,)), {
@@ -912,8 +1232,13 @@ def _stream_provider_reply(
     if registry is None or not bool(current_app.config.get("AI_ENABLED", True)):
         raise AIProviderUnavailable("No AI provider available.")
     provider = registry.select(selected_provider)
-    model = str(
-        getattr(provider, "model", None) or current_app.config.get("AI_MODEL") or status.get("model") or "qwen3:8b"
+    provider_name = (
+        provider.provider_name.value if hasattr(provider.provider_name, "value") else str(provider.provider_name)
+    )
+    model = (
+        assignment["model"]
+        if provider_name == selected_provider
+        else str(getattr(provider, "model", None) or status.get("model") or "qwen3:8b")
     )
     request_payload = AIRequest(
         model=model,
@@ -922,9 +1247,6 @@ def _stream_provider_reply(
         max_output_tokens=int(current_app.config.get("AI_MAX_TOKENS") or 1200),
         stream=True,
         metadata={"case_id": str(context.get("case_id") or "")},
-    )
-    provider_name = (
-        provider.provider_name.value if hasattr(provider.provider_name, "value") else str(provider.provider_name)
     )
     stream_status = {
         **status,
@@ -946,8 +1268,23 @@ def _stream_provider_reply(
 
 
 def _tail_file(path: Path, *, lines: int = 80) -> list[str]:
+    """Read a bounded file tail without loading a potentially large log into memory."""
+    if lines <= 0:
+        return []
     try:
-        return path.read_text(encoding="utf-8", errors="replace").splitlines()[-lines:]
+        with path.open("rb") as stream:
+            stream.seek(0, 2)
+            position = stream.tell()
+            chunks: list[bytes] = []
+            newline_count = 0
+            while position > 0 and newline_count <= lines:
+                block_size = min(8192, position)
+                position -= block_size
+                stream.seek(position)
+                chunk = stream.read(block_size)
+                chunks.append(chunk)
+                newline_count += chunk.count(b"\n")
+        return b"".join(reversed(chunks)).decode("utf-8", errors="replace").splitlines()[-lines:]
     except OSError:
         return []
 
@@ -1115,46 +1452,29 @@ def _ai_completion(task: str, payload: dict[str, object], *, max_tokens: int = 7
 
 
 def _local_report_analysis(document: dict[str, object], context: dict[str, object]) -> str:
-    registry, _, analysis_engine = _ai_runtime()
-    _ = registry
     evidence = context.get("evidence", []) if isinstance(context.get("evidence"), list) else []
     timeline = context.get("timeline", []) if isinstance(context.get("timeline"), list) else []
-    reports = context.get("reports", []) if isinstance(context.get("reports"), list) else []
-    text = json.dumps({"report": document, "context": context}, default=str)
-    analysis = analysis_engine.analyze_text(text) if analysis_engine is not None else None
-    threat_score = analysis.threat_score if analysis is not None else document.get("threat_score", 0)
-    iocs = analysis.iocs if analysis is not None else {}
-    mitre = analysis.mitre_attack if analysis is not None else []
-    recommendations = (
-        analysis.recommendations if analysis is not None else ["Review evidence, timeline, and report gaps."]
+    findings = document.get("findings", []) if isinstance(document.get("findings"), list) else []
+    indicators = document.get("iocs", []) if isinstance(document.get("iocs"), list) else []
+    mappings = document.get("mitre_attack", []) if isinstance(document.get("mitre_attack"), list) else []
+    recommendations = document.get("recommendations", []) if isinstance(document.get("recommendations"), list) else []
+    source_complete = all(
+        isinstance(item, dict) and isinstance(item.get("source"), dict) and item["source"].get("evidence_id")
+        for item in findings
     )
-    ioc_count = sum(len(values) for values in iocs.values()) if isinstance(iocs, dict) else 0
-    mitre_lines = (
-        "\n".join(
-            f"- {item.get('technique_id', 'Unknown')}: {item.get('technique', 'Technique')}" for item in mitre[:8]
-        )
-        if mitre
-        else "- No confident MITRE mapping was detected from the available local context."
-    )
-    recommendation_lines = "\n".join(f"- {item}" for item in recommendations[:8])
     return (
-        "## Executive Summary\n"
-        f"This report was reviewed with {len(evidence)} evidence item(s), {len(timeline)} timeline event(s), "
-        f"and {len(reports)} related report record(s). Local analysis found {ioc_count} IOC candidate(s).\n\n"
-        "## Threat Assessment\n"
-        f"Risk score: **{threat_score}/100**. Validate the highest-risk evidence and timeline events before release.\n\n"
-        "## MITRE Mapping\n"
-        f"{mitre_lines}\n\n"
-        "## IOC Analysis\n"
-        f"{ioc_count} candidate indicator(s) were extracted from report and investigation context.\n\n"
-        "## Recommendations\n"
-        f"{recommendation_lines}\n\n"
-        "## Confidence\n"
-        "Medium when local analysis is used; high-confidence conclusions require live AI enrichment and analyst review.\n\n"
-        "## Evidence Quality\n"
-        "Confirm hashes, custody timestamps, acquisition source, and analysis completeness for every evidence item.\n\n"
-        "## Missing Information\n"
-        "Document business impact, affected assets, containment status, and any unresolved timeline gaps."
+        "## Recorded Content Review\n"
+        f"The report contains {len(evidence)} evidence item(s), {len(timeline)} timeline event(s), "
+        f"{len(findings)} source-linked finding(s), {len(indicators)} indicator(s), "
+        f"{len(mappings)} recorded ATT&CK mapping(s), and {len(recommendations)} recorded recommendation(s).\n\n"
+        "## Traceability\n"
+        f"Finding source references are {'complete' if source_complete else 'incomplete and require investigator review'}.\n\n"
+        "## Authorship\n"
+        "This fallback review reports document structure only. It does not introduce findings, conclusions, "
+        "recommendations, indicators, or ATT&CK mappings.\n\n"
+        "## Review Status\n"
+        f"The report remains **{document.get('review', {}).get('status', 'draft')}** until an authorized investigator "
+        "reviews and approves it."
     )
 
 
@@ -1225,7 +1545,6 @@ def _investigation_context(case_id: str | None = None) -> dict[str, object]:
         "evidence": evidence,
         "timeline": timeline,
         "reports": reports,
-        "threat_score": min(100, len(timeline) * 10),
         "plugins": plugins,
     }
     current_app.extensions[cache_key] = {"created_at": time.time(), "payload": payload}
@@ -1234,43 +1553,71 @@ def _investigation_context(case_id: str | None = None) -> dict[str, object]:
 
 def _build_report_document(case_id: UUID, report_type: str, ai_summary: dict[str, object]) -> dict[str, object]:
     context = _investigation_context(str(case_id))
+    case = context["case"] or {}
     evidence = context["evidence"]
     timeline = context["timeline"]
-    threat_score = min(
-        100,
-        sum(
-            15 if "evidence" in item["event_type"] else 12 if "report" in item["event_type"] else 10
-            for item in timeline
-        ),
-    )
-    iocs: list[str] = []
-    mitre = []
+    findings: list[dict[str, object]] = []
+    iocs: list[dict[str, object]] = []
+    mitre: list[dict[str, object]] = []
     for item in evidence:
-        report = item.get("analysis_report") or {}
-        root = report.get("root", {}) if isinstance(report, dict) else {}
-        for flag in root.get("flags", []) if isinstance(root, dict) else []:
-            iocs.append(str(flag))
-        for finding in report.get("findings", []) if isinstance(report, dict) else []:
-            detail = str(finding.get("detail", ""))
-            if detail and detail not in iocs:
-                iocs.append(detail)
-    if any("credential" in str(item).lower() or "phish" in str(item).lower() for item in timeline):
-        mitre.append({"technique_id": "T1566", "technique_name": "Phishing", "tactic": "Initial Access"})
-    if any("archive" in str(item).lower() or "compression" in str(item).lower() for item in evidence):
-        mitre.append(
-            {"technique_id": "T1027", "technique_name": "Obfuscated Files or Information", "tactic": "Defense Evasion"}
+        analysis = item.get("analysis_report") or {}
+        if not isinstance(analysis, dict):
+            continue
+        source = {
+            "evidence_id": item.get("id"),
+            "evidence_number": item.get("evidence_number"),
+            "sha256": item.get("sha256"),
+        }
+        for finding in analysis.get("findings", []) if isinstance(analysis.get("findings"), list) else []:
+            if not isinstance(finding, dict):
+                continue
+            findings.append(
+                {
+                    "title": finding.get("title") or finding.get("type") or "Recorded forensic finding",
+                    "detail": finding.get("detail") or finding.get("description"),
+                    "severity": finding.get("severity"),
+                    "confidence": finding.get("confidence"),
+                    "source": source,
+                    "authorship": "forensic_analysis",
+                }
+            )
+        for indicator in analysis.get("ioc_table", []) if isinstance(analysis.get("ioc_table"), list) else []:
+            if isinstance(indicator, dict) and indicator.get("value"):
+                iocs.append({**indicator, "source": source})
+        for mapping in analysis.get("mitre_mapping", []) if isinstance(analysis.get("mitre_mapping"), list) else []:
+            if isinstance(mapping, dict) and mapping.get("technique_id"):
+                mitre.append({**mapping, "source": source})
+    recommendation_rows = list(
+        _db().session.scalars(
+            select(Recommendation).where(Recommendation.case_id == case_id).order_by(Recommendation.created_at)
         )
-    if not mitre:
-        mitre.append(
-            {"technique_id": "Triage", "technique_name": "No direct ATT&CK mapping detected", "tactic": "Analysis"}
-        )
+    )
     recommendations = [
-        "Preserve original evidence and verify SHA-256 before every transfer.",
-        "Review timeline gaps and correlate suspicious events with source evidence.",
-        "Escalate high-entropy, embedded-content, or flag-bearing artifacts for deeper manual review.",
+        {
+            "id": str(item.id),
+            "priority": item.priority,
+            "recommendation": item.recommendation,
+            "rationale": item.rationale,
+            "status": item.status,
+            "authorship": "recorded_recommendation",
+            "source_ai_reasoning_id": str(item.ai_reasoning_id),
+        }
+        for item in recommendation_rows
+    ]
+    reconstruction = _features().timeline.reconstruction.reconstruct(
+        timeline,
+        {
+            str(item["id"]): item["analysis_report"]
+            for item in evidence
+            if isinstance(item.get("analysis_report"), dict)
+        },
+    )
+    notes = [
+        {"content": value, "authorship": "investigator", "source": f"case:{case_id}"}
+        for value in (case.get("investigation_notes"), case.get("notes"))
+        if value
     ]
     charts = {
-        "threat_score": threat_score,
         "timeline_by_group": {
             group: sum(1 for item in timeline if item["event_type"].split(".", 1)[0] == group)
             for group in sorted({item["event_type"].split(".", 1)[0] for item in timeline})
@@ -1284,15 +1631,50 @@ def _build_report_document(case_id: UUID, report_type: str, ai_summary: dict[str
         "title": f"{context['case_number']} {report_type.title()} Report",
         "report_type": report_type,
         "generated_at": utc_now().isoformat(),
-        "executive_summary": f"{context['case_number']} contains {len(evidence)} evidence item(s), {len(timeline)} timeline event(s), and a threat score of {threat_score}/100.",
+        "schema_version": "2.0",
+        "executive_summary": (
+            f"{context['case_number']} contains {len(evidence)} preserved evidence item(s), "
+            f"{len(timeline)} recorded timeline event(s), and {len(findings)} source-linked forensic finding(s)."
+        ),
+        "technical_summary": {
+            "evidence_count": len(evidence),
+            "timeline_event_count": len(timeline),
+            "finding_count": len(findings),
+            "indicator_count": len(iocs),
+            "attack_mapping_count": len(mitre),
+        },
         "investigation_summary": context,
+        "investigator_notes": notes,
         "evidence": evidence,
-        "timeline": timeline,
-        "threat_score": threat_score,
+        "timeline": reconstruction,
+        "findings": findings,
+        "threat_assessment": {
+            "status": "not_scored",
+            "explanation": "No synthetic threat score is generated. Review source-linked findings and provider intelligence.",
+        },
+        "threat_score": None,
+        "threat_intelligence": _threat_intelligence_projection(case_id, enrich=False),
         "iocs": iocs[:50],
         "mitre_attack": mitre,
         "ai_explanation": ai_summary,
         "recommendations": recommendations,
+        "authorship": {
+            "executive_summary": "system-generated from recorded counts",
+            "findings": "forensic analysis",
+            "investigator_notes": "investigator-authored",
+            "ai_explanation": "AI-generated; requires investigator review",
+        },
+        "traceability": {
+            "requirement": "Every finding includes an evidence ID, evidence number, and SHA-256 source reference.",
+            "finding_sources_complete": all(item.get("source", {}).get("evidence_id") for item in findings),
+        },
+        "review": {
+            "status": "draft",
+            "approved_by": None,
+            "approved_at": None,
+            "digital_signature": None,
+            "signature_status": "not_configured",
+        },
         "appendix": {
             "chain_of_custody": "Evidence hashes, acquisition timestamps, and analysis reports are retained in the evidence records.",
             "plugins": context.get("plugins", []),
@@ -1305,19 +1687,25 @@ def _report_markdown(document: dict[str, object]) -> str:
     lines = [f"# {document['title']}", "", f"Generated: {document['generated_at']}", ""]
     for title, key in (
         ("Executive Summary", "executive_summary"),
+        ("Technical Summary", "technical_summary"),
         ("Investigation Summary", "investigation_summary"),
+        ("Investigator Notes", "investigator_notes"),
         ("Evidence", "evidence"),
         ("Timeline", "timeline"),
-        ("Threat Score", "threat_score"),
+        ("Source-linked Findings", "findings"),
+        ("Threat Intelligence", "threat_intelligence"),
         ("IOCs", "iocs"),
         ("MITRE ATT&CK", "mitre_attack"),
         ("AI Explanation", "ai_explanation"),
         ("Recommendations", "recommendations"),
+        ("Authorship", "authorship"),
+        ("Traceability", "traceability"),
+        ("Review", "review"),
         ("Appendix", "appendix"),
         ("Charts", "charts"),
     ):
         lines.extend([f"## {title}", ""])
-        value = document[key]
+        value = document.get(key)
         if isinstance(value, str | int):
             lines.append(str(value))
         else:
@@ -1332,18 +1720,24 @@ def _report_html(document: dict[str, object]) -> str:
     sections = []
     for title, key in (
         ("Executive Summary", "executive_summary"),
+        ("Technical Summary", "technical_summary"),
         ("Investigation Summary", "investigation_summary"),
+        ("Investigator Notes", "investigator_notes"),
         ("Evidence", "evidence"),
         ("Timeline", "timeline"),
-        ("Threat Score", "threat_score"),
+        ("Source-linked Findings", "findings"),
+        ("Threat Intelligence", "threat_intelligence"),
         ("IOCs", "iocs"),
         ("MITRE ATT&CK", "mitre_attack"),
         ("AI Explanation", "ai_explanation"),
         ("Recommendations", "recommendations"),
+        ("Authorship", "authorship"),
+        ("Traceability", "traceability"),
+        ("Review", "review"),
         ("Appendix", "appendix"),
         ("Charts", "charts"),
     ):
-        value = document[key]
+        value = document.get(key)
         body = (
             html.escape(str(value))
             if isinstance(value, str | int)
@@ -1436,12 +1830,19 @@ def _analyze_evidence_record(evidence_id: str):
         payload = _run_evidence_analysis(evidence_id)
     except ValueError as error:
         return _json_error(str(error), 400)
-    except FileNotFoundError as error:
-        return _json_error(f"Evidence file could not be read: {error}", 400)
+    except FileNotFoundError:
+        return _json_error("Evidence custody file is unavailable.", 400)
     return jsonify(payload)
 
 
-def _run_evidence_analysis(evidence_id: str, job_id: str | None = None) -> dict[str, object]:
+def _run_evidence_analysis(
+    evidence_id: str,
+    job_id: str | None = None,
+    *,
+    actor_id: UUID | None = None,
+    actor_username: str | None = None,
+    actor_role: str | None = None,
+) -> dict[str, object]:
     """Run the full forensic evidence analysis and return a JSON-safe payload."""
     _update_analysis_job(job_id, 8, "Loading evidence record")
     try:
@@ -1451,7 +1852,7 @@ def _run_evidence_analysis(evidence_id: str, job_id: str | None = None) -> dict[
     if evidence is None or evidence.deleted_at is not None:
         raise ValueError("Evidence was not found.")
     _update_analysis_job(job_id, 16, "Reading custody file")
-    path = Path(current_app.config["UPLOAD_FOLDER"]) / evidence.storage_path
+    path = _features().evidence.resolve_path(evidence.storage_path)
     try:
         result = ForensicAnalyzer().analyze_path(
             path,
@@ -1476,10 +1877,21 @@ def _run_evidence_analysis(evidence_id: str, job_id: str | None = None) -> dict[
     )
     _invalidate_dashboard_cache()
     payload = {"summary": result.summary, "report": result.report}
-    _update_analysis_job(job_id, 88, "Generating AI report")
+    _update_analysis_job(job_id, 88, "Requesting optional evidence-grounded AI summary")
     payload["ai_explanation"] = _ai_completion(
         "Explain forensic evidence findings, encoding, compression, archive contents, hidden strings, flags, metadata, entropy, and next steps.",
         payload,
+    )
+    result.report["ai_explanation"] = payload["ai_explanation"]
+    evidence.analysis_report = json.dumps(result.report, default=str, indent=2)
+    _db().session.commit()
+    _record_evidence_audit(
+        "evidence.analysis.completed",
+        evidence,
+        actor_id=actor_id,
+        username=actor_username,
+        role=actor_role,
+        reason=f"SHA-256 verified · {evidence.sha256}",
     )
     _update_analysis_job(job_id, 100, "Completed")
     return payload
@@ -1499,10 +1911,16 @@ def _update_analysis_job(job_id: str | None, progress: int, step: str, **extra: 
 def _start_evidence_analysis_job(evidence_id: str) -> dict[str, object]:
     job_id = str(uuid4())
     app = current_app._get_current_object()
+    actor_id = _current_user_id()
+    actor_username = _current_username()
+    actor_role = _current_user_role()
+    evidence = _db().session.get(Evidence, _uuid(evidence_id, "evidence_id"))
     _analysis_jobs()[job_id] = {
         "id": job_id,
         "type": "evidence_analysis",
         "evidence_id": evidence_id,
+        "case_id": str(evidence.case_id) if evidence is not None else None,
+        "owner_user_id": str(evidence.owner_user_id) if evidence is not None and evidence.owner_user_id else None,
         "status": "queued",
         "progress": 0,
         "step": "Queued",
@@ -1514,14 +1932,37 @@ def _start_evidence_analysis_job(evidence_id: str) -> dict[str, object]:
         with app.app_context():
             try:
                 _update_analysis_job(job_id, 3, "Uploading", status="running")
-                payload = _run_evidence_analysis(evidence_id, job_id)
+                payload = _run_evidence_analysis(
+                    evidence_id,
+                    job_id,
+                    actor_id=actor_id,
+                    actor_username=actor_username,
+                    actor_role=actor_role,
+                )
                 _update_analysis_job(job_id, 100, "Completed", status="completed", result=payload)
             except Exception as error:
                 current_app.logger.warning("Evidence analysis job failed: %s", error)
-                _update_analysis_job(job_id, 100, "Failed", status="failed", error=str(error))
+                failed_evidence = _db().session.get(Evidence, UUID(evidence_id))
+                if failed_evidence is not None:
+                    failed_evidence.analysis_status = "failed"
+                    _db().session.commit()
+                    _record_evidence_audit(
+                        "evidence.analysis.failed",
+                        failed_evidence,
+                        actor_id=actor_id,
+                        username=actor_username,
+                        role=actor_role,
+                        result="failure",
+                        reason=error.__class__.__name__,
+                    )
+                safe_error = (
+                    "Evidence integrity verification failed."
+                    if isinstance(error, ValueError) and "integrity verification failed" in str(error)
+                    else "Analysis could not complete safely. Review the server logs for this job."
+                )
+                _update_analysis_job(job_id, 100, "Failed", status="failed", error=safe_error)
 
-    executor = current_app.extensions["cyberinvestigator_executor"]
-    executor.submit(run)
+    current_app.extensions["cyberinvestigator_job_dispatcher"].submit(run)
     return _analysis_jobs()[job_id]
 
 
@@ -1545,14 +1986,16 @@ def _start_report_enrichment_job(report_id: str, report_file: Path, context: dic
             try:
                 _update_analysis_job(job_id, 15, "Generating AI narrative", status="running")
                 ai_summary = _ai_completion(
-                    "Create an investigation report narrative with executive summary, investigation summary, "
-                    "evidence, timeline, threat score, IOCs, MITRE ATT&CK, recommendations, appendix, and charts.",
+                    "Create an explainable report narrative using only the supplied investigation records. Separate "
+                    "confirmed facts from hypotheses, cite evidence IDs for every finding, preserve investigator "
+                    "authorship, and do not invent recommendations, indicators, actors, malware, or ATT&CK mappings.",
                     context,
                     max_tokens=1200,
                 )
                 document = json.loads(report_file.read_text(encoding="utf-8"))
                 document["ai_explanation"] = ai_summary
                 document["ai_summary"] = ai_summary
+                document.setdefault("authorship", {})["ai_explanation"] = "AI-generated; requires investigator review"
                 report_file.write_text(json.dumps(document, indent=2, default=str), encoding="utf-8")
                 report = _db().session.get(Report, UUID(report_id))
                 if report:
@@ -1567,7 +2010,7 @@ def _start_report_enrichment_job(report_id: str, report_file: Path, context: dic
                     _db().session.commit()
                 _update_analysis_job(job_id, 100, "Failed", status="failed", error=str(error))
 
-    current_app.extensions["cyberinvestigator_executor"].submit(run)
+    current_app.extensions["cyberinvestigator_job_dispatcher"].submit(run)
     return _analysis_jobs()[job_id]
 
 
@@ -1593,6 +2036,11 @@ def ai_test_connection():  # type: ignore[no-untyped-def]
     if registry is None:
         return jsonify({"available": False, "provider": provider, "message": "AI runtime is unavailable."}), 503
     status = registry.test_connection(provider)
+    _record_account_audit(
+        "admin.ai_provider.connection_tested",
+        f"ai_provider:{provider}",
+        reason=f"available={status.available}; source={status.health_source}",
+    )
     return jsonify(
         {
             "provider": status.provider,
@@ -1602,8 +2050,209 @@ def ai_test_connection():  # type: ignore[no-untyped-def]
             "message": status.message,
             "endpoint": status.endpoint,
             "installed_models": list(status.installed_models),
+            "health_source": status.health_source,
+            "checked_at": status.checked_at,
         }
     )
+
+
+@api_v1_blueprint.get("/admin/ai/management")
+@require_role("admin")
+def ai_management():  # type: ignore[no-untyped-def]
+    """Return observed provider state, persisted routing, prompts, and provider-reported usage."""
+    registry, _, _ = _ai_runtime()
+    statuses = _provider_status_payload()
+    failover = _configure_ai_failover(registry)
+    credentials = {item.key for item in _db().session.scalars(select(Setting).where(Setting.namespace == "secret.ai"))}
+    workload_assignments = {workload: _workload_assignment(workload) for workload in sorted(AI_WORKLOADS)}
+    prompt_records = []
+    for item in _db().session.scalars(
+        select(Setting).where(Setting.namespace == "ai.prompt.versions").order_by(Setting.updated_at.desc())
+    ):
+        document = _setting_json(item.namespace, item.key, {})
+        if not isinstance(document, dict):
+            continue
+        workload, _, version = item.key.partition(":")
+        prompt_records.append(
+            {
+                "workload": workload,
+                "version": version,
+                "description": document.get("description"),
+                "content": document.get("content"),
+                "created_at": document.get("created_at") or _iso(item.updated_at),
+                "created_by": document.get("created_by"),
+                "active": str(_setting_json("ai.prompt.active", workload, "")) == version,
+            }
+        )
+    reasoning = list(_db().session.scalars(select(AIReasoning).order_by(AIReasoning.created_at.desc()).limit(1000)))
+    usage_by_model: dict[tuple[str, str], dict[str, object]] = {}
+    for item in reasoning:
+        key = (item.provider, item.model)
+        record = usage_by_model.setdefault(
+            key,
+            {
+                "provider": item.provider,
+                "model": item.model,
+                "requests_recorded": 0,
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "token_usage_status": "provider_reported",
+            },
+        )
+        record["requests_recorded"] = int(record["requests_recorded"]) + 1
+        if item.input_tokens is None and item.output_tokens is None:
+            record["token_usage_status"] = "unavailable"
+        record["input_tokens"] = int(record["input_tokens"]) + int(item.input_tokens or 0)
+        record["output_tokens"] = int(record["output_tokens"]) + int(item.output_tokens or 0)
+    providers = []
+    for name, status in statuses.items():
+        providers.append(
+            {
+                **status,
+                "credential_configured": name in credentials
+                or (name == "openai" and bool(current_app.config.get("AI_API_KEY"))),
+                "credential_exposed": False,
+            }
+        )
+    return jsonify(
+        {
+            "selected_provider": current_app.config.get("AI_PROVIDER"),
+            "providers": providers,
+            "workloads": workload_assignments,
+            "prompt_versions": prompt_records,
+            "failover": failover,
+            "usage": list(usage_by_model.values()),
+            "usage_notice": "Token counts are shown only when recorded from provider responses. Latency and cost are unavailable.",
+        }
+    )
+
+
+@api_v1_blueprint.patch("/admin/ai/providers/<provider>")
+@require_role("admin")
+def update_ai_provider(provider: str):  # type: ignore[no-untyped-def]
+    provider = provider.strip().lower()
+    registry, _, _ = _ai_runtime()
+    if registry is None or provider not in _provider_status_payload():
+        return _json_error("Provider is not registered.", 404)
+    document = request.get_json(silent=True) or {}
+    allowed = {"model", "endpoint", "credential"}
+    if any(key not in allowed for key in document):
+        return _json_error("Only model, endpoint, and credential may be configured.", 400)
+    metadata = _setting_json("ai.providers", provider, {})
+    metadata = dict(metadata) if isinstance(metadata, dict) else {}
+    if "model" in document:
+        model = _normalize_text(document.get("model"), limit=255)
+        if not model:
+            return _json_error("Model must not be empty.", 400)
+        metadata["model"] = model
+    if "endpoint" in document:
+        if provider != "ollama":
+            return _json_error("A managed endpoint is supported only for the local Ollama adapter.", 400)
+        try:
+            metadata["endpoint"] = _validated_ai_endpoint(document.get("endpoint"))
+        except ValueError as error:
+            return _json_error(str(error), 400)
+    if "credential" in document:
+        credential = str(document.get("credential") or "")
+        if provider == "ollama":
+            return _json_error("The local Ollama adapter does not use an API credential.", 400)
+        if not credential:
+            return _json_error("Credential must not be empty.", 400)
+        try:
+            vault = CredentialVault(
+                str(current_app.config.get("AI_CREDENTIAL_ENCRYPTION_KEY") or current_app.config["SECRET_KEY"])
+            )
+            _set_setting("secret.ai", provider, vault.encrypt(credential), "encrypted")
+        except CredentialVaultUnavailable as error:
+            return _json_error(str(error), 503)
+    metadata["updated_at"] = utc_now().isoformat()
+    metadata["updated_by"] = _current_username()
+    _set_setting("ai.providers", provider, json.dumps(metadata), "json")
+    managed_config = hydrate_ai_config(current_app.config, _db().session)
+    current_app.extensions["cyberinvestigator_ai_registry"] = build_ai_registry(managed_config)
+    _record_account_audit(
+        "admin.ai_provider.updated",
+        f"ai_provider:{provider}",
+        reason=f"Updated fields: {', '.join(sorted(document))}; credential value was not logged.",
+    )
+    return ai_management()
+
+
+@api_v1_blueprint.patch("/admin/ai/workloads/<workload>")
+@require_role("admin")
+def update_ai_workload(workload: str):  # type: ignore[no-untyped-def]
+    if workload not in AI_WORKLOADS:
+        return _json_error("Unknown AI workload.", 404)
+    document = request.get_json(silent=True) or {}
+    provider = str(document.get("provider") or "").strip().lower()
+    model = _normalize_text(document.get("model"), limit=255)
+    if provider not in _provider_status_payload():
+        return _json_error("Provider is not registered.", 400)
+    if not model:
+        return _json_error("Model must not be empty.", 400)
+    assignment = {"provider": provider, "model": model}
+    _set_setting("ai.workloads", workload, json.dumps(assignment), "json")
+    _record_account_audit(
+        "admin.ai_workload.updated",
+        f"ai_workload:{workload}",
+        reason=f"provider={provider}; model={model}",
+    )
+    return jsonify({"workload": workload, **assignment})
+
+
+@api_v1_blueprint.post("/admin/ai/prompts")
+@require_role("admin")
+def create_ai_prompt_version():  # type: ignore[no-untyped-def]
+    document = request.get_json(silent=True) or {}
+    workload = str(document.get("workload") or "")
+    version = str(document.get("version") or "").strip()
+    content = _normalize_text(document.get("content"), limit=20_000)
+    if workload not in AI_WORKLOADS:
+        return _json_error("Unknown AI workload.", 400)
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}", version):
+        return _json_error("Prompt version must be a 1-64 character version identifier.", 400)
+    if not content:
+        return _json_error("Prompt content must not be empty.", 400)
+    key = f"{workload}:{version}"
+    if _setting_value("ai.prompt.versions", key):
+        return _json_error("Prompt versions are immutable; choose a new version.", 409)
+    prompt = {
+        "content": content,
+        "description": _normalize_text(document.get("description"), limit=2000),
+        "created_at": utc_now().isoformat(),
+        "created_by": _current_username(),
+    }
+    _set_setting("ai.prompt.versions", key, json.dumps(prompt), "json")
+    if bool(document.get("activate", True)):
+        _set_setting("ai.prompt.active", workload, json.dumps(version), "json")
+    _record_account_audit(
+        "admin.ai_prompt.created",
+        f"ai_prompt:{key}",
+        reason=f"activate={bool(document.get('activate', True))}",
+    )
+    return jsonify({"workload": workload, "version": version, "active": bool(document.get("activate", True))}), 201
+
+
+@api_v1_blueprint.patch("/admin/ai/failover")
+@require_role("admin")
+def update_ai_failover():  # type: ignore[no-untyped-def]
+    document = request.get_json(silent=True) or {}
+    order = document.get("order", [])
+    providers = set(_provider_status_payload())
+    if not isinstance(order, list) or not order or any(str(item) not in providers for item in order):
+        return _json_error("Failover order must contain registered providers.", 400)
+    if len(set(map(str, order))) != len(order):
+        return _json_error("Failover order must not contain duplicates.", 400)
+    policy = {"enabled": bool(document.get("enabled", True)), "order": [str(item) for item in order]}
+    _set_setting("ai.platform", "failover", json.dumps(policy), "json")
+    registry, _, _ = _ai_runtime()
+    _configure_ai_failover(registry)
+    _record_account_audit(
+        "admin.ai_failover.updated",
+        "ai_platform:failover",
+        reason=f"enabled={policy['enabled']}; order={','.join(policy['order'])}",
+    )
+    return jsonify(policy)
 
 
 @api_v1_blueprint.get("/openapi.json")
@@ -1632,9 +2281,17 @@ def ai_chat():  # type: ignore[no-untyped-def]
     history = document.get("history", [])
     if not isinstance(history, list):
         history = []
-    route = _chat_route(user_message, uploads)
+    requested_case_id = str(document.get("case_id") or "").strip()
+    if requested_case_id:
+        try:
+            parsed_case_id = _uuid(requested_case_id, "case_id")
+        except ValueError as error:
+            return _json_error(str(error), 400)
+        if not _case_accessible(parsed_case_id):
+            return _forbidden("You do not have access to this investigation.")
+    route = "investigation" if requested_case_id else _chat_route(user_message, uploads)
     context = (
-        _investigation_context(str(document.get("case_id") or "") or None)
+        _investigation_context(requested_case_id or None)
         if route == "investigation"
         else {"case_id": None, "evidence": [], "timeline": [], "reports": [], "plugins": []}
     )
@@ -1664,7 +2321,8 @@ def ai_chat():  # type: ignore[no-untyped-def]
             "context": context,
             "uploads": uploads or [],
             "provider_status": status,
-            "conversation_id": str(conversation.id),
+            "conversation_id": str(conversation.conversation_id),
+            "grounding": _ai_grounding(context),
         }
     )
 
@@ -1784,9 +2442,19 @@ def ai_chat_stream():  # type: ignore[no-untyped-def]
                 return
             history = document.get("history", [])
             history = history if isinstance(history, list) else []
-            route = _chat_route(message, uploads)
+            requested_case_id = str(document.get("case_id") or "").strip()
+            if requested_case_id:
+                try:
+                    parsed_case_id = _uuid(requested_case_id, "case_id")
+                except ValueError as error:
+                    yield _sse({"type": "error", "message": str(error)})
+                    return
+                if not _case_accessible(parsed_case_id):
+                    yield _sse({"type": "error", "message": "You do not have access to this investigation."})
+                    return
+            route = "investigation" if requested_case_id else _chat_route(message, uploads)
             context = (
-                _investigation_context(str(document.get("case_id") or "") or None)
+                _investigation_context(requested_case_id or None)
                 if route == "investigation"
                 else {"case_id": None, "evidence": [], "timeline": [], "reports": [], "plugins": []}
             )
@@ -1825,6 +2493,7 @@ def ai_chat_stream():  # type: ignore[no-untyped-def]
                     "provider_status": status,
                     "uploads": uploads or [],
                     "conversation_id": str(conversation.conversation_id),
+                    "grounding": _ai_grounding(context),
                 }
             )
         except Exception as error:
@@ -1958,6 +2627,8 @@ def plugin_inventory():  # type: ignore[no-untyped-def]
     for metadata, lifecycle_status in metadata_records:
         if not isinstance(metadata, PluginMetadata):
             continue
+        granted = _setting_json("plugin.permissions", metadata.identifier, [])
+        granted_permissions = [str(item) for item in granted] if isinstance(granted, list) else []
         plugins.append(
             {
                 "id": metadata.identifier,
@@ -1968,6 +2639,29 @@ def plugin_inventory():  # type: ignore[no-untyped-def]
                     item.value if hasattr(item, "value") else str(item) for item in metadata.supported_artifact_types
                 ],
                 "capabilities": list(metadata.capabilities),
+                "category": metadata.category,
+                "requested_permissions": list(metadata.permissions),
+                "granted_permissions": granted_permissions,
+                "permissions_satisfied": set(metadata.permissions).issubset(granted_permissions),
+                "configuration_schema": dict(metadata.configuration.schema),
+                "configuration_defaults": dict(metadata.configuration.defaults),
+                "configuration": _setting_json("plugin.configuration", metadata.identifier, {}),
+                "configured": bool(_setting_value("plugin.configuration", metadata.identifier)),
+                "credential_configured": bool(_setting_value("secret.plugin", metadata.identifier)),
+                "credential_exposed": False,
+                "connector_operations": [
+                    operation
+                    for operation, method_name in (("health", "health"), ("sync", "synchronize"))
+                    if callable(
+                        getattr(
+                            loader._loaded[metadata.identifier].plugin
+                            if loader is not None
+                            else registry.get(metadata.identifier),
+                            method_name,
+                            None,
+                        )
+                    )
+                ],
                 "dependencies": [
                     {
                         "name": dep.name,
@@ -1977,13 +2671,269 @@ def plugin_inventory():  # type: ignore[no-untyped-def]
                     for dep in metadata.dependencies
                 ],
                 "status": lifecycle_status,
-                "marketplace_ready": bool(metadata.description and metadata.version and metadata.capabilities),
+                "marketplace_ready": False,
+                "marketplace_readiness": "not_evaluated",
                 "validation": "valid",
                 "versioning": {"current": metadata.version, "identifier": metadata.identifier},
             }
         )
 
     return jsonify({"enabled": enabled, "count": len(plugins), "plugins": plugins})
+
+
+def _loaded_plugin(plugin_id: str):
+    loader = _plugin_loader()
+    if loader is None:
+        raise PluginLoadError("Plugin loader is unavailable.")
+    return loader._get_loaded(plugin_id)
+
+
+def _plugin_runtime_inputs(plugin_id: str) -> tuple[dict[str, object], dict[str, str]]:
+    configuration = _setting_json("plugin.configuration", plugin_id, {})
+    config_document = dict(configuration) if isinstance(configuration, dict) else {}
+    encrypted = _setting_value("secret.plugin", plugin_id)
+    if not encrypted:
+        return config_document, {}
+    vault = CredentialVault(
+        str(current_app.config.get("PLUGIN_CREDENTIAL_ENCRYPTION_KEY") or current_app.config["SECRET_KEY"])
+    )
+    decrypted = json.loads(vault.decrypt(encrypted))
+    credentials = {str(key): str(value) for key, value in decrypted.items()} if isinstance(decrypted, dict) else {}
+    return config_document, credentials
+
+
+@api_v1_blueprint.get("/admin/plugins/management")
+@require_role("admin")
+def plugin_management():  # type: ignore[no-untyped-def]
+    inventory = plugin_inventory().get_json()
+    jobs = [item for item in _analysis_jobs().values() if str(item.get("type", "")).startswith("plugin_connector_")]
+    health = {
+        item.key: _setting_json(item.namespace, item.key, {})
+        for item in _db().session.scalars(select(Setting).where(Setting.namespace == "plugin.health"))
+    }
+    synchronizations = {
+        item.key: _setting_json(item.namespace, item.key, {})
+        for item in _db().session.scalars(select(Setting).where(Setting.namespace == "plugin.sync"))
+    }
+    failed_jobs = [item for item in jobs if item.get("status") == "failed"]
+    return jsonify(
+        {
+            **inventory,
+            "health": health,
+            "synchronizations": synchronizations,
+            "jobs": jobs[-100:],
+            "errors": failed_jobs[-50:],
+            "updates": [],
+            "updates_notice": "No marketplace or update source is configured; update availability is unknown.",
+            "runtime": {
+                "state": (
+                    "disabled"
+                    if not inventory["enabled"]
+                    else "degraded"
+                    if current_app.extensions.get("cyberinvestigator_plugin_load_error")
+                    else "ready"
+                ),
+                "load_error": bool(current_app.extensions.get("cyberinvestigator_plugin_load_error")),
+                "isolation": "trusted_process",
+                "future_isolation": "external worker boundary prepared",
+            },
+            "categories": ["analysis", *[item.value for item in ConnectorCategory]],
+            "allowed_permissions": sorted(PLUGIN_RUNTIME_PERMISSIONS),
+        }
+    )
+
+
+@api_v1_blueprint.patch("/admin/plugins/<plugin_id>/configuration")
+@require_role("admin")
+def update_plugin_configuration(plugin_id: str):  # type: ignore[no-untyped-def]
+    try:
+        record = _loaded_plugin(plugin_id)
+    except PluginLoadError as error:
+        return _json_error(str(error), 404)
+    document = request.get_json(silent=True) or {}
+    configuration = document.get("configuration", {})
+    credentials = document.get("credentials", {})
+    grants = document.get("granted_permissions", [])
+    if not isinstance(configuration, dict) or not isinstance(credentials, dict) or not isinstance(grants, list):
+        return _json_error("Configuration, credentials, and granted_permissions must use their declared shapes.", 400)
+    metadata = record.plugin.metadata
+    schema = dict(metadata.configuration.schema)
+    public_keys = {
+        str(key)
+        for key, definition in schema.items()
+        if not (isinstance(definition, dict) and definition.get("secret") is True)
+    }
+    secret_keys = {
+        str(key)
+        for key, definition in schema.items()
+        if isinstance(definition, dict) and definition.get("secret") is True
+    }
+    if set(configuration) - public_keys:
+        return _json_error("Configuration contains keys not declared by the plugin schema.", 400)
+    if set(credentials) - secret_keys:
+        return _json_error("Credentials contain keys not declared as secret by the plugin schema.", 400)
+    for key, value in configuration.items():
+        definition = schema.get(key)
+        if not isinstance(definition, dict):
+            continue
+        expected = definition.get("type")
+        valid_type = (
+            expected in {None, "string"}
+            and isinstance(value, str)
+            or expected == "boolean"
+            and isinstance(value, bool)
+            or expected == "integer"
+            and isinstance(value, int)
+            and not isinstance(value, bool)
+            or expected == "number"
+            and isinstance(value, int | float)
+            and not isinstance(value, bool)
+        )
+        if not valid_type:
+            return _json_error(f"Configuration field {key} does not match its declared type.", 400)
+        choices = definition.get("enum")
+        if isinstance(choices, list) and value not in choices:
+            return _json_error(f"Configuration field {key} is not an allowed value.", 400)
+    if any(not isinstance(value, str) or not value for value in credentials.values()):
+        return _json_error("Credential values must be non-empty strings.", 400)
+    requested = set(metadata.permissions)
+    granted = {str(item) for item in grants}
+    if not granted.issubset(requested) or not granted.issubset(PLUGIN_RUNTIME_PERMISSIONS):
+        return _json_error("Granted permissions must be declared by the plugin and allowed by platform policy.", 400)
+    _set_setting("plugin.configuration", plugin_id, json.dumps(configuration), "json")
+    _set_setting("plugin.permissions", plugin_id, json.dumps(sorted(granted)), "json")
+    if credentials:
+        try:
+            vault = CredentialVault(
+                str(current_app.config.get("PLUGIN_CREDENTIAL_ENCRYPTION_KEY") or current_app.config["SECRET_KEY"])
+            )
+            _set_setting("secret.plugin", plugin_id, vault.encrypt(json.dumps(credentials)), "encrypted")
+        except CredentialVaultUnavailable as error:
+            return _json_error(str(error), 503)
+    _record_account_audit(
+        "admin.plugin.configuration.updated",
+        f"plugin:{plugin_id}",
+        reason=(
+            f"configuration_keys={','.join(sorted(configuration)) or 'none'}; "
+            f"credential_keys={','.join(sorted(credentials)) or 'unchanged'}; "
+            f"permissions={','.join(sorted(granted)) or 'none'}"
+        ),
+    )
+    return plugin_management()
+
+
+@api_v1_blueprint.post("/admin/plugins/<plugin_id>/<operation>")
+@require_role("admin")
+def run_plugin_operation(plugin_id: str, operation: str):  # type: ignore[no-untyped-def]
+    if operation not in {"health", "sync"}:
+        return _json_error("Connector operation must be health or sync.", 404)
+    try:
+        loaded = _loaded_plugin(plugin_id)
+        configuration, credentials = _plugin_runtime_inputs(plugin_id)
+    except (PluginLoadError, CredentialVaultUnavailable, json.JSONDecodeError) as error:
+        return _json_error(str(error), 400)
+    if loaded.status.value != "enabled":
+        return _json_error("Plugin must be enabled before connector operations can run.", 409)
+    method_name = "health" if operation == "health" else "synchronize"
+    method = getattr(loaded.plugin, method_name, None)
+    if not callable(method):
+        return _json_error(f"Plugin does not implement connector {operation}.", 409)
+    job_id = str(uuid4())
+    cursor_document = _setting_json("plugin.sync", plugin_id, {})
+    cursor = cursor_document.get("cursor") if isinstance(cursor_document, dict) else None
+    _analysis_jobs()[job_id] = {
+        "id": job_id,
+        "type": f"plugin_connector_{operation}",
+        "plugin_id": plugin_id,
+        "status": "queued",
+        "progress": 0,
+        "step": "Queued",
+        "created_at": time.time(),
+        "updated_at": time.time(),
+    }
+    app = current_app._get_current_object()
+    actor_id = _current_user_id()
+    actor_name = _current_username()
+    actor_role = _current_user_role()
+
+    def execute_connector_operation() -> None:
+        with app.app_context():
+            _update_analysis_job(job_id, 20, "Connecting", status="running")
+            try:
+                if operation == "health":
+                    result = method(configuration=configuration, credentials=credentials)
+                    if not isinstance(result, ConnectorHealth):
+                        raise TypeError("Connector health must return ConnectorHealth.")
+                    payload = {
+                        "state": result.state.value,
+                        "message": result.message,
+                        "checked_at": result.checked_at,
+                    }
+                    namespace = "plugin.health"
+                else:
+                    result = method(configuration=configuration, credentials=credentials, cursor=cursor)
+                    if not isinstance(result, ConnectorSyncResult):
+                        raise TypeError("Connector synchronization must return ConnectorSyncResult.")
+                    payload = {
+                        "status": result.status,
+                        "records_processed": result.records_processed,
+                        "message": result.message,
+                        "completed_at": result.completed_at,
+                        "cursor": result.cursor,
+                    }
+                    namespace = "plugin.sync"
+                _set_setting(namespace, plugin_id, json.dumps(payload), "json")
+                _update_analysis_job(job_id, 100, "Completed", status="completed", result=payload)
+                _db().session.add(
+                    AuditLog(
+                        user_id=actor_id,
+                        username=actor_name,
+                        role=actor_role,
+                        action=f"admin.plugin.{operation}.completed",
+                        result="success",
+                        affected_object=f"plugin:{plugin_id}",
+                        reason=f"job:{job_id}",
+                    )
+                )
+                _db().session.commit()
+            except Exception:
+                current_app.logger.warning("Plugin connector operation failed for %s; details suppressed.", plugin_id)
+                _update_analysis_job(
+                    job_id,
+                    100,
+                    "Failed",
+                    status="failed",
+                    error="Connector operation failed; review protected server logs.",
+                )
+                _db().session.add(
+                    AuditLog(
+                        user_id=actor_id,
+                        username=actor_name,
+                        role=actor_role,
+                        action=f"admin.plugin.{operation}.failed",
+                        result="failure",
+                        affected_object=f"plugin:{plugin_id}",
+                        reason=f"job:{job_id}",
+                    )
+                )
+                _db().session.commit()
+
+    current_app.extensions["cyberinvestigator_job_dispatcher"].submit(execute_connector_operation)
+    _record_account_audit(
+        f"admin.plugin.{operation}.queued",
+        f"plugin:{plugin_id}",
+        reason=f"job:{job_id}",
+    )
+    return jsonify(_analysis_jobs()[job_id]), 202
+
+
+@api_v1_blueprint.get("/admin/plugins/jobs/<job_id>")
+@require_role("admin")
+def plugin_operation_job(job_id: str):  # type: ignore[no-untyped-def]
+    job = _analysis_jobs().get(job_id)
+    if job is None or not str(job.get("type", "")).startswith("plugin_connector_"):
+        return _json_error("Plugin operation job was not found.", 404)
+    return jsonify(job)
 
 
 @api_v1_blueprint.post("/plugins/reload")
@@ -2002,6 +2952,11 @@ def reload_plugins():  # type: ignore[no-untyped-def]
                 loader.enable(manifest.identifier)
             loaded.append(record)
     current_app.extensions["cyberinvestigator_plugin_loaded_count"] = len(loaded)
+    _record_account_audit(
+        "admin.plugin.discovery.completed",
+        "plugin_registry",
+        reason=f"loaded={len(loaded)}",
+    )
     return plugin_inventory()
 
 
@@ -2020,24 +2975,51 @@ def upload_plugin():  # type: ignore[no-untyped-def]
     destination = (plugin_root / Path(safe_name).stem).resolve()
     if not str(destination).startswith(str(plugin_root.resolve())):
         return _json_error("Plugin destination is unsafe.", 400)
-    destination.mkdir(parents=True, exist_ok=True)
     if safe_name.lower().endswith(".zip"):
         try:
             with zipfile.ZipFile(BytesIO(upload.read())) as archive:
-                for member in archive.infolist():
+                members = archive.infolist()
+                if len(members) > int(current_app.config.get("PLUGIN_ARCHIVE_MAX_FILES", 256)):
+                    return _json_error("Plugin archive contains too many files.", 400)
+                expanded_size = sum(member.file_size for member in members)
+                if expanded_size > int(current_app.config.get("PLUGIN_ARCHIVE_MAX_EXPANDED_BYTES", 50 * 1024 * 1024)):
+                    return _json_error("Plugin archive exceeds the expanded-size limit.", 400)
+                for member in members:
                     target = (destination / member.filename).resolve()
                     if not target.is_relative_to(destination):
                         return _json_error("Plugin archive contains an unsafe path.", 400)
+                    if member.flag_bits & 0x1:
+                        return _json_error("Encrypted plugin archive members are not supported.", 400)
+                    mode = member.external_attr >> 16
+                    if stat.S_ISLNK(mode):
+                        return _json_error("Plugin archive symbolic links are not allowed.", 400)
+                manifests = [member for member in members if member.filename.replace("\\", "/") == "plugin.toml"]
+                if len(manifests) != 1:
+                    return _json_error("Plugin archive must contain exactly one plugin.toml manifest.", 400)
+                try:
+                    manifest_document = tomllib.loads(archive.read(manifests[0]).decode("utf-8"))
+                    declared_hash = manifest_document["plugin"]["sha256"]
+                except (KeyError, TypeError, UnicodeDecodeError, tomllib.TOMLDecodeError):
+                    return _json_error("Uploaded plugin manifest must declare its module SHA-256.", 400)
+                if not isinstance(declared_hash, str) or not re.fullmatch(r"[a-fA-F0-9]{64}", declared_hash):
+                    return _json_error("Uploaded plugin manifest SHA-256 must be a 64-character hex digest.", 400)
+                destination.mkdir(parents=True, exist_ok=True)
                 archive.extractall(destination)
         except zipfile.BadZipFile:
             return _json_error("Plugin archive is not a valid ZIP file.", 400)
     else:
+        destination.mkdir(parents=True, exist_ok=True)
         upload.save(destination / safe_name)
     try:
         response = reload_plugins()
     except PluginLoadError as error:
         return _json_error(f"Plugin uploaded but validation failed: {error}", 400)
     inventory = response.get_json()
+    _record_account_audit(
+        "admin.plugin.installed",
+        f"plugin_package:{safe_name}",
+        reason=f"loaded={inventory.get('count', 0)}",
+    )
     return jsonify({"uploaded": safe_name, "loaded": inventory.get("count", 0), "inventory": inventory}), 201
 
 
@@ -2065,10 +3047,27 @@ def plugin_lifecycle(plugin_id: str, action: str):  # type: ignore[no-untyped-de
             plugin_root = Path(current_app.config["PLUGINS_FOLDER"]).resolve()
             if plugin_dir.exists() and str(plugin_dir).startswith(str(plugin_root)):
                 shutil.rmtree(plugin_dir)
+            for namespace in (
+                "plugin.configuration",
+                "plugin.permissions",
+                "plugin.health",
+                "plugin.sync",
+                "secret.plugin",
+            ):
+                setting = _db().session.scalar(
+                    select(Setting).where(Setting.namespace == namespace, Setting.key == plugin_id)
+                )
+                if setting is not None:
+                    _db().session.delete(setting)
+            _db().session.commit()
         else:
             return _json_error("Unsupported plugin action.", 404)
     except (KeyError, PluginLoadError, OSError) as error:
         return _json_error(str(error), 400)
+    _record_account_audit(
+        f"admin.plugin.{action}",
+        f"plugin:{plugin_id}",
+    )
     return plugin_inventory()
 
 
@@ -2147,10 +3146,129 @@ def create_case():  # type: ignore[no-untyped-def]
             details=created.title,
         )
         _stamp_case_children(created.id)
+        _record_case_audit("case.created", case_record)
         _invalidate_dashboard_cache()
         return jsonify(_case_json(case_record)), 201
     except (ValueError, CaseManagementError) as error:
         return _json_error(str(error), 400)
+
+
+@api_v1_blueprint.get("/cases/<case_id>/workspace")
+def case_workspace(case_id: str):  # type: ignore[no-untyped-def]
+    """Return an ownership-scoped, read-only investigation workspace projection."""
+
+    try:
+        parsed_case_id = _uuid(case_id, "case_id")
+    except ValueError as error:
+        return _json_error(str(error), 400)
+    if not _case_accessible(parsed_case_id):
+        return _forbidden()
+
+    session = _db().session
+    case = session.get(Case, parsed_case_id)
+    if case is None or case.deleted_at is not None:
+        return _json_error("Case not found.", 404)
+
+    evidence = list(
+        session.scalars(
+            select(Evidence)
+            .where(Evidence.case_id == parsed_case_id, Evidence.deleted_at.is_(None))
+            .order_by(Evidence.acquired_at.desc())
+            .limit(12)
+        )
+    )
+    timeline = list(
+        session.scalars(
+            select(TimelineEvent)
+            .where(TimelineEvent.case_id == parsed_case_id)
+            .order_by(TimelineEvent.occurred_at.desc())
+            .limit(20)
+        )
+    )
+    reports = list(
+        session.scalars(
+            select(Report).where(Report.case_id == parsed_case_id).order_by(Report.generated_at.desc()).limit(12)
+        )
+    )
+    ai_records = list(
+        session.scalars(
+            select(AIReasoning)
+            .where(AIReasoning.case_id == parsed_case_id)
+            .order_by(AIReasoning.created_at.desc())
+            .limit(6)
+        )
+    )
+    recommendations = list(
+        session.scalars(
+            select(Recommendation)
+            .where(Recommendation.case_id == parsed_case_id)
+            .order_by(Recommendation.created_at.desc())
+            .limit(6)
+        )
+    )
+    timeline_payload = [_timeline_json(item) for item in timeline]
+    threat_signals = [
+        item
+        for item in timeline_payload
+        if str(item.get("threat_level") or "").lower() in {"critical", "high"}
+        or any(term in str(item.get("event_type") or "").lower() for term in ("threat", "indicator", "ioc"))
+    ]
+    evidence_total = (
+        session.scalar(
+            select(func.count())
+            .select_from(Evidence)
+            .where(Evidence.case_id == parsed_case_id, Evidence.deleted_at.is_(None))
+        )
+        or 0
+    )
+    timeline_total = (
+        session.scalar(select(func.count()).select_from(TimelineEvent).where(TimelineEvent.case_id == parsed_case_id))
+        or 0
+    )
+    reports_total = (
+        session.scalar(select(func.count()).select_from(Report).where(Report.case_id == parsed_case_id)) or 0
+    )
+    ai_total = (
+        session.scalar(select(func.count()).select_from(AIReasoning).where(AIReasoning.case_id == parsed_case_id)) or 0
+    ) + (
+        session.scalar(select(func.count()).select_from(Recommendation).where(Recommendation.case_id == parsed_case_id))
+        or 0
+    )
+    return jsonify(
+        {
+            "case": _case_json(case, include_related=False),
+            "evidence": [_evidence_json(item) for item in evidence],
+            "timeline": timeline_payload,
+            "reports": [_report_json(item) for item in reports],
+            "ai_findings": [
+                {
+                    "title": f"{record.provider} / {record.model}",
+                    "body": _short_text(record.reasoning, "AI reasoning record available."),
+                    "created_at": _iso(record.created_at),
+                    "kind": "reasoning",
+                }
+                for record in ai_records
+            ]
+            + [
+                {
+                    "title": f"{item.priority.title()} priority recommendation",
+                    "body": _short_text(item.recommendation, "Open recommendation."),
+                    "created_at": _iso(item.created_at),
+                    "kind": "recommendation",
+                    "status": item.status,
+                }
+                for item in recommendations
+            ],
+            "threat_signals": threat_signals,
+            "counts": {
+                "evidence": evidence_total,
+                "timeline": timeline_total,
+                "reports": reports_total,
+                "ai_findings": ai_total,
+                "threat_signals": len(threat_signals),
+            },
+        }
+    )
 
 
 @api_v1_blueprint.patch("/cases/<case_id>")
@@ -2182,6 +3300,7 @@ def update_case(case_id: str):  # type: ignore[no-untyped-def]
             details="Case details, owner, priority, tags, notes, or relationships were updated.",
         )
         _stamp_case_children(parsed_case_id)
+        _record_case_audit("case.updated", case_record)
         _invalidate_dashboard_cache()
         return jsonify(_case_json(case_record))
     except (ValueError, CaseManagementError) as error:
@@ -2214,11 +3333,130 @@ def case_action(case_id: str, action: str):  # type: ignore[no-untyped-def]
                 record.status = "deleted"
         else:
             return _json_error("Unsupported case action.", 404)
+        _timeline_service().record_investigation_event(
+            case_id=parsed,
+            event_type=f"case.{action}d" if action != "close" else "case.closed",
+            summary=f"Case lifecycle changed: {action}",
+            details=f"Investigation was {action}d by {_current_username()}.",
+        )
+        if record is not None:
+            audit_action = "case.closed" if action == "close" else f"case.{action}d"
+            _record_case_audit(audit_action, record)
         _invalidate_dashboard_cache()
         _db().session.commit()
         return jsonify(_case_json(_db().session.get(Case, parsed)))
     except (ValueError, CaseManagementError) as error:
         return _json_error(str(error), 400)
+
+
+def _case_indicator_inventory(case_id: UUID) -> tuple[list[object], dict[tuple[str, str], list[dict[str, str]]]]:
+    """Collect normalized indicators and their evidence provenance."""
+    aliases = {"ip": "ipv4", "ip_address": "ipv4", "hash": "sha256"}
+    normalized: dict[tuple[str, str], object] = {}
+    sources: dict[tuple[str, str], list[dict[str, str]]] = {}
+    records = _db().session.scalars(select(Evidence).where(Evidence.case_id == case_id, Evidence.deleted_at.is_(None)))
+    for evidence in records:
+        candidates: list[tuple[str, str]] = [("sha256", evidence.sha256)]
+        report = _stored_json(evidence.analysis_report)
+        if isinstance(report, dict):
+            for item in report.get("ioc_table", []) if isinstance(report.get("ioc_table"), list) else []:
+                if isinstance(item, dict) and item.get("type") and item.get("value"):
+                    candidates.append((str(item["type"]), str(item["value"])))
+        for raw_type, raw_value in candidates:
+            indicator_type = aliases.get(raw_type.strip().lower(), raw_type.strip().lower())
+            try:
+                indicator = normalize_indicator(indicator_type, raw_value)
+            except (KeyError, ValueError):
+                continue
+            key = (indicator.type.value, indicator.value)
+            normalized[key] = indicator
+            source = {
+                "evidence_id": str(evidence.id),
+                "evidence_number": evidence.evidence_number,
+                "filename": evidence.original_filename,
+            }
+            if source not in sources.setdefault(key, []):
+                sources[key].append(source)
+    return list(normalized.values()), sources
+
+
+def _threat_intelligence_projection(case_id: UUID, *, enrich: bool) -> dict[str, object]:
+    indicators, sources = _case_indicator_inventory(case_id)
+    engine = _features().threat_intelligence.engine
+    result = engine.correlate(indicators) if enrich else engine.correlate([])
+    if not enrich:
+        result["indicators"] = [
+            {
+                "type": indicator.type.value,
+                "value": indicator.value,
+                "original_value": indicator.original_value,
+                "status": "unknown",
+                "findings": [],
+            }
+            for indicator in indicators
+        ]
+        result["summary"] = {
+            "total": len(indicators),
+            "enriched": 0,
+            "unknown": len(indicators),
+            "providers_queried": 0,
+        }
+    for item in result["indicators"]:
+        item["sources"] = sources.get((str(item["type"]), str(item["value"])), [])
+    findings = result.get("findings", [])
+    result["reputation_counts"] = {
+        reputation: sum(1 for item in findings if item.get("reputation") == reputation)
+        for reputation in ("malicious", "suspicious", "benign")
+    }
+    result["attack_mappings"] = [
+        {
+            "technique_id": technique,
+            "provider": finding["provider"],
+            "indicator": finding["indicator"]["value"],
+            "reference": finding.get("reference"),
+        }
+        for finding in findings
+        for technique in finding.get("attack_techniques", [])
+    ]
+    result["case_id"] = str(case_id)
+    return result
+
+
+@api_v1_blueprint.get("/threat-intelligence")
+def threat_intelligence_snapshot():  # type: ignore[no-untyped-def]
+    case_id = request.args.get("case_id", "")
+    try:
+        parsed = _uuid(case_id, "case_id")
+    except ValueError as error:
+        return _json_error(str(error), 400)
+    if not _case_accessible(parsed):
+        return _forbidden()
+    return jsonify(_threat_intelligence_projection(parsed, enrich=False))
+
+
+@api_v1_blueprint.post("/threat-intelligence/enrich")
+def enrich_threat_intelligence():  # type: ignore[no-untyped-def]
+    document = request.get_json(silent=True) or {}
+    try:
+        parsed = _uuid(str(document.get("case_id") or ""), "case_id")
+    except ValueError as error:
+        return _json_error(str(error), 400)
+    if not _case_accessible(parsed):
+        return _forbidden()
+    case = _db().session.get(Case, parsed)
+    if case is None or case.deleted_at is not None:
+        return _json_error("Case not found.", 404)
+    result = _threat_intelligence_projection(parsed, enrich=True)
+    providers = result.get("providers", [])
+    _record_intelligence_audit(
+        case,
+        result="success",
+        reason=(
+            f"Enrichment completed with {len(providers)} configured provider(s); "
+            f"{result['summary']['enriched']} indicator(s) returned findings."
+        ),
+    )
+    return jsonify(result)
 
 
 @api_v1_blueprint.get("/evidence")
@@ -2300,8 +3538,11 @@ def create_evidence():  # type: ignore[no-untyped-def]
             details=created.original_filename,
         )
         _stamp_case_children(created.case_id)
+        evidence_record = _db().session.get(Evidence, created.id)
+        if evidence_record is not None:
+            _record_evidence_audit("evidence.ingested", evidence_record)
         _invalidate_dashboard_cache()
-        return jsonify(_evidence_json(_db().session.get(Evidence, created.id))), 201
+        return jsonify(_evidence_json(evidence_record)), 201
     except (ValueError, CaseManagementError, EvidenceManagementError) as error:
         return _json_error(str(error), 400)
 
@@ -2312,7 +3553,17 @@ def delete_evidence(evidence_id: str):  # type: ignore[no-untyped-def]
         evidence = _db().session.get(Evidence, _uuid(evidence_id, "evidence_id"))
         if evidence is None or not _case_accessible(evidence.case_id):
             return _forbidden()
+        if _case_has_legal_hold(evidence.case_id):
+            return _json_error("Evidence is protected by an active investigation legal hold.", 409)
         deleted = _evidence_service().delete_evidence(_uuid(evidence_id, "evidence_id"))
+        _timeline_service().record_evidence_event(
+            case_id=evidence.case_id,
+            evidence_id=evidence.id,
+            event_type="evidence.soft_deleted",
+            summary=f"Evidence {evidence.evidence_number} removed from active inventory",
+            details="Custody bytes were retained; metadata was soft-deleted.",
+        )
+        _record_evidence_audit("evidence.soft_deleted", evidence)
         _invalidate_dashboard_cache()
         return jsonify(_evidence_json(deleted))
     except (ValueError, EvidenceManagementError) as error:
@@ -2340,8 +3591,11 @@ def start_evidence_analysis(evidence_id: str):  # type: ignore[no-untyped-def]
         return _json_error(str(error), 400)
     if evidence is None or not _case_accessible(evidence.case_id):
         return _forbidden()
+    if evidence.analysis_status == "running":
+        return _json_error("Evidence analysis is already running.", 409)
     evidence.analysis_status = "running"
     _db().session.commit()
+    _record_evidence_audit("evidence.analysis.queued", evidence)
     job = _start_evidence_analysis_job(evidence_id)
     return jsonify(job), 202
 
@@ -2352,6 +3606,12 @@ def evidence_analysis_job(job_id: str):  # type: ignore[no-untyped-def]
     job = _analysis_jobs().get(job_id)
     if job is None:
         return _json_error("Analysis job was not found.", 404)
+    try:
+        evidence = _db().session.get(Evidence, _uuid(str(job.get("evidence_id")), "evidence_id"))
+    except ValueError:
+        return _json_error("Analysis job was not found.", 404)
+    if evidence is None or not _case_accessible(evidence.case_id):
+        return _forbidden()
     return jsonify(job)
 
 
@@ -2359,12 +3619,37 @@ def evidence_analysis_job(job_id: str):  # type: ignore[no-untyped-def]
 def export_evidence():  # type: ignore[no-untyped-def]
     response = list_evidence()
     data = response.get_json()
+    _db().session.add(
+        AuditLog(
+            user_id=_current_user_id(),
+            username=_current_username(),
+            role=_current_user_role(),
+            action="evidence.inventory.exported",
+            result="success",
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get("User-Agent"),
+            affected_object="evidence:inventory",
+            reason=f"{len(data['items'])} ownership-scoped record(s)",
+        )
+    )
+    _db().session.commit()
     output = StringIO()
-    output.write("id,case_id,evidence_number,filename,media_type,size_bytes,sha256,acquired_at\n")
+    writer = csv.writer(output)
+    writer.writerow(
+        ["id", "case_id", "evidence_number", "filename", "media_type", "size_bytes", "sha256", "acquired_at"]
+    )
     for item in data["items"]:
-        output.write(
-            f"{item['id']},{item['case_id']},{item['evidence_number']},{item['original_filename']},"
-            f"{item['media_type'] or ''},{item['size_bytes']},{item['sha256']},{item['acquired_at']}\n"
+        writer.writerow(
+            [
+                item["id"],
+                item["case_id"],
+                item["evidence_number"],
+                item["original_filename"],
+                item["media_type"] or "",
+                item["size_bytes"],
+                item["sha256"],
+                item["acquired_at"],
+            ]
         )
     return Response(
         output.getvalue(), mimetype="text/csv", headers={"Content-Disposition": "attachment; filename=evidence.csv"}
@@ -2386,7 +3671,8 @@ def list_timeline():  # type: ignore[no-untyped-def]
             return jsonify(
                 {
                     **_page([], total=0),
-                    "correlations": {"cases": [], "evidence": [], "groups": {}, "threat_score": 0},
+                    "correlations": {"cases": [], "evidence": [], "groups": {}, "confirmed": 0},
+                    "reconstruction": _features().timeline.reconstruction.reconstruct([]),
                 }
             )
         statement = statement.where(TimelineEvent.case_id.in_(owned_ids))
@@ -2411,6 +3697,17 @@ def list_timeline():  # type: ignore[no-untyped-def]
         items = [item for item in items if item["threat_level"] == threat]
     items.sort(key=lambda item: item["occurred_at"] or "", reverse=_direction() == "desc")
     payload = _page(items, total=len(items))
+    evidence_ids = {_uuid(str(item["evidence_id"]), "evidence_id") for item in items if item.get("evidence_id")}
+    evidence_reports = {
+        str(record.id): report
+        for record in (
+            _db().session.scalars(select(Evidence).where(Evidence.id.in_(evidence_ids))) if evidence_ids else []
+        )
+        if isinstance((report := _stored_json(record.analysis_report)), dict)
+    }
+    reconstruction = _features().timeline.reconstruction.reconstruct(items, evidence_reports)
+    payload["items"] = reconstruction["events"]
+    payload["reconstruction"] = reconstruction
     payload["correlations"] = {
         "cases": sorted({item["case_number"] for item in items if item["case_number"]}),
         "evidence": sorted({item["evidence_number"] for item in items if item["evidence_number"]}),
@@ -2418,7 +3715,8 @@ def list_timeline():  # type: ignore[no-untyped-def]
             name: sum(1 for item in items if item["group"] == name)
             for name in sorted({item["group"] for item in items})
         },
-        "threat_score": min(100, sum(int(item["threat_weight"]) for item in items)),
+        "confirmed": reconstruction["summary"]["confirmed_events"],
+        "correlated": reconstruction["summary"]["correlated_events"],
     }
     return jsonify(payload)
 
@@ -2456,15 +3754,28 @@ def export_timeline():  # type: ignore[no-untyped-def]
 @api_v1_blueprint.post("/timeline/ai-summary")
 def timeline_ai_summary():  # type: ignore[no-untyped-def]
     data = request.get_json(silent=True) or {}
-    context = _investigation_context(str(data.get("case_id") or "") or None)
+    requested_case_id = str(data.get("case_id") or "").strip()
+    if requested_case_id:
+        try:
+            parsed_case_id = _uuid(requested_case_id, "case_id")
+        except ValueError as error:
+            return _json_error(str(error), 400)
+        if not _case_accessible(parsed_case_id):
+            return _forbidden()
+    context = _investigation_context(requested_case_id or None)
     if context.get("case_id") and not _case_accessible(_uuid(str(context["case_id"]), "case_id")):
         return _forbidden()
-    return jsonify(
-        _ai_completion(
-            "Summarize this investigation timeline with case, evidence, threat, gaps, and recommended next actions.",
-            context,
-        )
+    completion = _ai_completion(
+        "Summarize only the recorded investigation timeline. Separate confirmed facts from hypotheses, cite event "
+        "IDs and evidence numbers, describe gaps, and do not invent attack stages, actors, malware, or ATT&CK mappings.",
+        context,
     )
+    completion["grounding"] = _ai_grounding(context)
+    completion["instructions"] = {
+        "facts": "Persisted timeline and evidence records",
+        "hypotheses": "Must be explicitly labeled and require validation",
+    }
+    return jsonify(completion)
 
 
 @api_v1_blueprint.post("/timeline")
@@ -2474,15 +3785,23 @@ def create_timeline_event():  # type: ignore[no-untyped-def]
         parsed_case_id = _uuid(str(data.get("case_id", "")), "case_id")
         if not _case_accessible(parsed_case_id):
             return _forbidden()
+        summary = _normalize_text(data.get("summary"), limit=1024)
+        if not summary:
+            return _json_error("A timeline event summary is required.", 400)
+        event_type = str(data.get("event_type") or "observation.manual")
+        if event_type != "observation.manual":
+            return _json_error("Manual timeline events must use observation.manual.", 400)
         event = _timeline_service().record_investigation_event(
             case_id=parsed_case_id,
-            event_type=str(data.get("event_type", "observation.manual")),
-            summary=str(data.get("summary", "")),
-            details=data.get("details"),
+            event_type=event_type,
+            summary=summary,
+            details=_normalize_text(data.get("details"), limit=8000),
         )
         _stamp_case_children(parsed_case_id)
+        persisted_event = _db().session.get(TimelineEvent, event.id)
+        _record_timeline_audit(persisted_event)
         _invalidate_dashboard_cache()
-        return jsonify(_timeline_json(_db().session.get(TimelineEvent, event.id))), 201
+        return jsonify(_timeline_json(persisted_event)), 201
     except (ValueError, Exception) as error:
         return _json_error(str(error), 400)
 
@@ -2551,6 +3870,7 @@ def create_report():  # type: ignore[no-untyped-def]
             "content": "AI enrichment is queued. The deterministic forensic report is ready now.",
         }
         document = _build_report_document(case_id, report_type, ai_summary)
+        document["title"] = report.title
         document["report"] = _report_json(report)
         document["ai_summary"] = ai_summary
         report_file.write_text(json.dumps(document, indent=2, default=str), encoding="utf-8")
@@ -2566,6 +3886,7 @@ def create_report():  # type: ignore[no-untyped-def]
         job = _start_report_enrichment_job(str(report.id), report_file, context)
         payload = _report_json(report)
         payload["generation_job"] = job
+        _record_report_audit(report, "report.generation.requested")
         return jsonify(payload), 201
     except ValueError as error:
         return _json_error(str(error), 400)
@@ -2591,6 +3912,58 @@ def get_report(report_id: str):  # type: ignore[no-untyped-def]
     return jsonify({"metadata": _report_json(report), "content": content})
 
 
+@api_v1_blueprint.patch("/reports/<report_id>")
+def update_report(report_id: str):  # type: ignore[no-untyped-def]
+    """Update investigator-authored review fields without mutating generated findings."""
+    try:
+        report = _db().session.get(Report, _uuid(report_id, "report_id"))
+    except ValueError as error:
+        return _json_error(str(error), 400)
+    if report is None:
+        return _json_error("Report was not found.", 404)
+    if not _case_accessible(report.case_id):
+        return _forbidden()
+    document_update = request.get_json(silent=True) or {}
+    report_file = Path(current_app.config["REPORTS_FOLDER"]) / report.storage_path
+    if not report_file.exists():
+        return _json_error("Report file was not found.", 404)
+    document = json.loads(report_file.read_text(encoding="utf-8"))
+    action = "report.edited"
+    if "title" in document_update:
+        title = _normalize_text(document_update.get("title"), limit=512)
+        if not title:
+            return _json_error("Report title must not be empty.", 400)
+        report.title = title
+        document["title"] = title
+    if "investigator_notes" in document_update:
+        note = _normalize_text(document_update.get("investigator_notes"), limit=12000)
+        document["investigator_notes"] = (
+            [{"content": note, "authorship": "investigator", "source": f"user:{_current_user_id()}"}] if note else []
+        )
+    if "status" in document_update:
+        status = str(document_update["status"]).strip().lower()
+        if status not in {"draft", "in_review", "approved"}:
+            return _json_error("Report status must be draft, in_review, or approved.", 400)
+        report.status = status
+        review = document.setdefault("review", {})
+        review["status"] = status
+        if status == "approved":
+            review["approved_by"] = str(_current_user_id()) if _current_user_id() else _current_username()
+            review["approved_at"] = utc_now().isoformat()
+            action = "report.approved"
+        else:
+            review["approved_by"] = None
+            review["approved_at"] = None
+            action = "report.review_updated"
+    report.updated_at = utc_now()
+    temporary = report_file.with_suffix(f"{report_file.suffix}.tmp")
+    temporary.write_text(json.dumps(document, indent=2, default=str), encoding="utf-8")
+    temporary.replace(report_file)
+    _db().session.commit()
+    _record_report_audit(report, action)
+    return jsonify({"metadata": _report_json(report), "content": document})
+
+
 @api_v1_blueprint.post("/reports/<report_id>/analyze")
 def analyze_report(report_id: str):  # type: ignore[no-untyped-def]
     try:
@@ -2611,14 +3984,15 @@ def analyze_report(report_id: str):  # type: ignore[no-untyped-def]
     context = _investigation_context(str(report.case_id))
     source = {"report": document, "context": context}
     analysis = _ai_completion(
-        "Analyze this investigation report and its case context. Return Markdown with Executive Summary, Threat "
-        "Assessment, MITRE Mapping, IOC Analysis, Risk Score, Recommendations, Confidence, Evidence Quality, and "
-        "Missing Information.",
+        "Review this investigation report using only its source-linked records. Separate recorded facts from labeled "
+        "hypotheses, identify traceability gaps, cite evidence IDs, preserve authorship, and do not create findings, "
+        "recommendations, indicators, risk scores, or ATT&CK mappings.",
         source,
         max_tokens=1400,
     )
     if not analysis.get("available"):
         analysis["content"] = _local_report_analysis(document, context)
+    _record_report_audit(report, "report.ai_analysis.requested")
     return jsonify({"report": _report_json(report), "analysis": analysis, "source": source})
 
 
@@ -2637,7 +4011,10 @@ def export_report(report_id: str):  # type: ignore[no-untyped-def]
         return _json_error("Report file was not found.", 404)
     document = json.loads(report_file.read_text(encoding="utf-8"))
     export_format = request.args.get("format", "json").lower()
+    if export_format not in {"json", "html", "md", "markdown", "csv", "xlsx", "excel", "docx", "pdf", "zip"}:
+        return _json_error("Unsupported report export format.", 400)
     base_name = f"{report.report_type}-v{report.version}"
+    _record_report_audit(report, "report.exported", reason=f"format:{export_format} · version:{report.version}")
     if export_format == "html":
         return Response(
             _report_html(document),
@@ -2714,6 +4091,7 @@ def get_settings():  # type: ignore[no-untyped-def]
             "updated_at": _iso(setting.updated_at),
         }
         for setting in session.scalars(select(Setting))
+        if not setting.namespace.startswith("secret.")
     }
     return jsonify(
         {
@@ -2754,6 +4132,12 @@ def update_settings():  # type: ignore[no-untyped-def]
                 return _json_error(str(error), 400)
         setting = _set_setting(namespace, key_text, json.dumps(value), "json")
         updated[f"{namespace}.{key_text}"] = {"value": setting.value, "value_type": setting.value_type}
+    if updated:
+        _record_account_audit(
+            "admin.settings.updated",
+            f"settings:{namespace}",
+            reason=f"Updated keys: {', '.join(sorted(values))}",
+        )
     return jsonify({"updated": updated})
 
 
@@ -2786,13 +4170,11 @@ def _apply_ai_setting(key: str, value: object) -> None:
     elif key == "enabled":
         current_app.config["AI_ENABLED"] = bool(value)
     elif key == "ollama_endpoint":
-        endpoint = str(value).strip().rstrip("/")
-        if not endpoint.startswith(("http://", "https://")):
-            raise ValueError("Ollama endpoint must start with http:// or https://.")
-        current_app.config["OLLAMA_ENDPOINT"] = endpoint
+        current_app.config["OLLAMA_ENDPOINT"] = _validated_ai_endpoint(value)
     else:
         return
-    current_app.extensions["cyberinvestigator_ai_registry"] = build_ai_registry(current_app.config)
+    managed_config = hydrate_ai_config(current_app.config, _db().session)
+    current_app.extensions["cyberinvestigator_ai_registry"] = build_ai_registry(managed_config)
 
 
 @api_v1_blueprint.get("/health/live")
@@ -2820,6 +4202,7 @@ def health_ready():  # type: ignore[no-untyped-def]
 @require_role("admin")
 def monitoring_metrics():  # type: ignore[no-untyped-def]
     session = _db().session
+    telemetry = current_app.extensions["cyberinvestigator_telemetry"].snapshot()
     return jsonify(
         {
             "cases": session.scalar(select(func.count()).select_from(Case)),
@@ -2828,8 +4211,559 @@ def monitoring_metrics():  # type: ignore[no-untyped-def]
             "reports": session.scalar(select(func.count()).select_from(Report)),
             "plugins_loaded": current_app.extensions.get("cyberinvestigator_plugin_loaded_count", 0),
             "rate_limit_requests": current_app.config.get("RATE_LIMIT_REQUESTS"),
+            "telemetry": telemetry,
+            "collected_at": _iso(utc_now()),
         }
     )
+
+
+@api_v1_blueprint.get("/admin/observability")
+@require_role("admin")
+def observability_workspace():  # type: ignore[no-untyped-def]
+    """Return measured, bounded telemetry and explicitly label unavailable sources."""
+    session = _db().session
+    registry = current_app.extensions["cyberinvestigator_telemetry"]
+    readiness_response, readiness_status = health_ready()
+    readiness = readiness_response.get_json()
+    alerts = list(
+        session.scalars(
+            select(SecurityAlert)
+            .where(SecurityAlert.status.in_(["open", "acknowledged"]))
+            .order_by(SecurityAlert.created_at.desc())
+            .limit(50)
+        )
+    )
+    audit_events = list(session.scalars(select(AuditLog).order_by(AuditLog.created_at.desc()).limit(50)))
+    audit_writer = current_app.extensions.get("cyberinvestigator_audit_writer")
+    audit_integrity = (
+        audit_writer.verify_integrity()
+        if audit_writer is not None and hasattr(audit_writer, "verify_integrity")
+        else {"valid": None, "reason": "Audit writer unavailable."}
+    )
+    log_path = Path(current_app.config["LOGS_FOLDER"]) / "cyberinvestigator.log"
+    log_events: list[dict[str, object]] = []
+    if log_path.is_file():
+        try:
+            lines = _tail_file(log_path, lines=100)
+        except OSError:  # pragma: no cover - helper already degrades safely.
+            lines = []
+        for line in reversed(lines):
+            try:
+                payload = json.loads(line)
+            except json.JSONDecodeError:
+                payload = {"timestamp": None, "level": "UNKNOWN", "message": line}
+            log_events.append(
+                {
+                    "timestamp": payload.get("timestamp"),
+                    "level": payload.get("level"),
+                    "logger": payload.get("logger"),
+                    "message": redact_text(payload.get("message", "")),
+                    "request_id": payload.get("request_id"),
+                    "trace_id": payload.get("trace_id"),
+                }
+            )
+    telemetry = registry.snapshot()
+    return jsonify(
+        {
+            "collected_at": _iso(utc_now()),
+            "status": "operational" if readiness_status == 200 else "degraded",
+            "critical_alerts": [_security_alert_json(item) for item in alerts if item.level in {"critical", "high"}],
+            "health": readiness,
+            "services": [
+                {"name": "Database", "status": readiness.get("database"), "source": "readiness probe"},
+                {"name": "Plugin runtime", "status": readiness.get("plugins"), "source": "plugin loader"},
+                {
+                    "name": "AI provider",
+                    "status": "ok" if readiness.get("ai", {}).get("available") else "degraded",
+                    "source": "provider registry",
+                },
+                {
+                    "name": "Audit chain",
+                    "status": "ok" if audit_integrity.get("valid") is True else "degraded",
+                    "source": "hash-chain verification",
+                },
+            ],
+            "telemetry": telemetry,
+            "traces": registry.recent_traces(100),
+            "recent_events": [_audit_log_json(item) for item in audit_events],
+            "logs": {
+                "available": log_path.is_file(),
+                "events": log_events,
+                "format": "structured_json",
+            },
+            "audit_integrity": audit_integrity,
+            "sources": [
+                {
+                    "name": "Application request telemetry",
+                    "status": "available",
+                    "scope": "current_process",
+                    "detail": "Bounded in-memory measurements; cleared when this process restarts.",
+                },
+                {
+                    "name": "Application logs",
+                    "status": "available" if log_path.is_file() else "unavailable",
+                    "scope": "local_rotating_file",
+                    "detail": "Secrets are redacted before persistence and presentation.",
+                },
+                {
+                    "name": "Distributed trace exporter",
+                    "status": "unavailable",
+                    "scope": None,
+                    "detail": "No external trace collector is configured.",
+                },
+                {
+                    "name": "Infrastructure metrics collector",
+                    "status": "unavailable",
+                    "scope": None,
+                    "detail": "No external infrastructure collector is configured.",
+                },
+            ],
+        }
+    )
+
+
+def _storage_policy() -> dict[str, object]:
+    configured = _setting_json("storage", "policy", {})
+    document = configured if isinstance(configured, dict) else {}
+    return {
+        "evidence_retention_days": document.get("evidence_retention_days"),
+        "backup_retention_days": int(document.get("backup_retention_days") or 30),
+        "backup_schedule_enabled": bool(document.get("backup_schedule_enabled", False)),
+        "backup_schedule": str(document.get("backup_schedule") or "manual"),
+        "scheduler_status": "unavailable",
+        "scheduler_detail": "No persistent backup scheduler is configured; manual verified backups remain available.",
+    }
+
+
+def _legal_holds() -> dict[str, dict[str, object]]:
+    configured = _setting_json("storage", "legal_holds", {})
+    return configured if isinstance(configured, dict) else {}
+
+
+def _case_has_legal_hold(case_id: UUID) -> bool:
+    hold = _legal_holds().get(str(case_id))
+    return bool(isinstance(hold, dict) and hold.get("active") is True)
+
+
+def _storage_notification(title: str, message: str, *, priority: str = "info") -> None:
+    _db().session.add(
+        Notification(
+            title=title,
+            message=message,
+            category="storage",
+            priority=priority,
+            pinned=priority in {"high", "critical"},
+        )
+    )
+    _db().session.commit()
+
+
+def _record_storage_audit(action: str, affected_object: str, *, result: str, reason: str) -> None:
+    _db().session.add(
+        AuditLog(
+            user_id=_current_user_id(),
+            username=_current_username(),
+            role=_current_user_role(),
+            action=action,
+            result=result,
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get("User-Agent"),
+            affected_object=affected_object,
+            reason=reason,
+        )
+    )
+    _db().session.commit()
+
+
+@api_v1_blueprint.get("/admin/storage")
+@require_role("admin")
+def storage_workspace():  # type: ignore[no-untyped-def]
+    """Return measured local provider state and persisted continuity records."""
+    payload = _storage_manager().workspace()
+    holds = _legal_holds()
+    integrity = _setting_json(
+        "storage",
+        "last_integrity_verification",
+        {"status": "not_checked", "detail": "Run an integrity verification to compare custody bytes with records."},
+    )
+    restores = _setting_json("storage", "restore_plans", [])
+    alerts = list(
+        _db().session.scalars(
+            select(SecurityAlert)
+            .where(SecurityAlert.category == "storage", SecurityAlert.status.in_(["open", "acknowledged"]))
+            .order_by(SecurityAlert.created_at.desc())
+            .limit(50)
+        )
+    )
+    payload.update(
+        {
+            "collected_at": _iso(utc_now()),
+            "policy": _storage_policy(),
+            "legal_holds": list(holds.values()),
+            "active_legal_holds": sum(1 for item in holds.values() if item.get("active") is True),
+            "integrity": integrity,
+            "alerts": [_security_alert_json(item) for item in alerts],
+            "recent_restores": restores[:20] if isinstance(restores, list) else [],
+            "recovery": {
+                "automatic_restore": False,
+                "mode": "verified_offline_restore",
+                "rpo": None,
+                "rto": None,
+                "detail": "Recovery objectives are not configured and are not inferred.",
+            },
+        }
+    )
+    return jsonify(payload)
+
+
+@api_v1_blueprint.patch("/admin/storage/policy")
+@require_role("admin")
+def update_storage_policy():  # type: ignore[no-untyped-def]
+    body = request.get_json(silent=True) or {}
+    evidence_days = body.get("evidence_retention_days")
+    if evidence_days not in (None, ""):
+        evidence_days = int(evidence_days)
+        if evidence_days < 1:
+            return _json_error("Evidence retention must be at least one day.", 400)
+    else:
+        evidence_days = None
+    backup_days = int(body.get("backup_retention_days", 30))
+    if backup_days < 1:
+        return _json_error("Backup retention must be at least one day.", 400)
+    schedule = str(body.get("backup_schedule") or "manual")
+    if schedule not in {"manual", "daily", "weekly"}:
+        return _json_error("Backup schedule must be manual, daily, or weekly.", 400)
+    policy = {
+        "evidence_retention_days": evidence_days,
+        "backup_retention_days": backup_days,
+        "backup_schedule_enabled": bool(body.get("backup_schedule_enabled", False)),
+        "backup_schedule": schedule,
+    }
+    _set_setting("storage", "policy", json.dumps(policy), "json")
+    _record_account_audit("storage.policy.updated", "storage:policy", reason=f"schedule:{schedule}")
+    return jsonify(_storage_policy())
+
+
+@api_v1_blueprint.patch("/admin/storage/legal-holds/<case_id>")
+@require_role("admin")
+def update_legal_hold(case_id: str):  # type: ignore[no-untyped-def]
+    try:
+        parsed_case_id = _uuid(case_id, "case_id")
+    except ValueError as error:
+        return _json_error(str(error), 400)
+    case = _db().session.get(Case, parsed_case_id)
+    if case is None:
+        return _json_error("Investigation was not found.", 404)
+    body = request.get_json(silent=True) or {}
+    active = bool(body.get("active"))
+    reason = str(body.get("reason") or "").strip()
+    if active and not reason:
+        return _json_error("A legal hold reason is required.", 400)
+    holds = _legal_holds()
+    hold = {
+        "case_id": str(case.id),
+        "case_number": case.case_number,
+        "case_title": case.title,
+        "active": active,
+        "reason": reason,
+        "updated_at": _iso(utc_now()),
+        "updated_by": _current_username(),
+    }
+    holds[str(case.id)] = hold
+    _set_setting("storage", "legal_holds", json.dumps(holds), "json")
+    action = "storage.legal_hold.applied" if active else "storage.legal_hold.released"
+    _record_account_audit(action, f"case:{case.id}", reason=reason or "Legal hold released.")
+    _storage_notification(
+        f"Legal hold {'applied' if active else 'released'}",
+        f"{case.case_number}: {reason or 'Hold released by an administrator.'}",
+        priority="high" if active else "info",
+    )
+    return jsonify(hold)
+
+
+@api_v1_blueprint.post("/admin/storage/backups")
+@require_role("admin")
+def create_storage_backup():  # type: ignore[no-untyped-def]
+    try:
+        backup = _storage_manager().create_backup()
+    except StorageOperationError as error:
+        _record_storage_audit("storage.backup.failed", "storage:backup", result="failure", reason=str(error))
+        _storage_notification("Backup failed", str(error), priority="high")
+        return _json_error(str(error), 503)
+    _record_storage_audit(
+        "storage.backup.created",
+        f"backup:{backup['backup_id']}",
+        result="success",
+        reason=f"files:{backup['file_count']} bytes:{backup['size_bytes']}",
+    )
+    _storage_notification(
+        "Verified backup created",
+        f"Backup {backup['backup_id']} passed manifest verification.",
+    )
+    return jsonify(backup), 201
+
+
+@api_v1_blueprint.post("/admin/storage/backups/<backup_id>/verify")
+@require_role("admin")
+def verify_storage_backup(backup_id: str):  # type: ignore[no-untyped-def]
+    try:
+        result = _storage_manager().verify_backup(backup_id)
+    except StorageOperationError as error:
+        return _json_error(str(error), 404)
+    _record_storage_audit(
+        "storage.backup.verified" if result["valid"] else "storage.backup.verification_failed",
+        f"backup:{backup_id}",
+        result="success" if result["valid"] else "failure",
+        reason=f"files_checked:{result['files_checked']}",
+    )
+    if result["valid"] is not True:
+        _storage_notification("Backup verification failed", f"Backup {backup_id} requires review.", priority="high")
+    return jsonify(result), 200 if result["valid"] is True else 409
+
+
+@api_v1_blueprint.post("/admin/storage/restore-plans")
+@require_role("admin")
+def create_restore_plan():  # type: ignore[no-untyped-def]
+    backup_id = str((request.get_json(silent=True) or {}).get("backup_id") or "")
+    try:
+        plan = _storage_manager().restore_plan(backup_id)
+    except StorageOperationError as error:
+        _record_storage_audit(
+            "storage.restore_plan.rejected",
+            f"backup:{backup_id}",
+            result="blocked",
+            reason=str(error),
+        )
+        return _json_error(str(error), 409)
+    history = _setting_json("storage", "restore_plans", [])
+    records = history if isinstance(history, list) else []
+    plan["created_at"] = _iso(utc_now())
+    plan["created_by"] = _current_username()
+    records.insert(0, plan)
+    _set_setting("storage", "restore_plans", json.dumps(records[:100]), "json")
+    _record_storage_audit(
+        "storage.restore_plan.created",
+        f"backup:{backup_id}",
+        result="success",
+        reason="Verified offline restore plan; no restore executed.",
+    )
+    return jsonify(plan), 201
+
+
+@api_v1_blueprint.post("/admin/storage/integrity/verify")
+@require_role("admin")
+def verify_evidence_integrity():  # type: ignore[no-untyped-def]
+    records = list(_db().session.scalars(select(Evidence).order_by(Evidence.created_at)))
+    failures: list[dict[str, str]] = []
+    checked = 0
+    for evidence in records:
+        try:
+            path = _features().evidence.resolve_path(evidence.storage_path)
+            digest = hashlib.sha256()
+            with path.open("rb") as stream:
+                while chunk := stream.read(1024 * 1024):
+                    digest.update(chunk)
+            if digest.hexdigest() != evidence.sha256 or path.stat().st_size != evidence.size_bytes:
+                failures.append({"evidence_id": str(evidence.id), "reason": "integrity_mismatch"})
+                continue
+            checked += 1
+        except (OSError, EvidenceManagementError):
+            failures.append({"evidence_id": str(evidence.id), "reason": "custody_file_unavailable"})
+    result = {
+        "status": "verified" if not failures else "failed",
+        "valid": not failures,
+        "records_checked": checked,
+        "records_total": len(records),
+        "failures": failures,
+        "verified_at": _iso(utc_now()),
+    }
+    _set_setting("storage", "last_integrity_verification", json.dumps(result), "json")
+    _record_storage_audit(
+        "storage.evidence_integrity.verified" if not failures else "storage.evidence_integrity.failed",
+        "storage:evidence",
+        result="success" if not failures else "failure",
+        reason=f"checked:{checked} failures:{len(failures)}",
+    )
+    if failures:
+        _storage_notification(
+            "Evidence integrity verification failed",
+            f"{len(failures)} custody records require immediate review.",
+            priority="critical",
+        )
+    return jsonify(result), 200 if not failures else 409
+
+
+def _deployment_workspace_payload() -> dict[str, object]:
+    return _deployment_inspector().workspace(
+        environment=str(current_app.config.get("ENVIRONMENT") or "development"),
+        last_verification=_setting_json("deployment", "last_verification", None),
+        release_catalog=_setting_json("deployment", "release_catalog", []),
+    )
+
+
+def _record_deployment_audit(action: str, affected_object: str, *, result: str, reason: str) -> None:
+    _db().session.add(
+        AuditLog(
+            user_id=_current_user_id(),
+            username=_current_username(),
+            role=_current_user_role(),
+            action=action,
+            result=result,
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get("User-Agent"),
+            affected_object=affected_object,
+            reason=reason,
+        )
+    )
+    _db().session.commit()
+
+
+@api_v1_blueprint.get("/admin/deployments")
+@require_role("admin")
+def deployment_workspace():  # type: ignore[no-untyped-def]
+    """Expose runtime and repository release state without inventing CI history."""
+    payload = _deployment_workspace_payload()
+    payload["rollback_plans"] = _setting_json("deployment", "rollback_plans", [])
+    return jsonify(payload)
+
+
+@api_v1_blueprint.post("/admin/deployments/verify")
+@require_role("admin")
+def verify_deployment():  # type: ignore[no-untyped-def]
+    checks: list[dict[str, object]] = []
+
+    def check(name: str, required: bool, operation) -> None:
+        try:
+            detail = operation()
+            checks.append({"name": name, "status": "passed", "required": required, "detail": detail})
+        except Exception as error:
+            checks.append(
+                {
+                    "name": name,
+                    "status": "failed",
+                    "required": required,
+                    "detail": str(error)[:300],
+                }
+            )
+
+    check("Database connectivity", True, lambda: str(_db().session.execute(select(1)).scalar_one()))
+    check(
+        "Evidence storage provider",
+        True,
+        lambda: _storage_manager().workspace()["provider"]["status"],
+    )
+    audit_writer = current_app.extensions.get("cyberinvestigator_audit_writer")
+    check(
+        "Audit chain",
+        True,
+        lambda: (
+            "verified"
+            if audit_writer is not None and audit_writer.verify_integrity().get("valid") is True
+            else (_ for _ in ()).throw(RuntimeError("Audit chain verification failed."))
+        ),
+    )
+    check(
+        "Security controls",
+        True,
+        lambda: (
+            "enabled"
+            if current_app.config.get("SECURITY_HEADERS_ENABLED") and current_app.config.get("CSRF_ENABLED")
+            else (_ for _ in ()).throw(RuntimeError("Required web security controls are disabled."))
+        ),
+    )
+    release = _deployment_inspector().current_release(str(current_app.config.get("ENVIRONMENT") or "development"))
+    check(
+        "Release metadata",
+        False,
+        lambda: (
+            release["version"]
+            if release.get("git_sha") and release.get("build_time")
+            else (_ for _ in ()).throw(RuntimeError("Build revision or build time is unavailable."))
+        ),
+    )
+    required_failures = [item for item in checks if item["required"] and item["status"] == "failed"]
+    warnings = [item for item in checks if not item["required"] and item["status"] == "failed"]
+    result = {
+        "status": "failed" if required_failures else "passed_with_warnings" if warnings else "passed",
+        "checks": checks,
+        "verified_at": _iso(utc_now()),
+        "verified_by": _current_username(),
+        "release": release,
+    }
+    _set_setting("deployment", "last_verification", json.dumps(result), "json")
+    _record_deployment_audit(
+        "deployment.verification.completed",
+        f"release:{release['version']}",
+        result="failure" if required_failures else "success",
+        reason=f"required_failures:{len(required_failures)} warnings:{len(warnings)}",
+    )
+    if required_failures:
+        _db().session.add(
+            SecurityAlert(
+                level="high",
+                category="deployment",
+                title="Deployment verification failed",
+                message=f"{len(required_failures)} required deployment checks failed.",
+                score=80,
+                confidence=100,
+            )
+        )
+        _db().session.add(
+            Notification(
+                title="Deployment verification failed",
+                message=f"{len(required_failures)} required deployment checks need review.",
+                category="deployment",
+                priority="high",
+                pinned=True,
+            )
+        )
+        _db().session.commit()
+    return jsonify(result), 409 if required_failures else 200
+
+
+@api_v1_blueprint.post("/admin/deployments/rollback-plans")
+@require_role("admin")
+def create_rollback_plan():  # type: ignore[no-untyped-def]
+    target_version = str((request.get_json(silent=True) or {}).get("target_version") or "").strip()
+    workspace = _deployment_workspace_payload()
+    current = workspace["deployment_status"]["release"]
+    candidates = workspace["rollback"]["candidates"]
+    target = next((item for item in candidates if str(item.get("version")) == target_version), None)
+    if target is None or not target.get("digest"):
+        _record_deployment_audit(
+            "deployment.rollback_plan.rejected",
+            f"release:{target_version or 'missing'}",
+            result="blocked",
+            reason="Target is not a recorded immutable release.",
+        )
+        return _json_error("Rollback target is not a recorded immutable release.", 409)
+    plan = {
+        "status": "ready_for_environment_adapter",
+        "created_at": _iso(utc_now()),
+        "created_by": _current_username(),
+        "from_version": current.get("version"),
+        "target_version": target.get("version"),
+        "target_digest": target.get("digest"),
+        "automatic_rollback_executed": False,
+        "steps": [
+            "Place the environment in maintenance mode.",
+            "Create and verify a pre-rollback storage backup.",
+            "Redeploy the recorded immutable image digest.",
+            "Run deployment and evidence-integrity verification.",
+            "Exit maintenance mode only after required checks pass.",
+        ],
+    }
+    history = _setting_json("deployment", "rollback_plans", [])
+    records = history if isinstance(history, list) else []
+    records.insert(0, plan)
+    _set_setting("deployment", "rollback_plans", json.dumps(records[:100]), "json")
+    _record_deployment_audit(
+        "deployment.rollback_plan.created",
+        f"release:{target_version}",
+        result="success",
+        reason=f"from:{current.get('version')} digest:{target.get('digest')}",
+    )
+    return jsonify(plan), 201
 
 
 @api_v1_blueprint.get("/admin/overview")
@@ -2867,16 +4801,6 @@ def admin_overview():  # type: ignore[no-untyped-def]
         role.name: [item.permission.code for item in role.permissions]
         for role in session.scalars(select(Role).where(Role.name.in_(["admin", "user"])).order_by(Role.name))
     }
-    jobs = [
-        {"name": "dashboard_cache", "status": "idle", "schedule": "on demand"},
-        {
-            "name": "plugin_discovery",
-            "status": "ready" if current_app.config.get("PLUGINS_ENABLED") else "disabled",
-            "schedule": "manual",
-        },
-        {"name": "evidence_analysis", "status": "ready", "schedule": "on demand"},
-        {"name": "backup", "status": "manual", "schedule": "scripted"},
-    ]
     plugins = plugin_inventory().get_json()
     return jsonify(
         {
@@ -2893,13 +4817,140 @@ def admin_overview():  # type: ignore[no-untyped-def]
                 _audit_log_json(item)
                 for item in session.scalars(select(AuditLog).order_by(AuditLog.created_at.desc()).limit(40))
             ],
-            "background_jobs": jobs,
+            "background_jobs": list(_analysis_jobs().values())[-100:],
             "plugin_health": plugins,
             "ai_status": _provider_status(),
             "openai_status": _provider_status(),
             "security": _security_overview(),
         }
     )
+
+
+@api_v1_blueprint.get("/admin/operations")
+@require_role("admin")
+def admin_operations_center():  # type: ignore[no-untyped-def]
+    """Return real operational state without inferred health or fabricated capacity metrics."""
+    session = _db().session
+    readiness_response, readiness_status = health_ready()
+    readiness = readiness_response.get_json()
+    alerts = list(
+        session.scalars(
+            select(SecurityAlert)
+            .where(SecurityAlert.status.in_(["open", "acknowledged"]))
+            .order_by(SecurityAlert.created_at.desc())
+            .limit(100)
+        )
+    )
+    jobs = list(_analysis_jobs().values())
+    job_counts = {
+        status: sum(1 for item in jobs if item.get("status") == status)
+        for status in ("queued", "running", "completed", "failed")
+    }
+    maintenance_record = session.scalar(
+        select(Setting).where(Setting.namespace == "platform", Setting.key == "maintenance")
+    )
+    try:
+        maintenance = json.loads(maintenance_record.value) if maintenance_record else {"enabled": False, "message": ""}
+    except (TypeError, json.JSONDecodeError):
+        maintenance = {"enabled": False, "message": "", "state": "invalid_configuration"}
+    failed_requests = (
+        session.scalar(select(func.count()).select_from(AuditLog).where(AuditLog.result.in_(["failure", "blocked"])))
+        or 0
+    )
+    integrity_writer = current_app.extensions.get("cyberinvestigator_audit_writer")
+    integrity = (
+        integrity_writer.verify_integrity()
+        if integrity_writer is not None and hasattr(integrity_writer, "verify_integrity")
+        else {"valid": None, "reason": "Audit writer unavailable."}
+    )
+    return jsonify(
+        {
+            "status": "maintenance"
+            if maintenance.get("enabled")
+            else "operational"
+            if readiness_status == 200
+            else "degraded",
+            "health": readiness,
+            "critical_alerts": [_security_alert_json(item) for item in alerts if item.level in {"critical", "high"}],
+            "active_issues": [_security_alert_json(item) for item in alerts],
+            "metrics": {
+                "entities": {
+                    "users": session.scalar(select(func.count()).select_from(User)) or 0,
+                    "cases": session.scalar(select(func.count()).select_from(Case)) or 0,
+                    "evidence": session.scalar(select(func.count()).select_from(Evidence)) or 0,
+                    "reports": session.scalar(select(func.count()).select_from(Report)) or 0,
+                },
+                "jobs": job_counts,
+                "failed_or_blocked_audit_events": failed_requests,
+                "open_alerts": len(alerts),
+            },
+            "resource_usage": {
+                "process_uptime_seconds": _runtime_metrics().get("uptime_seconds"),
+                "memory": {"status": "unavailable", "reason": "No process memory collector is configured."},
+                "cpu": {"status": "unavailable", "reason": "No process CPU collector is configured."},
+                "storage": _storage_manager().workspace()["capacity"],
+            },
+            "jobs": jobs[-100:],
+            "maintenance": maintenance,
+            "audit_integrity": integrity,
+            "activity": [
+                _audit_log_json(item)
+                for item in session.scalars(select(AuditLog).order_by(AuditLog.created_at.desc()).limit(50))
+            ],
+            "collected_at": utc_now().isoformat(),
+        }
+    )
+
+
+@api_v1_blueprint.patch("/admin/alerts/<alert_id>")
+@require_role("admin")
+def update_security_alert(alert_id: str):  # type: ignore[no-untyped-def]
+    try:
+        alert = _db().session.get(SecurityAlert, _uuid(alert_id, "alert_id"))
+    except ValueError as error:
+        return _json_error(str(error), 400)
+    if alert is None:
+        return _json_error("Security alert was not found.", 404)
+    status = str((request.get_json(silent=True) or {}).get("status") or "").strip().lower()
+    if status not in {"open", "acknowledged", "resolved"}:
+        return _json_error("Alert status must be open, acknowledged, or resolved.", 400)
+    alert.status = status
+    _db().session.commit()
+    _record_account_audit(
+        f"admin.security_alert.{status}",
+        f"security_alert:{alert.id}",
+        reason=f"{alert.level}:{alert.category}",
+    )
+    return jsonify(_security_alert_json(alert))
+
+
+@api_v1_blueprint.route("/admin/maintenance", methods=["GET", "PATCH"])
+@require_role("admin")
+def admin_maintenance():  # type: ignore[no-untyped-def]
+    session = _db().session
+    record = session.scalar(select(Setting).where(Setting.namespace == "platform", Setting.key == "maintenance"))
+    if request.method == "GET":
+        try:
+            state = json.loads(record.value) if record else {"enabled": False, "message": ""}
+        except (TypeError, json.JSONDecodeError):
+            state = {"enabled": False, "message": "", "state": "invalid_configuration"}
+        return jsonify(state)
+    document = request.get_json(silent=True) or {}
+    state = {
+        "enabled": bool(document.get("enabled")),
+        "message": _normalize_text(document.get("message"), limit=500)
+        or "The platform is temporarily unavailable for maintenance.",
+        "updated_at": utc_now().isoformat(),
+        "updated_by": _current_username(),
+    }
+    _set_setting("platform", "maintenance", json.dumps(state), "json")
+    session.commit()
+    _record_account_audit(
+        "admin.maintenance.enabled" if state["enabled"] else "admin.maintenance.disabled",
+        "platform:maintenance",
+        reason=state["message"],
+    )
+    return jsonify(state)
 
 
 @api_v1_blueprint.get("/admin/logs")
@@ -2967,6 +5018,228 @@ def list_users():  # type: ignore[no-untyped-def]
     return jsonify({"users": [_user_json(item) for item in users], "roles": roles})
 
 
+def _managed_session_json(item: UserSession) -> dict[str, object]:
+    active = _managed_session_active(item)
+    return {
+        "id": str(item.id),
+        "user_id": str(item.user_id),
+        "status": "expired" if item.active and not active else item.status,
+        "active": active,
+        "ip_address": item.ip_address,
+        "user_agent": item.user_agent,
+        "created_at": _iso(item.created_at),
+        "updated_at": _iso(item.updated_at),
+        "last_seen_at": _iso(item.last_seen_at),
+        "expires_at": _iso(item.expires_at),
+    }
+
+
+def _managed_session_active(item: UserSession) -> bool:
+    expires_at = item.expires_at
+    now = utc_now()
+    if expires_at.tzinfo is None:
+        now = now.replace(tzinfo=None)
+    return bool(item.active and expires_at > now)
+
+
+def _role_json(role: Role) -> dict[str, object]:
+    return {
+        "id": str(role.id),
+        "name": role.name,
+        "description": role.description,
+        "is_system": role.is_system,
+        "user_count": len(role.users),
+        "permissions": sorted(item.permission.code for item in role.permissions),
+    }
+
+
+@api_v1_blueprint.get("/admin/identity")
+@require_role("admin")
+def identity_workspace():  # type: ignore[no-untyped-def]
+    """Return persisted IAM state, never inferred users, grants, or sessions."""
+    session = _db().session
+    users = list(session.scalars(select(User).order_by(User.created_at.desc()).limit(500)))
+    roles = list(session.scalars(select(Role).order_by(Role.is_system.desc(), Role.name)))
+    permissions = list(session.scalars(select(Permission).order_by(Permission.category, Permission.code)))
+    active_sessions = (
+        session.scalar(
+            select(func.count())
+            .select_from(UserSession)
+            .where(UserSession.active.is_(True), UserSession.expires_at > utc_now())
+        )
+        or 0
+    )
+    locked_users = session.scalar(select(func.count()).select_from(User).where(User.locked_until.is_not(None))) or 0
+    return jsonify(
+        {
+            "summary": {
+                "users": len(users),
+                "active_users": sum(item.status == "active" for item in users),
+                "locked_users": locked_users,
+                "active_sessions": active_sessions,
+                "roles": len(roles),
+                "permissions": len(permissions),
+            },
+            "users": [_user_json(item) for item in users],
+            "roles": [_role_json(item) for item in roles],
+            "permissions": [
+                {
+                    "id": str(item.id),
+                    "code": item.code,
+                    "label": item.label,
+                    "category": item.category,
+                }
+                for item in permissions
+            ],
+            "capabilities": {
+                "mfa": {"status": "not_configured"},
+                "sso": {"status": "not_configured"},
+                "directory": {"status": "not_configured"},
+            },
+        }
+    )
+
+
+@api_v1_blueprint.get("/admin/identity/users/<user_id>")
+@require_role("admin")
+def identity_user_detail(user_id: str):  # type: ignore[no-untyped-def]
+    try:
+        user = _db().session.get(User, _uuid(user_id, "user_id"))
+    except ValueError as error:
+        return _json_error(str(error), 400)
+    if user is None:
+        return _json_error("User was not found.", 404)
+    sessions = list(
+        _db().session.scalars(
+            select(UserSession).where(UserSession.user_id == user.id).order_by(UserSession.created_at.desc()).limit(100)
+        )
+    )
+    activity = list(
+        _db().session.scalars(
+            select(AuditLog).where(AuditLog.user_id == user.id).order_by(AuditLog.created_at.desc()).limit(50)
+        )
+    )
+    return jsonify(
+        {
+            "user": _user_json(user),
+            "permissions": sorted(item.permission.code for item in user.role.permissions),
+            "sessions": [_managed_session_json(item) for item in sessions],
+            "security": {
+                "failed_login_count": user.failed_login_count,
+                "locked_until": _iso(user.locked_until),
+                "active_sessions": sum(_managed_session_active(item) for item in sessions),
+                "last_login_at": _iso(user.last_login_at),
+            },
+            "activity": [_audit_log_json(item) for item in activity],
+        }
+    )
+
+
+@api_v1_blueprint.post("/admin/roles")
+@require_role("admin")
+def create_role():  # type: ignore[no-untyped-def]
+    document = request.get_json(silent=True) or {}
+    name = str(document.get("name") or "").strip().lower()
+    description = _normalize_text(document.get("description"), limit=2000)
+    if not re.fullmatch(r"[a-z][a-z0-9_-]{2,63}", name):
+        return _json_error("Role name must be 3-64 lowercase letters, numbers, underscores, or hyphens.", 400)
+    session = _db().session
+    if session.scalar(select(Role).where(Role.name == name)):
+        return _json_error("Role already exists.", 409)
+    permission_codes = {str(item) for item in document.get("permission_codes", [])}
+    permissions = list(session.scalars(select(Permission).where(Permission.code.in_(permission_codes))))
+    if len(permissions) != len(permission_codes):
+        return _json_error("One or more permissions were not found.", 400)
+    role = Role(name=name, description=description, is_system=False)
+    session.add(role)
+    session.flush()
+    session.add_all(RolePermission(role_id=role.id, permission_id=item.id) for item in permissions)
+    session.commit()
+    _record_account_audit(
+        "admin.role.created",
+        f"role:{role.id}",
+        reason=f"{name}; permissions={','.join(sorted(permission_codes)) or 'none'}",
+    )
+    return jsonify(_role_json(role)), 201
+
+
+@api_v1_blueprint.patch("/admin/roles/<role_id>")
+@require_role("admin")
+def update_role(role_id: str):  # type: ignore[no-untyped-def]
+    try:
+        role = _db().session.get(Role, _uuid(role_id, "role_id"))
+    except ValueError as error:
+        return _json_error(str(error), 400)
+    if role is None:
+        return _json_error("Role was not found.", 404)
+    document = request.get_json(silent=True) or {}
+    if "description" in document:
+        role.description = _normalize_text(document.get("description"), limit=2000)
+    if "permission_codes" in document:
+        permission_codes = {str(item) for item in document.get("permission_codes", [])}
+        if role.name == "admin" and not {"admin.access", "users.manage"}.issubset(permission_codes):
+            return _json_error("The system administrator role must retain admin.access and users.manage.", 409)
+        permissions = list(_db().session.scalars(select(Permission).where(Permission.code.in_(permission_codes))))
+        if len(permissions) != len(permission_codes):
+            return _json_error("One or more permissions were not found.", 400)
+        role.permissions.clear()
+        _db().session.flush()
+        role.permissions.extend(RolePermission(role_id=role.id, permission_id=item.id) for item in permissions)
+    _db().session.commit()
+    _record_account_audit(
+        "admin.role.updated",
+        f"role:{role.id}",
+        reason=f"{role.name}; fields={','.join(sorted(document)) or 'none'}",
+    )
+    return jsonify(_role_json(role))
+
+
+@api_v1_blueprint.delete("/admin/roles/<role_id>")
+@require_role("admin")
+def delete_role(role_id: str):  # type: ignore[no-untyped-def]
+    try:
+        role = _db().session.get(Role, _uuid(role_id, "role_id"))
+    except ValueError as error:
+        return _json_error(str(error), 400)
+    if role is None:
+        return _json_error("Role was not found.", 404)
+    if role.is_system:
+        return _json_error("System roles cannot be deleted.", 409)
+    if role.users:
+        return _json_error("Reassign all users before deleting this role.", 409)
+    affected_object = f"role:{role.id}"
+    role_name = role.name
+    _db().session.delete(role)
+    _db().session.commit()
+    _record_account_audit(
+        "admin.role.deleted",
+        affected_object,
+        reason=role_name,
+    )
+    return jsonify({"deleted": True, "id": role_id, "name": role_name})
+
+
+@api_v1_blueprint.delete("/admin/identity/sessions/<session_id>")
+@require_role("admin")
+def revoke_managed_session(session_id: str):  # type: ignore[no-untyped-def]
+    try:
+        record = _db().session.get(UserSession, _uuid(session_id, "session_id"))
+    except ValueError as error:
+        return _json_error(str(error), 400)
+    if record is None:
+        return _json_error("Session was not found.", 404)
+    record.active = False
+    record.status = "revoked"
+    record.updated_at = utc_now()
+    _db().session.commit()
+    _record_account_audit(
+        "admin.session.revoked",
+        f"session:{record.id}",
+        reason=f"user:{record.user_id}",
+    )
+    return jsonify(_managed_session_json(record))
+
+
 @api_v1_blueprint.post("/admin/users")
 @require_role("admin")
 def create_user():  # type: ignore[no-untyped-def]
@@ -2977,29 +5250,25 @@ def create_user():  # type: ignore[no-untyped-def]
     role_name = str(data.get("role") or "user").strip().lower()
     if role_name == "administrator":
         role_name = "admin"
-    if role_name not in {"admin", "user"}:
-        return _json_error("role must be admin or user.", 400)
     if not username or not email or len(password) < 10:
         return _json_error("username, email, and a password of at least 10 characters are required.", 400)
     session = _db().session
     role = session.scalar(select(Role).where(Role.name == role_name))
     if role is None:
-        return _json_error("role was not found.", 404)
+        return _json_error("Role was not found.", 404)
     if session.scalar(
         select(User).where((func.lower(User.username) == username.lower()) | (func.lower(User.email) == email.lower()))
     ):
         return _json_error("user already exists.", 409)
     user = User(username=username, email=email, password_hash=hash_password(password), role_id=role.id, status="active")
     session.add(user)
-    session.add(
-        AuditLog(
-            username=getattr(getattr(request, "user", None), "username", None),
-            action="admin.user.create",
-            result="success",
-            affected_object=username,
-        )
-    )
+    session.flush()
     session.commit()
+    _record_account_audit(
+        "admin.user.create",
+        f"user:{user.id}",
+        reason=f"Created account {user.username} with role {role_name}.",
+    )
     return jsonify({"user": _user_json(user)}), 201
 
 
@@ -3011,35 +5280,70 @@ def update_user(user_id: str):  # type: ignore[no-untyped-def]
     user = session.get(User, _uuid(user_id))
     if user is None:
         return _json_error("user was not found.", 404)
+    actor_id = _current_user_id()
+    if actor_id == user.id and (
+        data.get("status") in {"disabled", "suspended"}
+        or ("role" in data and str(data["role"]).strip().lower() != user.role.name)
+    ):
+        return _json_error("Administrators cannot disable or change their own role.", 409)
     if "status" in data:
         status = str(data["status"])
         if status not in {"active", "disabled", "suspended"}:
             return _json_error("status must be active, disabled, or suspended.", 400)
+        if user.role.name == "admin" and status != "active":
+            other_admins = (
+                session.scalar(
+                    select(func.count())
+                    .select_from(User)
+                    .join(Role)
+                    .where(Role.name == "admin", User.status == "active", User.id != user.id)
+                )
+                or 0
+            )
+            if other_admins == 0:
+                return _json_error("The final active administrator cannot be disabled.", 409)
         user.status = status
     if "role" in data:
         role_name = str(data["role"]).strip().lower()
         if role_name == "administrator":
             role_name = "admin"
-        if role_name not in {"admin", "user"}:
-            return _json_error("role must be admin or user.", 400)
         role = session.scalar(select(Role).where(Role.name == role_name))
         if role is None:
-            return _json_error("role was not found.", 404)
+            return _json_error("Role was not found.", 404)
+        if user.role.name == "admin" and role.name != "admin" and user.status == "active":
+            other_admins = (
+                session.scalar(
+                    select(func.count())
+                    .select_from(User)
+                    .join(Role)
+                    .where(Role.name == "admin", User.status == "active", User.id != user.id)
+                )
+                or 0
+            )
+            if other_admins == 0:
+                return _json_error("The final active administrator cannot be reassigned.", 409)
         user.role_id = role.id
     if "password" in data and str(data["password"]):
         if len(str(data["password"])) < 10:
             return _json_error("password must contain at least 10 characters.", 400)
         user.password_hash = hash_password(str(data["password"]))
-    session.add(
-        AuditLog(
-            username=user.username,
-            role=user.role.name,
-            action="admin.user.update",
-            result="success",
-            affected_object=user.username,
-        )
-    )
+    if data.get("unlock") is True:
+        user.failed_login_count = 0
+        user.locked_until = None
+    if user.status != "active" or ("password" in data and str(data["password"])):
+        for managed_session in session.scalars(
+            select(UserSession).where(UserSession.user_id == user.id, UserSession.active.is_(True))
+        ):
+            managed_session.active = False
+            managed_session.status = "revoked"
+            managed_session.updated_at = utc_now()
     session.commit()
+    changed_fields = sorted(key for key in ("status", "role", "password", "unlock") if key in data)
+    _record_account_audit(
+        "admin.user.update",
+        f"user:{user.id}",
+        reason=f"Updated {user.username}: {', '.join(changed_fields) or 'no fields'}.",
+    )
     return jsonify({"user": _user_json(user)})
 
 
@@ -3165,6 +5469,126 @@ def list_notifications():  # type: ignore[no-untyped-def]
     return jsonify({"unread_count": sum(1 for item in items if not item.read), "items": payload})
 
 
+@api_v1_blueprint.get("/history")
+def investigation_history():  # type: ignore[no-untyped-def]
+    """Return one ownership-scoped projection of real notifications, activity, and security events."""
+    session = _db().session
+    user_id = _current_user_id()
+    query_text = _query_text()
+    case_id_text = request.args.get("case_id", "").strip()
+    selected_case_id = None
+    if case_id_text:
+        try:
+            selected_case_id = _uuid(case_id_text, "case_id")
+        except ValueError as error:
+            return _json_error(str(error), 400)
+        if not _case_accessible(selected_case_id):
+            return _forbidden()
+    owned_case_ids = (
+        {selected_case_id}
+        if selected_case_id
+        else set(session.scalars(select(Case.id).where(Case.deleted_at.is_(None))))
+        if _is_admin()
+        else _owned_case_ids()
+    )
+    timeline_statement = (
+        select(TimelineEvent)
+        .where(TimelineEvent.case_id.in_(owned_case_ids))
+        .order_by(TimelineEvent.occurred_at.desc())
+        .limit(300)
+        if owned_case_ids
+        else None
+    )
+    activity = (
+        [_timeline_json(item) for item in session.scalars(timeline_statement)] if timeline_statement is not None else []
+    )
+    if query_text:
+        activity = [
+            item
+            for item in activity
+            if query_text in f"{item['event_type']} {item['summary']} {item.get('details') or ''}".lower()
+        ]
+
+    audit_rows = list(session.scalars(select(AuditLog).order_by(AuditLog.created_at.desc()).limit(500)))
+    if not _is_admin():
+        owned_objects = {f"case:{item}" for item in owned_case_ids}
+        evidence_ids = (
+            set(session.scalars(select(Evidence.id).where(Evidence.case_id.in_(owned_case_ids))))
+            if owned_case_ids
+            else set()
+        )
+        report_ids = (
+            set(session.scalars(select(Report.id).where(Report.case_id.in_(owned_case_ids))))
+            if owned_case_ids
+            else set()
+        )
+        timeline_ids = (
+            set(session.scalars(select(TimelineEvent.id).where(TimelineEvent.case_id.in_(owned_case_ids))))
+            if owned_case_ids
+            else set()
+        )
+        owned_objects.update(f"evidence:{item}" for item in evidence_ids)
+        owned_objects.update(f"report:{item}" for item in report_ids)
+        owned_objects.update(f"timeline_event:{item}" for item in timeline_ids)
+        audit_rows = [
+            item
+            for item in audit_rows
+            if item.user_id == user_id or (item.affected_object and item.affected_object in owned_objects)
+        ]
+    result_filter = request.args.get("result", "all")
+    action_filter = request.args.get("action", "all")
+    if result_filter != "all":
+        audit_rows = [item for item in audit_rows if item.result == result_filter]
+    if action_filter != "all":
+        audit_rows = [item for item in audit_rows if item.action.startswith(action_filter)]
+    if query_text:
+        audit_rows = [
+            item for item in audit_rows if query_text in json.dumps(_audit_log_json(item), default=str).lower()
+        ]
+
+    notifications = list_notifications().get_json() or {"items": [], "unread_count": 0}
+    if _is_admin():
+        security_events = [
+            _security_alert_json(item)
+            for item in session.scalars(select(SecurityAlert).order_by(SecurityAlert.created_at.desc()).limit(200))
+        ]
+    else:
+        security_events = [
+            _audit_log_json(item)
+            for item in audit_rows
+            if item.action.startswith(("auth.", "rbac.", "csrf.", "rate_limit."))
+        ]
+    namespace = f"user:{user_id}"
+    preferences = {}
+    for item in session.scalars(select(Setting).where(Setting.namespace == namespace)):
+        try:
+            preferences[item.key] = json.loads(item.value)
+        except (TypeError, json.JSONDecodeError):
+            preferences[item.key] = item.value
+    writer = current_app.extensions.get("cyberinvestigator_audit_writer")
+    integrity = (
+        writer.verify_integrity()
+        if _is_admin() and writer is not None and hasattr(writer, "verify_integrity")
+        else {"available": False, "reason": "Administrative access is required."}
+    )
+    critical = [item for item in notifications["items"] if item.get("priority") in {"critical", "high"}]
+    return jsonify(
+        {
+            "critical_notifications": critical,
+            "notifications": notifications,
+            "investigation_activity": activity[:200],
+            "audit_events": [_audit_log_json(item) for item in audit_rows[:200]],
+            "security_events": security_events[:200],
+            "preferences": preferences,
+            "audit_integrity": integrity,
+            "scope": {
+                "case_ids": [str(item) for item in sorted(owned_case_ids, key=str)],
+                "administrator": _is_admin(),
+            },
+        }
+    )
+
+
 @api_v1_blueprint.get("/account")
 def account_workspace():  # type: ignore[no-untyped-def]
     """Return only the authenticated user's settings, sessions, history, and usage."""
@@ -3234,6 +5658,11 @@ def update_account_preferences():  # type: ignore[no-untyped-def]
             return _json_error(f"Unsupported preference: {key}.", 400)
         _set_setting(f"user:{user_id}", key, json.dumps(value), "json")
     _db().session.commit()
+    _record_account_audit(
+        "account.notification_preferences.updated",
+        f"user:{user_id}",
+        reason=f"Updated preference keys: {', '.join(sorted(data))}",
+    )
     return account_workspace()
 
 
@@ -3251,6 +5680,7 @@ def revoke_account_session(session_id: str):  # type: ignore[no-untyped-def]
     record.status = "revoked"
     record.updated_at = utc_now()
     _db().session.commit()
+    _record_account_audit("account.session.revoked", f"session:{record.id}")
     return account_workspace()
 
 
@@ -3259,10 +5689,13 @@ def mark_notifications_read():  # type: ignore[no-untyped-def]
     statement = select(Notification).where(Notification.read.is_(False))
     if not _is_admin():
         statement = statement.where(Notification.owner_user_id == _current_user_id())
+    changed = 0
     for item in _db().session.scalars(statement):
         item.read = True
         item.status = "read"
+        changed += 1
     _db().session.commit()
+    _record_account_audit("notifications.marked_read", f"user:{_current_user_id()}", reason=f"count:{changed}")
     return list_notifications()
 
 
@@ -3280,6 +5713,7 @@ def archive_notification(notification_id: str):  # type: ignore[no-untyped-def]
     item.archived = True
     item.status = "archived"
     _db().session.commit()
+    _record_account_audit("notification.archived", f"notification:{item.id}")
     return list_notifications()
 
 
@@ -3296,6 +5730,7 @@ def mark_notification_read(notification_id: str):  # type: ignore[no-untyped-def
     item.read = True
     item.status = "read"
     _db().session.commit()
+    _record_account_audit("notification.read", f"notification:{item.id}")
     return list_notifications()
 
 
@@ -3309,8 +5744,10 @@ def delete_notification(notification_id: str):  # type: ignore[no-untyped-def]
         return _json_error("Notification was not found.", 404)
     if not _is_admin() and item.owner_user_id != _current_user_id():
         return _forbidden()
+    notification_id_value = item.id
     _db().session.delete(item)
     _db().session.commit()
+    _record_account_audit("notification.deleted", f"notification:{notification_id_value}")
     return list_notifications()
 
 
@@ -3460,6 +5897,7 @@ def dashboard_snapshot():  # type: ignore[no-untyped-def]
         payload = {
             "cases_count": 0,
             "active_cases_count": 0,
+            "active_cases": [],
             "selected_case_id": None,
             "selected_case": None,
             "evidence_count": 0,
@@ -3485,6 +5923,12 @@ def dashboard_snapshot():  # type: ignore[no-untyped-def]
                 "status": "disabled" if not bool(current_app.config.get("PLUGINS_ENABLED", True)) else "healthy",
             },
             "investigation_progress": {"completed": 0, "remaining": 10, "label": "No active case"},
+            "lifecycle_progress": {
+                "completed": 0,
+                "total": 4,
+                "stages": {"case": False, "evidence": False, "timeline": False, "report": False},
+                "label": "No active case",
+            },
             "quick_actions": quick_actions,
             "recent_notifications": recent_notifications.get("items", []) if recent_notifications else [],
         }
@@ -3600,14 +6044,8 @@ def dashboard_snapshot():  # type: ignore[no-untyped-def]
         }
         for item in recommendations
     )
-    if not ai_insights:
-        ai_insights.append(
-            {
-                "title": "Local analysis ready",
-                "body": provider["message"],
-                "created_at": None,
-            }
-        )
+    completed_stages = 1 + int(bool(evidence_count)) + int(bool(timeline_count)) + int(bool(reports_count))
+    lifecycle_progress = completed_stages * 25
 
     quick_actions = (
         [
@@ -3673,6 +6111,7 @@ def dashboard_snapshot():  # type: ignore[no-untyped-def]
     payload = {
         "cases_count": all_case_count,
         "active_cases_count": len(active_cases),
+        "active_cases": [_case_json(case, include_related=False) for case in active_cases],
         "selected_case_id": str(newest_case.id),
         "selected_case": _case_json(newest_case),
         "evidence_count": evidence_count,
@@ -3706,6 +6145,17 @@ def dashboard_snapshot():  # type: ignore[no-untyped-def]
             "completed": timeline_count,
             "remaining": max(0, 10 - timeline_count),
             "label": f"{progress}% complete",
+        },
+        "lifecycle_progress": {
+            "completed": completed_stages,
+            "total": 4,
+            "stages": {
+                "case": True,
+                "evidence": bool(evidence_count),
+                "timeline": bool(timeline_count),
+                "report": bool(reports_count),
+            },
+            "label": f"{lifecycle_progress}% lifecycle coverage",
         },
         "quick_actions": quick_actions,
         "recent_notifications": recent_notifications.get("items", []) if recent_notifications else [],

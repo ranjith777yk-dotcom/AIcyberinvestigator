@@ -40,6 +40,8 @@ class ProviderStatus:
     message: str
     endpoint: str | None = None
     installed_models: tuple[str, ...] = ()
+    health_source: str = "configuration"
+    checked_at: float | None = None
 
 
 logger = logging.getLogger(__name__)
@@ -78,6 +80,8 @@ class OllamaHTTPProvider(OllamaProviderStrategy):
             message=message,
             endpoint=self.endpoint,
             installed_models=installed,
+            health_source="live_endpoint",
+            checked_at=time.time(),
         )
 
     def generate(self, request: AIRequest) -> AIResponse:
@@ -188,7 +192,37 @@ class OpenAISDKProvider(OpenAIProviderStrategy):
             available=configured,
             configured=configured,
             model=self.model,
-            message="OpenAI provider configured." if configured else "OpenAI API key is not configured.",
+            message=(
+                "OpenAI adapter is configured; use connection testing to verify live availability."
+                if configured
+                else "OpenAI API key is not configured."
+            ),
+            health_source="configuration",
+        )
+
+    def test_connection(self) -> ProviderStatus:
+        if not self.api_key:
+            return self.status
+        try:
+            self._openai_client().models.list()
+        except Exception:
+            return ProviderStatus(
+                provider=self.provider_name.value,
+                available=False,
+                configured=True,
+                model=self.model,
+                message="OpenAI connection test failed; provider details were suppressed.",
+                health_source="live_endpoint",
+                checked_at=time.time(),
+            )
+        return ProviderStatus(
+            provider=self.provider_name.value,
+            available=True,
+            configured=True,
+            model=self.model,
+            message="OpenAI connection test succeeded.",
+            health_source="live_endpoint",
+            checked_at=time.time(),
         )
 
     def generate(self, request: AIRequest) -> AIResponse:
@@ -263,6 +297,7 @@ class OptionalAPIKeyProvider(AIProviderStrategy):
                 if configured
                 else f"{self.provider_name.value.title()} API key is not configured."
             ),
+            health_source="adapter",
         )
 
     def generate(self, request: AIRequest) -> AIResponse:
@@ -292,13 +327,24 @@ class AIProviderManager:
         self._status_cache: dict[str, tuple[float, ProviderStatus]] = {}
         self._failed_until: dict[str, float] = {}
         self.status_ttl_seconds = 5.0
+        self.failover_enabled = True
+        self._fallback_order = list(self.fallback_order)
+
+    def configure_failover(self, *, enabled: bool, order: list[str] | tuple[str, ...]) -> None:
+        """Apply an allow-listed routing order without changing provider adapters."""
+        registered = set(self._providers)
+        normalized = [str(item) for item in order if str(item) in registered]
+        self.failover_enabled = bool(enabled)
+        self._fallback_order = normalized or list(self.fallback_order)
 
     def select(self, provider_name: AIProviderName | str) -> AIProviderStrategy:
         key = provider_name.value if isinstance(provider_name, AIProviderName) else str(provider_name)
         provider = self._providers.get(key)
         if provider and not self._temporarily_failed(key) and self.status(key).available:
             return provider
-        for fallback_key in self.fallback_order:
+        if not self.failover_enabled:
+            raise AIProviderUnavailable(f"AI provider '{key}' is unavailable and failover is disabled.")
+        for fallback_key in self._fallback_order:
             provider = self._providers.get(fallback_key)
             if provider and not self._temporarily_failed(fallback_key) and self.status(fallback_key).available:
                 return provider
@@ -332,12 +378,21 @@ class AIProviderManager:
         return fallback
 
     def all_statuses(self) -> dict[str, ProviderStatus]:
-        return {name: self.status(name) for name in self.fallback_order}
+        return {name: self.status(name) for name in self._providers}
+
+    @property
+    def routing_policy(self) -> dict[str, object]:
+        return {"enabled": self.failover_enabled, "order": list(self._fallback_order)}
 
     def test_connection(self, provider_name: str) -> ProviderStatus:
-        self._failed_until.pop(str(provider_name), None)
-        self._status_cache.pop(str(provider_name), None)
-        return self.status(provider_name)
+        key = str(provider_name)
+        self._failed_until.pop(key, None)
+        self._status_cache.pop(key, None)
+        provider = self._providers.get(key)
+        tester = getattr(provider, "test_connection", None) if provider is not None else None
+        status = tester() if callable(tester) else self.status(key)
+        self._status_cache[key] = (time.time(), status)
+        return status
 
     def mark_unavailable(self, provider_name: str, *, retry_after: float = 10.0) -> None:
         """Temporarily avoid a failed provider so a configured fallback can run."""

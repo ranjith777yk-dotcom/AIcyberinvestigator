@@ -38,10 +38,11 @@ class LocalEvidenceStorage:
 
     _CHUNK_SIZE: Final[int] = 1024 * 1024
 
-    def __init__(self, root_directory: Path) -> None:
+    def __init__(self, root_directory: Path, *, max_bytes: int | None = None) -> None:
         """Create storage rooted at an explicit, caller-controlled path."""
         self._root_directory = root_directory.resolve()
         self._root_directory.mkdir(parents=True, exist_ok=True)
+        self._max_bytes = max_bytes
 
     def store(
         self,
@@ -70,6 +71,8 @@ class LocalEvidenceStorage:
                 while chunk := content.read(self._CHUNK_SIZE):
                     if not isinstance(chunk, bytes):
                         raise TypeError("Evidence content must yield bytes.")
+                    if self._max_bytes is not None and size_bytes + len(chunk) > self._max_bytes:
+                        raise EvidenceStorageError("Evidence exceeds the configured custody size limit.")
                     digest.update(chunk)
                     target.write(chunk)
                     size_bytes += len(chunk)
@@ -79,9 +82,13 @@ class LocalEvidenceStorage:
 
             # Atomic replace on same filesystem.
             temporary.replace(destination)
+            destination.chmod(0o600)
 
-        except (OSError, TypeError) as error:
+        except (OSError, TypeError, EvidenceStorageError) as error:
             self._remove_if_present(temporary)
+            self._remove_if_present(destination)
+            if isinstance(error, EvidenceStorageError):
+                raise
             raise EvidenceStorageError("Evidence file could not be stored safely.") from error
 
         # Backward compatibility: preserve the same storage_path format returned

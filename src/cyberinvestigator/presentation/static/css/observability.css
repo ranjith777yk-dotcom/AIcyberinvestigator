@@ -1,0 +1,32 @@
+.observability-workspace { display: grid; gap: var(--space-4, 1rem); }
+.observability-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1.25rem; }
+.observability-header h3 { margin-bottom: .25rem; }
+.observability-header p:last-child { margin: 0; color: var(--text-muted, #94a3b8); }
+.observability-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 1rem; }
+.observability-grid > article { padding: 1.1rem; min-width: 0; }
+.observability-critical, .observability-health, .observability-services, .observability-events { grid-column: span 6; }
+.observability-metrics, .observability-history, .observability-sources, .observability-jobs { grid-column: span 4; }
+.observability-traces, .observability-logs { grid-column: span 6; }
+.observability-scroll { max-height: 24rem; overflow: auto; scrollbar-gutter: stable; }
+.observability-record { display: grid; gap: .25rem; padding: .75rem 0; border-bottom: 1px solid var(--border-subtle, rgba(148,163,184,.16)); }
+.observability-record:last-child { border-bottom: 0; }
+.observability-record small { color: var(--text-muted, #94a3b8); overflow-wrap: anywhere; }
+.observability-status { text-transform: capitalize; }
+@media (max-width: 991.98px) {
+  .observability-critical, .observability-health, .observability-services, .observability-events,
+  .observability-metrics, .observability-history, .observability-sources, .observability-jobs, .observability-traces, .observability-logs { grid-column: span 12; }
+}
+@media (max-width: 575.98px) {
+  .observability-header { align-items: flex-start; flex-direction: column; }
+  .observability-grid { display: flex; flex-direction: column; }
+  .observability-critical { order: 1; }
+  .observability-health { order: 2; }
+  .observability-services { order: 3; }
+  .observability-events { order: 4; }
+  .observability-metrics { order: 5; }
+  .observability-history { order: 6; }
+  .observability-traces { order: 7; }
+  .observability-logs { order: 8; }
+  .observability-sources { order: 9; }
+  .observability-jobs { order: 10; }
+}

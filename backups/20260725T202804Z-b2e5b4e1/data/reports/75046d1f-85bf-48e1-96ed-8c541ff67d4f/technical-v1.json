@@ -1,0 +1,138 @@
+{
+  "title": "REPORT-EXPORT-1 Technical Report",
+  "report_type": "technical",
+  "generated_at": "2026-07-19T07:16:14.660547+00:00",
+  "executive_summary": "REPORT-EXPORT-1 contains 0 evidence item(s), 1 timeline event(s), and a threat score of 10/100.",
+  "investigation_summary": {
+    "case_id": "75046d1f-85bf-48e1-96ed-8c541ff67d4f",
+    "case_number": "REPORT-EXPORT-1",
+    "case": {
+      "id": "75046d1f-85bf-48e1-96ed-8c541ff67d4f",
+      "case_number": "REPORT-EXPORT-1",
+      "title": "Report Export",
+      "description": null,
+      "severity": "medium",
+      "priority": "medium",
+      "owner": null,
+      "tags": [],
+      "notes": [],
+      "relationships": [],
+      "attachments": [],
+      "history": [
+        {
+          "id": "e75ea331-d11a-4996-a4e9-9017845764fe",
+          "case_id": "75046d1f-85bf-48e1-96ed-8c541ff67d4f",
+          "case_number": "REPORT-EXPORT-1",
+          "evidence_id": null,
+          "evidence_number": null,
+          "artifact_id": null,
+          "occurred_at": "2026-07-19T07:16:14.643280",
+          "event_type": "case.created",
+          "group": "case",
+          "threat_weight": 6,
+          "threat_level": "low",
+          "summary": "Case REPORT-EXPORT-1 created",
+          "details": "Report Export"
+        }
+      ],
+      "opened_at": "2026-07-19T07:16:14.640831",
+      "closed_at": null,
+      "archived_at": null,
+      "deleted_at": null,
+      "status": "active"
+    },
+    "evidence": [],
+    "timeline": [
+      {
+        "id": "e75ea331-d11a-4996-a4e9-9017845764fe",
+        "case_id": "75046d1f-85bf-48e1-96ed-8c541ff67d4f",
+        "case_number": "REPORT-EXPORT-1",
+        "evidence_id": null,
+        "evidence_number": null,
+        "artifact_id": null,
+        "occurred_at": "2026-07-19T07:16:14.643280",
+        "event_type": "case.created",
+        "group": "case",
+        "threat_weight": 6,
+        "threat_level": "low",
+        "summary": "Case REPORT-EXPORT-1 created",
+        "details": "Report Export"
+      }
+    ],
+    "reports": [
+      {
+        "id": "22da7e67-70ff-4d7c-ae03-6d528d65f1ef",
+        "case_id": "75046d1f-85bf-48e1-96ed-8c541ff67d4f",
+        "report_type": "technical",
+        "version": 1,
+        "title": "Exportable Report",
+        "storage_path": "75046d1f-85bf-48e1-96ed-8c541ff67d4f\\technical-v1.json",
+        "generated_at": "2026-07-19T07:16:14.653168"
+      }
+    ],
+    "plugins": []
+  },
+  "evidence": [],
+  "timeline": [
+    {
+      "id": "e75ea331-d11a-4996-a4e9-9017845764fe",
+      "case_id": "75046d1f-85bf-48e1-96ed-8c541ff67d4f",
+      "case_number": "REPORT-EXPORT-1",
+      "evidence_id": null,
+      "evidence_number": null,
+      "artifact_id": null,
+      "occurred_at": "2026-07-19T07:16:14.643280",
+      "event_type": "case.created",
+      "group": "case",
+      "threat_weight": 6,
+      "threat_level": "low",
+      "summary": "Case REPORT-EXPORT-1 created",
+      "details": "Report Export"
+    }
+  ],
+  "threat_score": 10,
+  "iocs": [],
+  "mitre_attack": [
+    {
+      "technique_id": "Triage",
+      "technique_name": "No direct ATT&CK mapping detected",
+      "tactic": "Analysis"
+    }
+  ],
+  "ai_explanation": {
+    "available": false,
+    "provider": {
+      "provider": "openai",
+      "available": false,
+      "configured": true,
+      "model": "gpt-4.1-mini",
+      "message": "AI is disabled by configuration; using local fallback."
+    },
+    "content": "OpenAI is not configured. Local deterministic analysis is available and the workflow can continue."
+  },
+  "recommendations": [
+    "Preserve original evidence and verify SHA-256 before every transfer.",
+    "Review timeline gaps and correlate suspicious events with source evidence.",
+    "Escalate high-entropy, embedded-content, or flag-bearing artifacts for deeper manual review."
+  ],
+  "appendix": {
+    "chain_of_custody": "Evidence hashes, acquisition timestamps, and analysis reports are retained in the evidence records.",
+    "plugins": []
+  },
+  "charts": {
+    "threat_score": 10,
+    "timeline_by_group": {
+      "case": 1
+    },
+    "evidence_by_type": {}
+  },
+  "report": {
+    "id": "22da7e67-70ff-4d7c-ae03-6d528d65f1ef",
+    "case_id": "75046d1f-85bf-48e1-96ed-8c541ff67d4f",
+    "report_type": "technical",
+    "version": 1,
+    "title": "Exportable Report",
+    "storage_path": "75046d1f-85bf-48e1-96ed-8c541ff67d4f\\technical-v1.json",
+    "generated_at": "2026-07-19T07:16:14.653168"
+  }
+}

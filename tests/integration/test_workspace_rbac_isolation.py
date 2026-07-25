@@ -3,7 +3,7 @@ from __future__ import annotations
 from sqlalchemy import select
 
 from cyberinvestigator import create_app
-from cyberinvestigator.infrastructure.database.models import Notification, Role, User
+from cyberinvestigator.infrastructure.database.models import AuditLog, Notification, Role, User
 from cyberinvestigator.infrastructure.security.web_security import hash_password
 
 
@@ -42,6 +42,15 @@ def test_user_objects_are_isolated_and_admin_bypasses_scope() -> None:
         ).status_code
         == 201
     )
+    evidence_id = client.get("/api/v1/evidence", headers=_headers("owner-one")).get_json()["items"][0]["id"]
+    job = client.post(f"/api/v1/evidence/{evidence_id}/analysis-jobs", headers=_headers("owner-one"))
+    assert job.status_code == 202
+    job_id = job.get_json()["id"]
+    assert client.get(f"/api/v1/evidence/analysis-jobs/{job_id}", headers=_headers("owner-two")).status_code == 403
+    assert (
+        client.get(f"/api/v1/evidence/analysis-jobs/{job_id}", headers=_headers("investigator", "admin")).status_code
+        == 200
+    )
     assert (
         client.post(
             "/api/v1/timeline",
@@ -57,6 +66,32 @@ def test_user_objects_are_isolated_and_admin_bypasses_scope() -> None:
     assert greeting.status_code == 200
     assert greeting.get_json()["provider_status"]["provider"] == "local"
     assert greeting.get_json()["provider_status"]["provider_called"] is False
+
+    workspace = client.get(f"/api/v1/cases/{case_id}/workspace", headers=_headers("owner-one"))
+    assert workspace.status_code == 200
+    workspace_payload = workspace.get_json()
+    assert workspace_payload["case"]["id"] == case_id
+    assert workspace_payload["counts"]["evidence"] == 1
+    assert workspace_payload["counts"]["timeline"] >= 2
+    assert workspace_payload["counts"]["reports"] == 1
+    assert client.get(f"/api/v1/cases/{case_id}/workspace", headers=_headers("owner-two")).status_code == 403
+    assert (
+        client.get(f"/api/v1/cases/{case_id}/workspace", headers=_headers("investigator", "admin")).status_code == 200
+    )
+    assert client.post(f"/api/v1/cases/{case_id}/close", headers=_headers("owner-one")).status_code == 200
+    lifecycle_workspace = client.get(f"/api/v1/cases/{case_id}/workspace", headers=_headers("owner-one")).get_json()
+    assert lifecycle_workspace["case"]["status"] == "closed"
+    assert any(item["event_type"] == "case.closed" for item in lifecycle_workspace["timeline"])
+    with app.app_context():
+        db = app.extensions["cyberinvestigator_database"]
+        audit = db.session.scalar(
+            select(AuditLog)
+            .where(AuditLog.action == "case.closed", AuditLog.affected_object == f"case:{case_id}")
+            .order_by(AuditLog.created_at.desc())
+        )
+        assert audit is not None
+        assert audit.username == "owner-one"
+        assert audit.result == "success"
 
     streamed = client.post("/api/v1/ai/chat/stream", headers=_headers("owner-one"), json={"message": "hello"})
     assert streamed.status_code == 200
@@ -110,6 +145,17 @@ def test_user_objects_are_isolated_and_admin_bypasses_scope() -> None:
         item["title"]
         for item in client.get("/api/v1/notifications", headers=_headers("investigator", "admin")).get_json()["items"]
     } >= {"One", "Two"}
+    owner_history_response = client.get("/api/v1/history", headers=_headers("owner-one"))
+    assert owner_history_response.status_code == 200, owner_history_response.get_data(as_text=True)
+    owner_history = owner_history_response.get_json()
+    assert [item["title"] for item in owner_history["notifications"]["items"]] == ["One"]
+    assert owner_history["scope"]["administrator"] is False
+    assert owner_history["audit_integrity"]["available"] is False
+    assert all(item["case_id"] == case_id for item in owner_history["investigation_activity"])
+
+    admin_history = client.get("/api/v1/history", headers=_headers("investigator", "admin")).get_json()
+    assert admin_history["scope"]["administrator"] is True
+    assert "valid" in admin_history["audit_integrity"]
 
 
 def test_user_cannot_access_admin_routes() -> None:

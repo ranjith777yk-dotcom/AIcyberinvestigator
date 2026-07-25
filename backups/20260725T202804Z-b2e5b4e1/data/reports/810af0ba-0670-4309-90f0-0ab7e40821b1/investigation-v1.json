@@ -1,0 +1,119 @@
+{
+  "case": {
+    "id": "810af0ba-0670-4309-90f0-0ab7e40821b1",
+    "case_number": "2",
+    "title": "asdfgh",
+    "description": null,
+    "severity": "critical",
+    "opened_at": "2026-07-19T05:41:16.454793",
+    "closed_at": null,
+    "archived_at": null,
+    "deleted_at": null,
+    "status": "active"
+  },
+  "report": {
+    "id": "a1675e9e-5360-4070-b609-aa0b0d33571e",
+    "case_id": "810af0ba-0670-4309-90f0-0ab7e40821b1",
+    "report_type": "investigation",
+    "version": 1,
+    "title": "zfg",
+    "storage_path": "810af0ba-0670-4309-90f0-0ab7e40821b1\\investigation-v1.json",
+    "generated_at": "2026-07-19T05:42:37.376988"
+  },
+  "ai_summary": {
+    "available": false,
+    "provider": {
+      "provider": "openai",
+      "available": false,
+      "configured": true,
+      "model": "gpt-4.1-mini",
+      "message": "AI is disabled by configuration; using local fallback."
+    },
+    "content": "OpenAI is not configured. Local deterministic analysis is available and the workflow can continue."
+  },
+  "context": {
+    "case_id": "810af0ba-0670-4309-90f0-0ab7e40821b1",
+    "case_number": "2",
+    "case": {
+      "id": "810af0ba-0670-4309-90f0-0ab7e40821b1",
+      "case_number": "2",
+      "title": "asdfgh",
+      "description": null,
+      "severity": "critical",
+      "opened_at": "2026-07-19T05:41:16.454793",
+      "closed_at": null,
+      "archived_at": null,
+      "deleted_at": null,
+      "status": "active"
+    },
+    "evidence": [
+      {
+        "id": "0f3b4615-e385-4ed5-80c0-16538049c4fa",
+        "case_id": "810af0ba-0670-4309-90f0-0ab7e40821b1",
+        "evidence_number": "2",
+        "original_filename": "HiddenTruth.zip",
+        "storage_path": "810af0ba-0670-4309-90f0-0ab7e40821b1\\115609e2e6824354b8225df942992a71.zip",
+        "media_type": "application/x-zip-compressed",
+        "size_bytes": 816554,
+        "sha256": "fde4e32f4a0ce6678afb050ce553c581d6c4cbdefec3ba17f14604e423f37c65",
+        "source_description": null,
+        "acquired_at": "2026-07-19T05:41:44.043240",
+        "deleted_at": null
+      }
+    ],
+    "timeline": [
+      {
+        "id": "a32860bd-66b8-446f-8a45-4aa2a6835247",
+        "case_id": "810af0ba-0670-4309-90f0-0ab7e40821b1",
+        "evidence_id": "0f3b4615-e385-4ed5-80c0-16538049c4fa",
+        "artifact_id": null,
+        "occurred_at": "2026-07-19T05:41:55.821674",
+        "event_type": "ai.analysis.completed",
+        "summary": "AI analysis completed for 2",
+        "details": "Local analysis for 115609e2e6824354b8225df942992a71.zip found 2 IOC(s), 0 ATT&CK mapping(s), and a threat score of 24/100."
+      },
+      {
+        "id": "5d7fbe18-cb9d-4982-9309-c83188c34058",
+        "case_id": "810af0ba-0670-4309-90f0-0ab7e40821b1",
+        "evidence_id": "0f3b4615-e385-4ed5-80c0-16538049c4fa",
+        "artifact_id": null,
+        "occurred_at": "2026-07-19T05:41:54.584777",
+        "event_type": "ai.analysis.completed",
+        "summary": "AI analysis completed for 2",
+        "details": "Local analysis for 115609e2e6824354b8225df942992a71.zip found 2 IOC(s), 0 ATT&CK mapping(s), and a threat score of 24/100."
+      },
+      {
+        "id": "90639336-66a3-42ab-a1e0-3ce738ee4338",
+        "case_id": "810af0ba-0670-4309-90f0-0ab7e40821b1",
+        "evidence_id": "0f3b4615-e385-4ed5-80c0-16538049c4fa",
+        "artifact_id": null,
+        "occurred_at": "2026-07-19T05:41:44.079617",
+        "event_type": "evidence.added",
+        "summary": "Evidence 2 added",
+        "details": "HiddenTruth.zip"
+      },
+      {
+        "id": "d5f8af85-0844-4ce2-a696-f28c1081d283",
+        "case_id": "810af0ba-0670-4309-90f0-0ab7e40821b1",
+        "evidence_id": null,
+        "artifact_id": null,
+        "occurred_at": "2026-07-19T05:41:16.488904",
+        "event_type": "case.created",
+        "summary": "Case 2 created",
+        "details": "asdfgh"
+      }
+    ],
+    "reports": [
+      {
+        "id": "a1675e9e-5360-4070-b609-aa0b0d33571e",
+        "case_id": "810af0ba-0670-4309-90f0-0ab7e40821b1",
+        "report_type": "investigation",
+        "version": 1,
+        "title": "zfg",
+        "storage_path": "810af0ba-0670-4309-90f0-0ab7e40821b1\\investigation-v1.json",
+        "generated_at": "2026-07-19T05:42:37.376988"
+      }
+    ],
+    "plugins": []
+  }
+}

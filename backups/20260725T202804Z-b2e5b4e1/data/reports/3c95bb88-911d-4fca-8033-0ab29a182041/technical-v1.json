@@ -1,0 +1,75 @@
+{
+  "case": {
+    "id": "3c95bb88-911d-4fca-8033-0ab29a182041",
+    "case_number": "REPORT-EXPORT-1",
+    "title": "Report Export",
+    "description": null,
+    "severity": "medium",
+    "opened_at": "2026-07-19T06:27:39.695107",
+    "closed_at": null,
+    "archived_at": null,
+    "deleted_at": null,
+    "status": "active"
+  },
+  "report": {
+    "id": "c6106b4a-ef9e-492b-a6e9-9ed73be28bb9",
+    "case_id": "3c95bb88-911d-4fca-8033-0ab29a182041",
+    "report_type": "technical",
+    "version": 1,
+    "title": "Exportable Report",
+    "storage_path": "3c95bb88-911d-4fca-8033-0ab29a182041\\technical-v1.json",
+    "generated_at": "2026-07-19T06:27:39.717067"
+  },
+  "ai_summary": {
+    "available": false,
+    "provider": {
+      "provider": "openai",
+      "available": false,
+      "configured": true,
+      "model": "gpt-4.1-mini",
+      "message": "AI is disabled by configuration; using local fallback."
+    },
+    "content": "OpenAI is not configured. Local deterministic analysis is available and the workflow can continue."
+  },
+  "context": {
+    "case_id": "3c95bb88-911d-4fca-8033-0ab29a182041",
+    "case_number": "REPORT-EXPORT-1",
+    "case": {
+      "id": "3c95bb88-911d-4fca-8033-0ab29a182041",
+      "case_number": "REPORT-EXPORT-1",
+      "title": "Report Export",
+      "description": null,
+      "severity": "medium",
+      "opened_at": "2026-07-19T06:27:39.695107",
+      "closed_at": null,
+      "archived_at": null,
+      "deleted_at": null,
+      "status": "active"
+    },
+    "evidence": [],
+    "timeline": [
+      {
+        "id": "e47688bc-906d-46a2-af18-804048bdba70",
+        "case_id": "3c95bb88-911d-4fca-8033-0ab29a182041",
+        "evidence_id": null,
+        "artifact_id": null,
+        "occurred_at": "2026-07-19T06:27:39.702255",
+        "event_type": "case.created",
+        "summary": "Case REPORT-EXPORT-1 created",
+        "details": "Report Export"
+      }
+    ],
+    "reports": [
+      {
+        "id": "c6106b4a-ef9e-492b-a6e9-9ed73be28bb9",
+        "case_id": "3c95bb88-911d-4fca-8033-0ab29a182041",
+        "report_type": "technical",
+        "version": 1,
+        "title": "Exportable Report",
+        "storage_path": "3c95bb88-911d-4fca-8033-0ab29a182041\\technical-v1.json",
+        "generated_at": "2026-07-19T06:27:39.717067"
+      }
+    ],
+    "plugins": []
+  }
+}

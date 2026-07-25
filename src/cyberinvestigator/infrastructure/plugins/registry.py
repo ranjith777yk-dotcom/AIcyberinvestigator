@@ -44,6 +44,8 @@ class PluginMetadata:
     capabilities: tuple[str, ...] = ()
     dependencies: tuple[PluginDependency, ...] = ()
     configuration: PluginConfiguration = field(default_factory=PluginConfiguration)
+    category: str = "analysis"
+    permissions: tuple[str, ...] = ()
 
 
 class Plugin(Protocol):

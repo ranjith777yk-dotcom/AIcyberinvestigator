@@ -1,0 +1,23 @@
+.deployment-workspace { display: grid; gap: 1rem; }
+.deployment-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1.25rem; }
+.deployment-header h3 { margin-bottom: .25rem; }
+.deployment-header p:last-child { margin: 0; color: var(--text-muted, #94a3b8); }
+.deployment-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 1rem; }
+.deployment-grid > article { grid-column: span 6; min-width: 0; padding: 1.1rem; }
+.deployment-grid > article > h3 { font-size: 1rem; }
+.deployment-grid > article > p { color: var(--text-muted, #94a3b8); font-size: .85rem; }
+@media (max-width: 991.98px) {
+  .deployment-grid > article { grid-column: span 12; }
+}
+@media (max-width: 575.98px) {
+  .deployment-header { align-items: stretch; flex-direction: column; }
+  .deployment-grid { display: flex; flex-direction: column; }
+  .deployment-status { order: 1; }
+  .deployment-pipelines { order: 2; }
+  .deployment-failures { order: 3; }
+  .deployment-releases { order: 4; }
+  .deployment-security { order: 5; }
+  .deployment-verification { order: 6; }
+  .deployment-rollback { order: 7; }
+  .deployment-infrastructure { order: 8; }
+}

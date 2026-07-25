@@ -1,0 +1,23 @@
+{
+  "case": {
+    "id": "85260de2-5aa0-4c1e-b6db-fe5a1f7d2a88",
+    "case_number": "CASE-900",
+    "title": "Smoke Case",
+    "description": "workflow",
+    "severity": "high",
+    "opened_at": "2026-07-19T04:39:06.768207",
+    "closed_at": null,
+    "archived_at": null,
+    "deleted_at": null,
+    "status": "active"
+  },
+  "report": {
+    "id": "47f23066-904b-41a1-ad3a-ba464c6baa49",
+    "case_id": "85260de2-5aa0-4c1e-b6db-fe5a1f7d2a88",
+    "report_type": "technical",
+    "version": 1,
+    "title": "Smoke Report",
+    "storage_path": "85260de2-5aa0-4c1e-b6db-fe5a1f7d2a88\\technical-v1.json",
+    "generated_at": "2026-07-19T04:39:06.847019"
+  }
+}

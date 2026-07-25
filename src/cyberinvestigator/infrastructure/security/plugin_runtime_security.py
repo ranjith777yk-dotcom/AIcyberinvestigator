@@ -16,6 +16,20 @@ from typing import Mapping, Protocol, Sequence
 
 from cyberinvestigator.domain.services.artifact_engine import ArtifactType
 
+PLUGIN_RUNTIME_PERMISSIONS = frozenset(
+    {
+        "evidence.read",
+        "evidence.write",
+        "timeline.read",
+        "timeline.write",
+        "reports.write",
+        "threat_intelligence.read",
+        "network.egress",
+        "jobs.submit",
+        "secrets.read",
+    }
+)
+
 
 class PluginLifecycleState(str, Enum):
     """Unified lifecycle state for both Python and Java plugin execution."""
@@ -150,7 +164,7 @@ class DefaultNoopDependencyValidator:
 
 
 class DefaultNoopCompatibilityChecker:
-    """Compatibility checker adapter that always returns compatible."""
+    """Conservative adapter used when no compatibility evaluator is configured."""
 
     def check(
         self,
@@ -159,13 +173,21 @@ class DefaultNoopCompatibilityChecker:
         supported_artifact_types: Sequence[ArtifactType],
         required_runtime_version: str | None = None,
     ) -> PluginCompatibility:
-        return PluginCompatibility(compatible=True)
+        return PluginCompatibility(
+            compatible=False,
+            reason="Compatibility was not evaluated because no compatibility checker is configured.",
+        )
 
 
 class DefaultPluginRuntimeHealthChecker:
     """Health checker for runtime security adapters."""
 
-    def __init__(self, *, ready: bool = True, message: str = "Runtime security adapters are configured.") -> None:
+    def __init__(
+        self,
+        *,
+        ready: bool = False,
+        message: str = "Runtime security health is unavailable until adapters are configured.",
+    ) -> None:
         self._ready = ready
         self._message = message
 

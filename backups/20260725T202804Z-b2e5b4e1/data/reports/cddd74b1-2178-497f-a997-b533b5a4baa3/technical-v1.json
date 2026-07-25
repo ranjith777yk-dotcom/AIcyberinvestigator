@@ -1,0 +1,149 @@
+{
+  "title": "REPORT-EXPORT-1 Technical Report",
+  "report_type": "technical",
+  "generated_at": "2026-07-19T10:53:28.931139+00:00",
+  "executive_summary": "REPORT-EXPORT-1 contains 0 evidence item(s), 1 timeline event(s), and a threat score of 10/100.",
+  "investigation_summary": {
+    "case_id": "cddd74b1-2178-497f-a997-b533b5a4baa3",
+    "case_number": "REPORT-EXPORT-1",
+    "case": {
+      "id": "cddd74b1-2178-497f-a997-b533b5a4baa3",
+      "case_number": "REPORT-EXPORT-1",
+      "title": "Report Export",
+      "description": null,
+      "severity": "medium",
+      "priority": "medium",
+      "owner": null,
+      "tags": [],
+      "notes": [],
+      "relationships": [],
+      "attachments": [],
+      "history": [
+        {
+          "id": "7c23341a-901f-4210-be55-c97ebae18314",
+          "case_id": "cddd74b1-2178-497f-a997-b533b5a4baa3",
+          "case_number": "REPORT-EXPORT-1",
+          "evidence_id": null,
+          "evidence_number": null,
+          "artifact_id": null,
+          "occurred_at": "2026-07-19T10:53:28.900940",
+          "event_type": "case.created",
+          "group": "case",
+          "threat_weight": 6,
+          "threat_level": "low",
+          "summary": "Case REPORT-EXPORT-1 created",
+          "details": "Report Export"
+        }
+      ],
+      "opened_at": "2026-07-19T10:53:28.894502",
+      "closed_at": null,
+      "archived_at": null,
+      "deleted_at": null,
+      "status": "active"
+    },
+    "evidence": [],
+    "timeline": [
+      {
+        "id": "7c23341a-901f-4210-be55-c97ebae18314",
+        "case_id": "cddd74b1-2178-497f-a997-b533b5a4baa3",
+        "case_number": "REPORT-EXPORT-1",
+        "evidence_id": null,
+        "evidence_number": null,
+        "artifact_id": null,
+        "occurred_at": "2026-07-19T10:53:28.900940",
+        "event_type": "case.created",
+        "group": "case",
+        "threat_weight": 6,
+        "threat_level": "low",
+        "summary": "Case REPORT-EXPORT-1 created",
+        "details": "Report Export"
+      }
+    ],
+    "reports": [
+      {
+        "id": "5cb3bbe8-9e03-456c-89e3-8682be271c87",
+        "case_id": "cddd74b1-2178-497f-a997-b533b5a4baa3",
+        "report_type": "technical",
+        "version": 1,
+        "title": "Exportable Report",
+        "storage_path": "cddd74b1-2178-497f-a997-b533b5a4baa3\\technical-v1.json",
+        "generated_at": "2026-07-19T10:53:28.915670"
+      }
+    ],
+    "plugins": []
+  },
+  "evidence": [],
+  "timeline": [
+    {
+      "id": "7c23341a-901f-4210-be55-c97ebae18314",
+      "case_id": "cddd74b1-2178-497f-a997-b533b5a4baa3",
+      "case_number": "REPORT-EXPORT-1",
+      "evidence_id": null,
+      "evidence_number": null,
+      "artifact_id": null,
+      "occurred_at": "2026-07-19T10:53:28.900940",
+      "event_type": "case.created",
+      "group": "case",
+      "threat_weight": 6,
+      "threat_level": "low",
+      "summary": "Case REPORT-EXPORT-1 created",
+      "details": "Report Export"
+    }
+  ],
+  "threat_score": 10,
+  "iocs": [],
+  "mitre_attack": [
+    {
+      "technique_id": "Triage",
+      "technique_name": "No direct ATT&CK mapping detected",
+      "tactic": "Analysis"
+    }
+  ],
+  "ai_explanation": {
+    "available": false,
+    "provider": {
+      "provider": "openai",
+      "available": false,
+      "configured": true,
+      "model": "gpt-4.1-mini",
+      "message": "AI is disabled by configuration; using local fallback."
+    },
+    "content": "OpenAI is not configured. Local deterministic analysis is available and the workflow can continue."
+  },
+  "recommendations": [
+    "Preserve original evidence and verify SHA-256 before every transfer.",
+    "Review timeline gaps and correlate suspicious events with source evidence.",
+    "Escalate high-entropy, embedded-content, or flag-bearing artifacts for deeper manual review."
+  ],
+  "appendix": {
+    "chain_of_custody": "Evidence hashes, acquisition timestamps, and analysis reports are retained in the evidence records.",
+    "plugins": []
+  },
+  "charts": {
+    "threat_score": 10,
+    "timeline_by_group": {
+      "case": 1
+    },
+    "evidence_by_type": {}
+  },
+  "report": {
+    "id": "5cb3bbe8-9e03-456c-89e3-8682be271c87",
+    "case_id": "cddd74b1-2178-497f-a997-b533b5a4baa3",
+    "report_type": "technical",
+    "version": 1,
+    "title": "Exportable Report",
+    "storage_path": "cddd74b1-2178-497f-a997-b533b5a4baa3\\technical-v1.json",
+    "generated_at": "2026-07-19T10:53:28.915670"
+  },
+  "ai_summary": {
+    "available": false,
+    "provider": {
+      "provider": "openai",
+      "available": false,
+      "configured": true,
+      "model": "gpt-4.1-mini",
+      "message": "AI is disabled by configuration; using local fallback."
+    },
+    "content": "OpenAI is not configured. Local deterministic analysis is available and the workflow can continue."
+  }
+}

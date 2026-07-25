@@ -1,0 +1,380 @@
+{
+  "title": "RBAC-ONE Investigation Report",
+  "report_type": "investigation",
+  "generated_at": "2026-07-25T17:20:35.632186+00:00",
+  "executive_summary": "RBAC-ONE contains 1 evidence item(s), 3 timeline event(s), and a threat score of 35/100.",
+  "investigation_summary": {
+    "case_id": "6d4cd2a1-618d-4e83-a8cb-4dece4d20641",
+    "case_number": "RBAC-ONE",
+    "case": {
+      "id": "6d4cd2a1-618d-4e83-a8cb-4dece4d20641",
+      "case_number": "RBAC-ONE",
+      "title": "Private",
+      "description": null,
+      "severity": "medium",
+      "priority": "medium",
+      "owner": "owner-one",
+      "owner_user_id": "14e369a9-cb12-4b17-873c-abc176a31ab1",
+      "created_by": "14e369a9-cb12-4b17-873c-abc176a31ab1",
+      "created_at": "2026-07-25T17:20:35.596672",
+      "updated_at": "2026-07-25T17:20:35.598669",
+      "tags": [],
+      "notes": [],
+      "relationships": [],
+      "review_status": "pending",
+      "reviewer_user_id": null,
+      "investigation_notes": null,
+      "attachments": [
+        {
+          "id": "81057d6f-09e0-4297-b15f-5d3fe329dec1",
+          "case_id": "6d4cd2a1-618d-4e83-a8cb-4dece4d20641",
+          "owner_user_id": "14e369a9-cb12-4b17-873c-abc176a31ab1",
+          "created_by": "14e369a9-cb12-4b17-873c-abc176a31ab1",
+          "created_at": "2026-07-25T17:20:35.614033",
+          "updated_at": "2026-07-25T17:20:35.618684",
+          "status": "active",
+          "evidence_number": "EV-RBAC",
+          "original_filename": "private.txt",
+          "storage_path": "6d4cd2a1-618d-4e83-a8cb-4dece4d20641\\a2fd6a153a6b4c1eb219f90f16d71ff6.txt",
+          "media_type": "text/plain",
+          "size_bytes": 6,
+          "sha256": "2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b",
+          "source_description": null,
+          "analysis_status": "pending",
+          "analysis_summary": null,
+          "analysis_report": null,
+          "acquired_at": "2026-07-25T17:20:35.614025",
+          "deleted_at": null
+        }
+      ],
+      "history": [
+        {
+          "id": "e7ebc78a-9a7e-43c1-b64e-4f4b39a0b50c",
+          "case_id": "6d4cd2a1-618d-4e83-a8cb-4dece4d20641",
+          "owner_user_id": "14e369a9-cb12-4b17-873c-abc176a31ab1",
+          "created_by": "14e369a9-cb12-4b17-873c-abc176a31ab1",
+          "created_at": "2026-07-25T17:20:35.622645",
+          "updated_at": "2026-07-25T17:20:35.623651",
+          "status": "active",
+          "case_number": "RBAC-ONE",
+          "evidence_id": null,
+          "evidence_number": null,
+          "artifact_id": null,
+          "occurred_at": "2026-07-25T17:20:35.622451",
+          "event_type": "observation.manual",
+          "group": "observation",
+          "threat_weight": 10,
+          "threat_level": "medium",
+          "summary": "private event",
+          "details": null
+        },
+        {
+          "id": "4fbd6c7a-dec6-461d-9f8e-16eaec5320ee",
+          "case_id": "6d4cd2a1-618d-4e83-a8cb-4dece4d20641",
+          "owner_user_id": "14e369a9-cb12-4b17-873c-abc176a31ab1",
+          "created_by": "14e369a9-cb12-4b17-873c-abc176a31ab1",
+          "created_at": "2026-07-25T17:20:35.616805",
+          "updated_at": "2026-07-25T17:20:35.619406",
+          "status": "active",
+          "case_number": "RBAC-ONE",
+          "evidence_id": "81057d6f-09e0-4297-b15f-5d3fe329dec1",
+          "evidence_number": "EV-RBAC",
+          "artifact_id": null,
+          "occurred_at": "2026-07-25T17:20:35.616169",
+          "event_type": "evidence.added",
+          "group": "evidence",
+          "threat_weight": 15,
+          "threat_level": "high",
+          "summary": "Evidence EV-RBAC added",
+          "details": "private.txt"
+        },
+        {
+          "id": "870bea22-a526-4dbb-ab28-da4e49fd22d4",
+          "case_id": "6d4cd2a1-618d-4e83-a8cb-4dece4d20641",
+          "owner_user_id": "14e369a9-cb12-4b17-873c-abc176a31ab1",
+          "created_by": "14e369a9-cb12-4b17-873c-abc176a31ab1",
+          "created_at": "2026-07-25T17:20:35.600240",
+          "updated_at": "2026-07-25T17:20:35.602840",
+          "status": "active",
+          "case_number": "RBAC-ONE",
+          "evidence_id": null,
+          "evidence_number": null,
+          "artifact_id": null,
+          "occurred_at": "2026-07-25T17:20:35.599598",
+          "event_type": "case.created",
+          "group": "case",
+          "threat_weight": 6,
+          "threat_level": "low",
+          "summary": "Case RBAC-ONE created",
+          "details": "Private"
+        }
+      ],
+      "opened_at": "2026-07-25T17:20:35.596665",
+      "closed_at": null,
+      "archived_at": null,
+      "deleted_at": null,
+      "status": "active"
+    },
+    "evidence": [
+      {
+        "id": "81057d6f-09e0-4297-b15f-5d3fe329dec1",
+        "case_id": "6d4cd2a1-618d-4e83-a8cb-4dece4d20641",
+        "owner_user_id": "14e369a9-cb12-4b17-873c-abc176a31ab1",
+        "created_by": "14e369a9-cb12-4b17-873c-abc176a31ab1",
+        "created_at": "2026-07-25T17:20:35.614033",
+        "updated_at": "2026-07-25T17:20:35.618684",
+        "status": "active",
+        "evidence_number": "EV-RBAC",
+        "original_filename": "private.txt",
+        "storage_path": "6d4cd2a1-618d-4e83-a8cb-4dece4d20641\\a2fd6a153a6b4c1eb219f90f16d71ff6.txt",
+        "media_type": "text/plain",
+        "size_bytes": 6,
+        "sha256": "2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b",
+        "source_description": null,
+        "analysis_status": "pending",
+        "analysis_summary": null,
+        "analysis_report": null,
+        "acquired_at": "2026-07-25T17:20:35.614025",
+        "deleted_at": null
+      }
+    ],
+    "timeline": [
+      {
+        "id": "e7ebc78a-9a7e-43c1-b64e-4f4b39a0b50c",
+        "case_id": "6d4cd2a1-618d-4e83-a8cb-4dece4d20641",
+        "owner_user_id": "14e369a9-cb12-4b17-873c-abc176a31ab1",
+        "created_by": "14e369a9-cb12-4b17-873c-abc176a31ab1",
+        "created_at": "2026-07-25T17:20:35.622645",
+        "updated_at": "2026-07-25T17:20:35.623651",
+        "status": "active",
+        "case_number": "RBAC-ONE",
+        "evidence_id": null,
+        "evidence_number": null,
+        "artifact_id": null,
+        "occurred_at": "2026-07-25T17:20:35.622451",
+        "event_type": "observation.manual",
+        "group": "observation",
+        "threat_weight": 10,
+        "threat_level": "medium",
+        "summary": "private event",
+        "details": null
+      },
+      {
+        "id": "4fbd6c7a-dec6-461d-9f8e-16eaec5320ee",
+        "case_id": "6d4cd2a1-618d-4e83-a8cb-4dece4d20641",
+        "owner_user_id": "14e369a9-cb12-4b17-873c-abc176a31ab1",
+        "created_by": "14e369a9-cb12-4b17-873c-abc176a31ab1",
+        "created_at": "2026-07-25T17:20:35.616805",
+        "updated_at": "2026-07-25T17:20:35.619406",
+        "status": "active",
+        "case_number": "RBAC-ONE",
+        "evidence_id": "81057d6f-09e0-4297-b15f-5d3fe329dec1",
+        "evidence_number": "EV-RBAC",
+        "artifact_id": null,
+        "occurred_at": "2026-07-25T17:20:35.616169",
+        "event_type": "evidence.added",
+        "group": "evidence",
+        "threat_weight": 15,
+        "threat_level": "high",
+        "summary": "Evidence EV-RBAC added",
+        "details": "private.txt"
+      },
+      {
+        "id": "870bea22-a526-4dbb-ab28-da4e49fd22d4",
+        "case_id": "6d4cd2a1-618d-4e83-a8cb-4dece4d20641",
+        "owner_user_id": "14e369a9-cb12-4b17-873c-abc176a31ab1",
+        "created_by": "14e369a9-cb12-4b17-873c-abc176a31ab1",
+        "created_at": "2026-07-25T17:20:35.600240",
+        "updated_at": "2026-07-25T17:20:35.602840",
+        "status": "active",
+        "case_number": "RBAC-ONE",
+        "evidence_id": null,
+        "evidence_number": null,
+        "artifact_id": null,
+        "occurred_at": "2026-07-25T17:20:35.599598",
+        "event_type": "case.created",
+        "group": "case",
+        "threat_weight": 6,
+        "threat_level": "low",
+        "summary": "Case RBAC-ONE created",
+        "details": "Private"
+      }
+    ],
+    "reports": [
+      {
+        "id": "7a798441-294a-43ef-a313-1310fae91f96",
+        "case_id": "6d4cd2a1-618d-4e83-a8cb-4dece4d20641",
+        "owner_user_id": "14e369a9-cb12-4b17-873c-abc176a31ab1",
+        "created_by": "14e369a9-cb12-4b17-873c-abc176a31ab1",
+        "created_at": "2026-07-25T17:20:35.628604",
+        "updated_at": "2026-07-25T17:20:35.628596",
+        "status": "generating",
+        "report_type": "investigation",
+        "version": 1,
+        "title": "RBAC-ONE Investigation Report v1",
+        "storage_path": "6d4cd2a1-618d-4e83-a8cb-4dece4d20641\\investigation-v1.json",
+        "generated_at": "2026-07-25T17:20:35.628598"
+      }
+    ],
+    "threat_score": 30,
+    "plugins": []
+  },
+  "evidence": [
+    {
+      "id": "81057d6f-09e0-4297-b15f-5d3fe329dec1",
+      "case_id": "6d4cd2a1-618d-4e83-a8cb-4dece4d20641",
+      "owner_user_id": "14e369a9-cb12-4b17-873c-abc176a31ab1",
+      "created_by": "14e369a9-cb12-4b17-873c-abc176a31ab1",
+      "created_at": "2026-07-25T17:20:35.614033",
+      "updated_at": "2026-07-25T17:20:35.618684",
+      "status": "active",
+      "evidence_number": "EV-RBAC",
+      "original_filename": "private.txt",
+      "storage_path": "6d4cd2a1-618d-4e83-a8cb-4dece4d20641\\a2fd6a153a6b4c1eb219f90f16d71ff6.txt",
+      "media_type": "text/plain",
+      "size_bytes": 6,
+      "sha256": "2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b",
+      "source_description": null,
+      "analysis_status": "pending",
+      "analysis_summary": null,
+      "analysis_report": null,
+      "acquired_at": "2026-07-25T17:20:35.614025",
+      "deleted_at": null
+    }
+  ],
+  "timeline": [
+    {
+      "id": "e7ebc78a-9a7e-43c1-b64e-4f4b39a0b50c",
+      "case_id": "6d4cd2a1-618d-4e83-a8cb-4dece4d20641",
+      "owner_user_id": "14e369a9-cb12-4b17-873c-abc176a31ab1",
+      "created_by": "14e369a9-cb12-4b17-873c-abc176a31ab1",
+      "created_at": "2026-07-25T17:20:35.622645",
+      "updated_at": "2026-07-25T17:20:35.623651",
+      "status": "active",
+      "case_number": "RBAC-ONE",
+      "evidence_id": null,
+      "evidence_number": null,
+      "artifact_id": null,
+      "occurred_at": "2026-07-25T17:20:35.622451",
+      "event_type": "observation.manual",
+      "group": "observation",
+      "threat_weight": 10,
+      "threat_level": "medium",
+      "summary": "private event",
+      "details": null
+    },
+    {
+      "id": "4fbd6c7a-dec6-461d-9f8e-16eaec5320ee",
+      "case_id": "6d4cd2a1-618d-4e83-a8cb-4dece4d20641",
+      "owner_user_id": "14e369a9-cb12-4b17-873c-abc176a31ab1",
+      "created_by": "14e369a9-cb12-4b17-873c-abc176a31ab1",
+      "created_at": "2026-07-25T17:20:35.616805",
+      "updated_at": "2026-07-25T17:20:35.619406",
+      "status": "active",
+      "case_number": "RBAC-ONE",
+      "evidence_id": "81057d6f-09e0-4297-b15f-5d3fe329dec1",
+      "evidence_number": "EV-RBAC",
+      "artifact_id": null,
+      "occurred_at": "2026-07-25T17:20:35.616169",
+      "event_type": "evidence.added",
+      "group": "evidence",
+      "threat_weight": 15,
+      "threat_level": "high",
+      "summary": "Evidence EV-RBAC added",
+      "details": "private.txt"
+    },
+    {
+      "id": "870bea22-a526-4dbb-ab28-da4e49fd22d4",
+      "case_id": "6d4cd2a1-618d-4e83-a8cb-4dece4d20641",
+      "owner_user_id": "14e369a9-cb12-4b17-873c-abc176a31ab1",
+      "created_by": "14e369a9-cb12-4b17-873c-abc176a31ab1",
+      "created_at": "2026-07-25T17:20:35.600240",
+      "updated_at": "2026-07-25T17:20:35.602840",
+      "status": "active",
+      "case_number": "RBAC-ONE",
+      "evidence_id": null,
+      "evidence_number": null,
+      "artifact_id": null,
+      "occurred_at": "2026-07-25T17:20:35.599598",
+      "event_type": "case.created",
+      "group": "case",
+      "threat_weight": 6,
+      "threat_level": "low",
+      "summary": "Case RBAC-ONE created",
+      "details": "Private"
+    }
+  ],
+  "threat_score": 35,
+  "iocs": [],
+  "mitre_attack": [
+    {
+      "technique_id": "Triage",
+      "technique_name": "No direct ATT&CK mapping detected",
+      "tactic": "Analysis"
+    }
+  ],
+  "ai_explanation": {
+    "available": false,
+    "provider": {
+      "provider": "ollama",
+      "available": false,
+      "configured": true,
+      "model": "qwen3:8b",
+      "message": "Ollama is running and ready.",
+      "endpoint": "http://localhost:11434",
+      "installed_models": [
+        "qwen3:8b"
+      ]
+    },
+    "content": "No AI provider available. Local deterministic analysis is available and the workflow can continue."
+  },
+  "recommendations": [
+    "Preserve original evidence and verify SHA-256 before every transfer.",
+    "Review timeline gaps and correlate suspicious events with source evidence.",
+    "Escalate high-entropy, embedded-content, or flag-bearing artifacts for deeper manual review."
+  ],
+  "appendix": {
+    "chain_of_custody": "Evidence hashes, acquisition timestamps, and analysis reports are retained in the evidence records.",
+    "plugins": []
+  },
+  "charts": {
+    "threat_score": 35,
+    "timeline_by_group": {
+      "case": 1,
+      "evidence": 1,
+      "observation": 1
+    },
+    "evidence_by_type": {
+      "text/plain": 1
+    }
+  },
+  "report": {
+    "id": "7a798441-294a-43ef-a313-1310fae91f96",
+    "case_id": "6d4cd2a1-618d-4e83-a8cb-4dece4d20641",
+    "owner_user_id": "14e369a9-cb12-4b17-873c-abc176a31ab1",
+    "created_by": "14e369a9-cb12-4b17-873c-abc176a31ab1",
+    "created_at": "2026-07-25T17:20:35.628604",
+    "updated_at": "2026-07-25T17:20:35.628596",
+    "status": "generating",
+    "report_type": "investigation",
+    "version": 1,
+    "title": "RBAC-ONE Investigation Report v1",
+    "storage_path": "6d4cd2a1-618d-4e83-a8cb-4dece4d20641\\investigation-v1.json",
+    "generated_at": "2026-07-25T17:20:35.628598"
+  },
+  "ai_summary": {
+    "available": false,
+    "provider": {
+      "provider": "ollama",
+      "available": false,
+      "configured": true,
+      "model": "qwen3:8b",
+      "message": "Ollama is running and ready.",
+      "endpoint": "http://localhost:11434",
+      "installed_models": [
+        "qwen3:8b"
+      ]
+    },
+    "content": "No AI provider available. Local deterministic analysis is available and the workflow can continue."
+  }
+}

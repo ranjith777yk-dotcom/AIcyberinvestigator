@@ -1,24 +1,52 @@
 services:
   app:
-    build: .
+    build:
+      context: .
+      args:
+        RELEASE_VERSION: ${RELEASE_VERSION:-local}
+        GIT_SHA: ${GIT_SHA:-unknown}
+        BUILD_TIME: ${BUILD_TIME:-unknown}
+    image: cyberinvestigator:${RELEASE_VERSION:-local}
+    restart: unless-stopped
     env_file: .env
     environment:
-      CYBERINVESTIGATOR_ENV: development
-      DATABASE_URL: postgresql+psycopg://cyberinvestigator:change-me@db:5432/cyberinvestigator
-      TRUSTED_HOSTS: localhost,127.0.0.1
+      CYBERINVESTIGATOR_ENV: production
+      DATABASE_AUTO_CREATE_SCHEMA: ${DATABASE_AUTO_CREATE_SCHEMA:-true}
+      DATABASE_URL: postgresql+psycopg://cyberinvestigator:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@db:5432/cyberinvestigator
+      TRUSTED_HOSTS: ${TRUSTED_HOSTS:?TRUSTED_HOSTS is required}
+      INSTANCE_PATH: /app/instance
+      UPLOAD_ROOT: /app/instance/uploads
+      REPORTS_FOLDER: /app/instance/reports
+      LOGS_FOLDER: /app/instance/logs
+      BACKUP_ROOT: /app/instance/backups
     ports:
-      - "8000:8000"
+      - "127.0.0.1:${APP_PORT:-8000}:8000"
     depends_on:
       db:
         condition: service_healthy
     volumes:
       - cyberinvestigator_instance:/app/instance
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=128m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health/ready', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+
   db:
     image: postgres:16-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_DB: cyberinvestigator
       POSTGRES_USER: cyberinvestigator
-      POSTGRES_PASSWORD: change-me
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U cyberinvestigator -d cyberinvestigator"]
       interval: 10s
@@ -26,6 +54,9 @@ services:
       retries: 5
     volumes:
       - cyberinvestigator_db:/var/lib/postgresql/data
+    security_opt:
+      - no-new-privileges:true
+
 volumes:
   cyberinvestigator_instance:
   cyberinvestigator_db:

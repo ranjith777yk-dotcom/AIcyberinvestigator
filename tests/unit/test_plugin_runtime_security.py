@@ -42,14 +42,15 @@ def test_default_permissions_model_denies_capabilities_by_default() -> None:
     assert not any(p.allowed for p in perms)
 
 
-def test_default_compatibility_checker_always_compatible() -> None:
+def test_default_compatibility_checker_never_fabricates_compatibility() -> None:
     checker = DefaultNoopCompatibilityChecker()
     compat = checker.check(
         plugin_identifier="p",
         supported_artifact_types=[ArtifactType.PDF],
         required_runtime_version="1",
     )
-    assert compat.compatible is True
+    assert compat.compatible is False
+    assert "not evaluated" in compat.reason
 
 
 def test_default_dependency_validator_noop() -> None:
@@ -59,5 +60,5 @@ def test_default_dependency_validator_noop() -> None:
 
 def test_health_checker_reports_ready() -> None:
     health = DefaultPluginRuntimeHealthChecker().health()
-    assert health.ready is True
-    assert "Runtime security" in health.message
+    assert health.ready is False
+    assert "unavailable" in health.message

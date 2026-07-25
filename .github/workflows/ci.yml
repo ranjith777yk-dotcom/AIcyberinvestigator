@@ -1,23 +1,105 @@
-name: CI
+name: Continuous integration
 
 on:
+  workflow_call:
   push:
+    branches: ["**"]
   pull_request:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  test:
+  quality:
+    name: Quality and tests
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.13"]
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
-      - name: Install
+          python-version: "3.13"
+          cache: pip
+      - name: Install project tooling
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements-dev.txt
+          python -m pip install -r requirements-dev.txt
+      - name: Lint
+        run: python -m ruff check .
+      - name: Format
+        run: python -m ruff format --check src tests
+      - name: Compile
+        run: python -m compileall -q src
       - name: Test
-        run: pytest
+        run: python -m pytest --junitxml=test-results.xml
+      - name: Publish test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: test-results.xml
+          if-no-files-found: error
+          retention-days: 14
+
+  dependency-security:
+    name: Dependency and source security
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - name: Install security tooling
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+      - name: Audit dependencies
+        run: python -m pip_audit
+      - name: Static application security scan
+        run: python -m bandit -r src -x tests -lll -iii
+
+  codeql:
+    name: CodeQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: python
+      - uses: github/codeql-action/analyze@v3
+        with:
+          category: /language:python
+
+  container:
+    name: Container build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [quality, dependency-security]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - id: build-metadata
+        name: Capture build time
+        run: echo "time=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
+      - name: Build production image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: cyberinvestigator:${{ github.sha }}
+          build-args: |
+            RELEASE_VERSION=ci-${{ github.run_number }}
+            GIT_SHA=${{ github.sha }}
+            BUILD_TIME=${{ steps.build-metadata.outputs.time }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

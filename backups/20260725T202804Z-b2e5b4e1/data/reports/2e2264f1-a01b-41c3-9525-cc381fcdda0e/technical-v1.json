@@ -1,0 +1,189 @@
+{
+  "title": "REPORT-EXPORT-1 Technical Report",
+  "report_type": "technical",
+  "generated_at": "2026-07-25T18:35:59.316585+00:00",
+  "executive_summary": "REPORT-EXPORT-1 contains 0 evidence item(s), 1 timeline event(s), and a threat score of 10/100.",
+  "investigation_summary": {
+    "case_id": "2e2264f1-a01b-41c3-9525-cc381fcdda0e",
+    "case_number": "REPORT-EXPORT-1",
+    "case": {
+      "id": "2e2264f1-a01b-41c3-9525-cc381fcdda0e",
+      "case_number": "REPORT-EXPORT-1",
+      "title": "Report Export",
+      "description": null,
+      "severity": "medium",
+      "priority": "medium",
+      "owner": null,
+      "owner_user_id": null,
+      "created_by": null,
+      "created_at": "2026-07-25T18:35:59.294151",
+      "updated_at": "2026-07-25T18:35:59.296223",
+      "tags": [],
+      "notes": [],
+      "relationships": [],
+      "review_status": "pending",
+      "reviewer_user_id": null,
+      "investigation_notes": null,
+      "attachments": [],
+      "history": [
+        {
+          "id": "0cb6cc02-936e-47ae-8d20-343aa4ddbed4",
+          "case_id": "2e2264f1-a01b-41c3-9525-cc381fcdda0e",
+          "owner_user_id": null,
+          "created_by": null,
+          "created_at": "2026-07-25T18:35:59.297170",
+          "updated_at": "2026-07-25T18:35:59.300488",
+          "status": "active",
+          "case_number": "REPORT-EXPORT-1",
+          "evidence_id": null,
+          "evidence_number": null,
+          "artifact_id": null,
+          "occurred_at": "2026-07-25T18:35:59.296732",
+          "event_type": "case.created",
+          "group": "case",
+          "threat_weight": 6,
+          "threat_level": "low",
+          "summary": "Case REPORT-EXPORT-1 created",
+          "details": "Report Export"
+        }
+      ],
+      "opened_at": "2026-07-25T18:35:59.294141",
+      "closed_at": null,
+      "archived_at": null,
+      "deleted_at": null,
+      "status": "active"
+    },
+    "evidence": [],
+    "timeline": [
+      {
+        "id": "0cb6cc02-936e-47ae-8d20-343aa4ddbed4",
+        "case_id": "2e2264f1-a01b-41c3-9525-cc381fcdda0e",
+        "owner_user_id": null,
+        "created_by": null,
+        "created_at": "2026-07-25T18:35:59.297170",
+        "updated_at": "2026-07-25T18:35:59.300488",
+        "status": "active",
+        "case_number": "REPORT-EXPORT-1",
+        "evidence_id": null,
+        "evidence_number": null,
+        "artifact_id": null,
+        "occurred_at": "2026-07-25T18:35:59.296732",
+        "event_type": "case.created",
+        "group": "case",
+        "threat_weight": 6,
+        "threat_level": "low",
+        "summary": "Case REPORT-EXPORT-1 created",
+        "details": "Report Export"
+      }
+    ],
+    "reports": [
+      {
+        "id": "f2f07711-0b9f-4ab0-b379-0bccaa5b0f2d",
+        "case_id": "2e2264f1-a01b-41c3-9525-cc381fcdda0e",
+        "owner_user_id": null,
+        "created_by": null,
+        "created_at": "2026-07-25T18:35:59.312680",
+        "updated_at": "2026-07-25T18:35:59.312668",
+        "status": "generating",
+        "report_type": "technical",
+        "version": 1,
+        "title": "Exportable Report",
+        "storage_path": "2e2264f1-a01b-41c3-9525-cc381fcdda0e\\technical-v1.json",
+        "generated_at": "2026-07-25T18:35:59.312672"
+      }
+    ],
+    "plugins": []
+  },
+  "evidence": [],
+  "timeline": [
+    {
+      "id": "0cb6cc02-936e-47ae-8d20-343aa4ddbed4",
+      "case_id": "2e2264f1-a01b-41c3-9525-cc381fcdda0e",
+      "owner_user_id": null,
+      "created_by": null,
+      "created_at": "2026-07-25T18:35:59.297170",
+      "updated_at": "2026-07-25T18:35:59.300488",
+      "status": "active",
+      "case_number": "REPORT-EXPORT-1",
+      "evidence_id": null,
+      "evidence_number": null,
+      "artifact_id": null,
+      "occurred_at": "2026-07-25T18:35:59.296732",
+      "event_type": "case.created",
+      "group": "case",
+      "threat_weight": 6,
+      "threat_level": "low",
+      "summary": "Case REPORT-EXPORT-1 created",
+      "details": "Report Export"
+    }
+  ],
+  "threat_score": 10,
+  "iocs": [],
+  "mitre_attack": [
+    {
+      "technique_id": "Triage",
+      "technique_name": "No direct ATT&CK mapping detected",
+      "tactic": "Analysis"
+    }
+  ],
+  "ai_explanation": {
+    "available": false,
+    "provider": {
+      "provider": "ollama",
+      "available": false,
+      "configured": true,
+      "model": "qwen3:8b",
+      "message": "Ollama is running and ready.",
+      "endpoint": "http://localhost:11434",
+      "installed_models": [
+        "qwen3:8b"
+      ]
+    },
+    "content": "No AI provider available. Local deterministic analysis is available and the workflow can continue."
+  },
+  "recommendations": [
+    "Preserve original evidence and verify SHA-256 before every transfer.",
+    "Review timeline gaps and correlate suspicious events with source evidence.",
+    "Escalate high-entropy, embedded-content, or flag-bearing artifacts for deeper manual review."
+  ],
+  "appendix": {
+    "chain_of_custody": "Evidence hashes, acquisition timestamps, and analysis reports are retained in the evidence records.",
+    "plugins": []
+  },
+  "charts": {
+    "threat_score": 10,
+    "timeline_by_group": {
+      "case": 1
+    },
+    "evidence_by_type": {}
+  },
+  "report": {
+    "id": "f2f07711-0b9f-4ab0-b379-0bccaa5b0f2d",
+    "case_id": "2e2264f1-a01b-41c3-9525-cc381fcdda0e",
+    "owner_user_id": null,
+    "created_by": null,
+    "created_at": "2026-07-25T18:35:59.312680",
+    "updated_at": "2026-07-25T18:35:59.312668",
+    "status": "generating",
+    "report_type": "technical",
+    "version": 1,
+    "title": "Exportable Report",
+    "storage_path": "2e2264f1-a01b-41c3-9525-cc381fcdda0e\\technical-v1.json",
+    "generated_at": "2026-07-25T18:35:59.312672"
+  },
+  "ai_summary": {
+    "available": false,
+    "provider": {
+      "provider": "ollama",
+      "available": false,
+      "configured": true,
+      "model": "qwen3:8b",
+      "message": "Ollama is running and ready.",
+      "endpoint": "http://localhost:11434",
+      "installed_models": [
+        "qwen3:8b"
+      ]
+    },
+    "content": "No AI provider available. Local deterministic analysis is available and the workflow can continue."
+  }
+}

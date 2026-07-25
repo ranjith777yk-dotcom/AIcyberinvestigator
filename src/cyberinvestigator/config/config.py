@@ -124,6 +124,7 @@ class BaseConfig:
     PERMANENT_SESSION_LIFETIME: ClassVar[int] = _positive_integer_value("PERMANENT_SESSION_LIFETIME_SECONDS", 28_800)
     PREFERRED_URL_SCHEME: ClassVar[str] = _environment_value("PREFERRED_URL_SCHEME", "http")
     MAX_CONTENT_LENGTH: ClassVar[int] = _positive_integer_value("MAX_CONTENT_LENGTH_BYTES", 1_073_741_824)
+    EVIDENCE_MAX_FILE_BYTES: ClassVar[int] = _positive_integer_value("EVIDENCE_MAX_FILE_BYTES", MAX_CONTENT_LENGTH)
 
     UPLOAD_ROOT: ClassVar[Path] = Path(_environment_value("UPLOAD_ROOT", str(INSTANCE_PATH / "uploads"))).resolve()
     UPLOAD_FOLDER: ClassVar[Path] = UPLOAD_ROOT / "incoming"
@@ -131,10 +132,12 @@ class BaseConfig:
     REPORTS_FOLDER: ClassVar[Path] = Path(
         _environment_value("REPORTS_FOLDER", str(INSTANCE_PATH / "reports"))
     ).resolve()
+    BACKUP_ROOT: ClassVar[Path] = Path(_environment_value("BACKUP_ROOT", str(PROJECT_ROOT / "backups"))).resolve()
     LOGS_FOLDER: ClassVar[Path] = Path(_environment_value("LOGS_FOLDER", str(INSTANCE_PATH / "logs"))).resolve()
     LOG_LEVEL: ClassVar[str] = _environment_value("LOG_LEVEL", "INFO").upper()
     LOG_MAX_BYTES: ClassVar[int] = _positive_integer_value("LOG_MAX_BYTES", 10_485_760)
     LOG_BACKUP_COUNT: ClassVar[int] = _positive_integer_value("LOG_BACKUP_COUNT", 10)
+    OBSERVABILITY_MAX_TRACES: ClassVar[int] = _positive_integer_value("OBSERVABILITY_MAX_TRACES", 5_000)
 
     SQLALCHEMY_DATABASE_URI: ClassVar[str] = _environment_value(
         "DATABASE_URL", f"sqlite:///{(INSTANCE_PATH / 'cyberinvestigator.db').as_posix()}"
@@ -153,6 +156,17 @@ class BaseConfig:
         provider_name=_environment_value("AI_PROVIDER", "ollama"),
     )
     AI_API_KEY: ClassVar[str | None] = os.getenv("OPENAI_API_KEY") or os.getenv("AI_API_KEY") or None
+    AI_CREDENTIAL_ENCRYPTION_KEY: ClassVar[str | None] = os.getenv("AI_CREDENTIAL_ENCRYPTION_KEY") or None
+    AI_ALLOWED_PROVIDER_HOSTS: ClassVar[str] = _environment_value(
+        "AI_ALLOWED_PROVIDER_HOSTS",
+        "localhost,127.0.0.1,::1",
+    )
+    PLUGIN_CREDENTIAL_ENCRYPTION_KEY: ClassVar[str | None] = os.getenv("PLUGIN_CREDENTIAL_ENCRYPTION_KEY") or None
+    PLUGIN_ARCHIVE_MAX_FILES: ClassVar[int] = _positive_integer_value("PLUGIN_ARCHIVE_MAX_FILES", 256)
+    PLUGIN_ARCHIVE_MAX_EXPANDED_BYTES: ClassVar[int] = _positive_integer_value(
+        "PLUGIN_ARCHIVE_MAX_EXPANDED_BYTES",
+        50 * 1024 * 1024,
+    )
     AI_BASE_URL: ClassVar[str | None] = os.getenv("AI_BASE_URL") or None
     AI_TEMPERATURE: ClassVar[float] = float(_environment_value("AI_TEMPERATURE", "0.2"))
     AI_MAX_TOKENS: ClassVar[int] = _positive_integer_value("AI_MAX_TOKENS", 1200)
@@ -210,6 +224,7 @@ class BaseConfig:
             cls.UPLOAD_FOLDER,
             cls.QUARANTINE_UPLOAD_FOLDER,
             cls.REPORTS_FOLDER,
+            cls.BACKUP_ROOT,
             cls.LOGS_FOLDER,
         ):
             directory.mkdir(parents=True, exist_ok=True)
@@ -259,12 +274,21 @@ class ProductionConfig(BaseConfig):
     def _validate(cls) -> None:
         """Enforce production-only security and deployment requirements."""
         super()._validate()
-        if not os.getenv("SECRET_KEY"):
+        secret_key = os.getenv("SECRET_KEY", "")
+        database_url = os.getenv("DATABASE_URL", "")
+        if not secret_key:
             raise RuntimeError("SECRET_KEY must be explicitly set in production.")
-        if not os.getenv("DATABASE_URL"):
+        if secret_key.lower().startswith(("change-me", "replace-with")):
+            raise RuntimeError("SECRET_KEY must not use a documented placeholder value.")
+        if not database_url:
             raise RuntimeError("DATABASE_URL must be explicitly set in production.")
+        if any(marker in database_url.lower() for marker in ("change-me", "replace-with")):
+            raise RuntimeError("DATABASE_URL must not contain documented placeholder credentials.")
         if not cls.TRUSTED_HOSTS:
             raise RuntimeError("TRUSTED_HOSTS must list one or more production hosts.")
+        bootstrap_password = os.getenv("DEFAULT_ADMIN_PASSWORD")
+        if not bootstrap_password or bootstrap_password.lower().startswith(("changeme", "change-me", "replace-with")):
+            raise RuntimeError("DEFAULT_ADMIN_PASSWORD must be explicitly set to a unique value in production.")
 
 
 CONFIG_BY_NAME: dict[str, type[BaseConfig]] = {

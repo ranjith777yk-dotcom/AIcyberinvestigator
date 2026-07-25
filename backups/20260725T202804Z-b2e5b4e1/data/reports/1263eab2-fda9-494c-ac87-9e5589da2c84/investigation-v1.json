@@ -1,0 +1,859 @@
+{
+  "title": "RBAC-ONE Investigation Report v1",
+  "report_type": "investigation",
+  "generated_at": "2026-07-25T19:10:47.514521+00:00",
+  "schema_version": "2.0",
+  "executive_summary": "RBAC-ONE contains 1 preserved evidence item(s), 4 recorded timeline event(s), and 0 source-linked forensic finding(s).",
+  "technical_summary": {
+    "evidence_count": 1,
+    "timeline_event_count": 4,
+    "finding_count": 0,
+    "indicator_count": 0,
+    "attack_mapping_count": 0
+  },
+  "investigation_summary": {
+    "case_id": "1263eab2-fda9-494c-ac87-9e5589da2c84",
+    "case_number": "RBAC-ONE",
+    "case": {
+      "id": "1263eab2-fda9-494c-ac87-9e5589da2c84",
+      "case_number": "RBAC-ONE",
+      "title": "Private",
+      "description": null,
+      "severity": "medium",
+      "priority": "medium",
+      "owner": "owner-one",
+      "owner_user_id": "233606b4-4adf-43a6-b961-9cef7400ecb4",
+      "created_by": "233606b4-4adf-43a6-b961-9cef7400ecb4",
+      "created_at": "2026-07-25T19:10:47.397068",
+      "updated_at": "2026-07-25T19:10:47.407465",
+      "tags": [],
+      "notes": [],
+      "relationships": [],
+      "review_status": "pending",
+      "reviewer_user_id": null,
+      "investigation_notes": null,
+      "attachments": [
+        {
+          "id": "e3b7ad0f-2710-449a-818d-8a24d58199dc",
+          "case_id": "1263eab2-fda9-494c-ac87-9e5589da2c84",
+          "owner_user_id": "233606b4-4adf-43a6-b961-9cef7400ecb4",
+          "created_by": "233606b4-4adf-43a6-b961-9cef7400ecb4",
+          "created_at": "2026-07-25T19:10:47.440902",
+          "updated_at": "2026-07-25T19:10:47.479748",
+          "status": "active",
+          "evidence_number": "EV-RBAC",
+          "original_filename": "private.txt",
+          "storage_path": "1263eab2-fda9-494c-ac87-9e5589da2c84\\944ada3c41b14a3899dda5bc00bb457a.txt",
+          "media_type": "text/plain",
+          "size_bytes": 6,
+          "sha256": "2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b",
+          "source_description": null,
+          "analysis_status": "completed",
+          "analysis_summary": "Unknown analyzed; entropy 2.2516. 0 notable findings, 0 possible flags, 0 extracted child item(s).",
+          "analysis_report": {
+            "generated_at": "2026-07-25T19:10:47.478575+00:00",
+            "executive_summary": "Read-only forensic triage identified 0 notable indicator(s) in a Unknown artifact with entropy 2.2516. The report includes evidence context, recovered artifacts, confidence scoring, and recommended actions.",
+            "evidence": {
+              "evidence_number": "EV-RBAC",
+              "original_filename": "private.txt",
+              "stored_path": "C:\\Users\\RANJITH REDDY\\OneDrive\\Desktop\\AIcyberinvestigator\\instance\\uploads\\quarantine\\1263eab2-fda9-494c-ac87-9e5589da2c84\\944ada3c41b14a3899dda5bc00bb457a.txt",
+              "sha256": "2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b",
+              "integrity_verified": true,
+              "stored_size_bytes": 6,
+              "bytes_analyzed": 6,
+              "truncated": false
+            },
+            "threat_assessment": {
+              "severity": "low",
+              "reason": "0 high and 0 medium confidence forensic indicator(s) were identified.",
+              "entropy": 2.2516,
+              "signature": "Unknown"
+            },
+            "technical_summary": "Unknown analyzed; entropy 2.2516. 0 notable findings, 0 possible flags, 0 extracted child item(s).",
+            "evidence_summary": {
+              "signature": "Unknown",
+              "entropy": 2.2516,
+              "size_bytes": 6
+            },
+            "recovered_files": [],
+            "chain_of_custody": [
+              "Evidence bytes were read from quarantine custody storage without execution.",
+              "The full stored object was rehashed and matched the persisted SHA-256 custody value.",
+              "Analysis was read-only; extracted children were analyzed in memory."
+            ],
+            "root": {
+              "name": "private.txt",
+              "size_bytes": 6,
+              "magic_bytes": "73 65 63 72 65 74",
+              "file_signature": "Unknown",
+              "entropy": 2.2516,
+              "encoding": {
+                "detected": true,
+                "encoding": "utf-8"
+              },
+              "compression": {
+                "detected": false,
+                "type": null
+              },
+              "archive": {
+                "detected": false,
+                "type": null,
+                "filename_hint": ".txt"
+              },
+              "encryption_indicators": [],
+              "steganography_indicators": [],
+              "embedded_file_indicators": [],
+              "metadata": {
+                "extension": ".txt"
+              },
+              "hidden_strings": [
+                "secret"
+              ],
+              "suspicious_commands": [],
+              "decoded_payloads": [],
+              "flags": [],
+              "children": []
+            },
+            "findings": [],
+            "forensic_findings": [],
+            "recovered_artifacts": [],
+            "confidence_score": 55,
+            "risk_score": 10,
+            "ioc_table": [],
+            "mitre_mapping": [],
+            "yara_results": [],
+            "sigma_results": [],
+            "timeline_summary": "Analysis completion is recorded in the investigation timeline with evidence provenance.",
+            "recommendations": [
+              "Preserve the original evidence and retain hash verification in the case record."
+            ],
+            "explanation": [
+              "Magic bytes identify the root artifact as: Unknown.",
+              "Entropy is 2.2516; values near 8.0 often indicate compressed, encrypted, or packed data.",
+              "Printable strings and supported encodings were inspected without executing content.",
+              "No strong hidden-content, flag, encryption, archive, or embedded-file indicators were detected."
+            ],
+            "appendix": {
+              "analysis_limits": {
+                "max_bytes": 8388608,
+                "max_depth": 4,
+                "max_children": 40
+              }
+            }
+          },
+          "acquired_at": "2026-07-25T19:10:47.440890",
+          "deleted_at": null
+        }
+      ],
+      "history": [
+        {
+          "id": "08d53aa1-1085-4e37-a744-bc64d26b2c31",
+          "case_id": "1263eab2-fda9-494c-ac87-9e5589da2c84",
+          "owner_user_id": "233606b4-4adf-43a6-b961-9cef7400ecb4",
+          "created_by": "233606b4-4adf-43a6-b961-9cef7400ecb4",
+          "created_at": "2026-07-25T19:10:47.488080",
+          "updated_at": "2026-07-25T19:10:47.491624",
+          "status": "active",
+          "case_number": "RBAC-ONE",
+          "evidence_id": "e3b7ad0f-2710-449a-818d-8a24d58199dc",
+          "evidence_number": "EV-RBAC",
+          "artifact_id": null,
+          "occurred_at": "2026-07-25T19:10:47.487731",
+          "event_type": "evidence.analysis.completed",
+          "group": "evidence",
+          "threat_weight": 0,
+          "threat_level": "unassessed",
+          "certainty": "confirmed",
+          "summary": "Forensic analysis completed for EV-RBAC",
+          "details": "Unknown analyzed; entropy 2.2516. 0 notable findings, 0 possible flags, 0 extracted child item(s)."
+        },
+        {
+          "id": "5822b989-ff67-48ff-bff3-603a7cde751a",
+          "case_id": "1263eab2-fda9-494c-ac87-9e5589da2c84",
+          "owner_user_id": "233606b4-4adf-43a6-b961-9cef7400ecb4",
+          "created_by": "233606b4-4adf-43a6-b961-9cef7400ecb4",
+          "created_at": "2026-07-25T19:10:47.486809",
+          "updated_at": "2026-07-25T19:10:47.491610",
+          "status": "active",
+          "case_number": "RBAC-ONE",
+          "evidence_id": null,
+          "evidence_number": null,
+          "artifact_id": null,
+          "occurred_at": "2026-07-25T19:10:47.486395",
+          "event_type": "observation.manual",
+          "group": "observation",
+          "threat_weight": 0,
+          "threat_level": "unassessed",
+          "certainty": "confirmed",
+          "summary": "private event",
+          "details": null
+        },
+        {
+          "id": "104a8036-fa84-4b25-a55a-3b49a0751246",
+          "case_id": "1263eab2-fda9-494c-ac87-9e5589da2c84",
+          "owner_user_id": "233606b4-4adf-43a6-b961-9cef7400ecb4",
+          "created_by": "233606b4-4adf-43a6-b961-9cef7400ecb4",
+          "created_at": "2026-07-25T19:10:47.444884",
+          "updated_at": "2026-07-25T19:10:47.448675",
+          "status": "active",
+          "case_number": "RBAC-ONE",
+          "evidence_id": "e3b7ad0f-2710-449a-818d-8a24d58199dc",
+          "evidence_number": "EV-RBAC",
+          "artifact_id": null,
+          "occurred_at": "2026-07-25T19:10:47.444412",
+          "event_type": "evidence.added",
+          "group": "evidence",
+          "threat_weight": 0,
+          "threat_level": "unassessed",
+          "certainty": "confirmed",
+          "summary": "Evidence EV-RBAC added",
+          "details": "private.txt"
+        },
+        {
+          "id": "32131d22-76b1-4824-afe5-721beee83f18",
+          "case_id": "1263eab2-fda9-494c-ac87-9e5589da2c84",
+          "owner_user_id": "233606b4-4adf-43a6-b961-9cef7400ecb4",
+          "created_by": "233606b4-4adf-43a6-b961-9cef7400ecb4",
+          "created_at": "2026-07-25T19:10:47.409642",
+          "updated_at": "2026-07-25T19:10:47.416135",
+          "status": "active",
+          "case_number": "RBAC-ONE",
+          "evidence_id": null,
+          "evidence_number": null,
+          "artifact_id": null,
+          "occurred_at": "2026-07-25T19:10:47.408585",
+          "event_type": "case.created",
+          "group": "case",
+          "threat_weight": 0,
+          "threat_level": "unassessed",
+          "certainty": "confirmed",
+          "summary": "Case RBAC-ONE created",
+          "details": "Private"
+        }
+      ],
+      "opened_at": "2026-07-25T19:10:47.397058",
+      "closed_at": null,
+      "archived_at": null,
+      "deleted_at": null,
+      "status": "active"
+    },
+    "evidence": [
+      {
+        "id": "e3b7ad0f-2710-449a-818d-8a24d58199dc",
+        "case_id": "1263eab2-fda9-494c-ac87-9e5589da2c84",
+        "owner_user_id": "233606b4-4adf-43a6-b961-9cef7400ecb4",
+        "created_by": "233606b4-4adf-43a6-b961-9cef7400ecb4",
+        "created_at": "2026-07-25T19:10:47.440902",
+        "updated_at": "2026-07-25T19:10:47.479748",
+        "status": "active",
+        "evidence_number": "EV-RBAC",
+        "original_filename": "private.txt",
+        "storage_path": "1263eab2-fda9-494c-ac87-9e5589da2c84\\944ada3c41b14a3899dda5bc00bb457a.txt",
+        "media_type": "text/plain",
+        "size_bytes": 6,
+        "sha256": "2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b",
+        "source_description": null,
+        "analysis_status": "completed",
+        "analysis_summary": "Unknown analyzed; entropy 2.2516. 0 notable findings, 0 possible flags, 0 extracted child item(s).",
+        "analysis_report": {
+          "generated_at": "2026-07-25T19:10:47.478575+00:00",
+          "executive_summary": "Read-only forensic triage identified 0 notable indicator(s) in a Unknown artifact with entropy 2.2516. The report includes evidence context, recovered artifacts, confidence scoring, and recommended actions.",
+          "evidence": {
+            "evidence_number": "EV-RBAC",
+            "original_filename": "private.txt",
+            "stored_path": "C:\\Users\\RANJITH REDDY\\OneDrive\\Desktop\\AIcyberinvestigator\\instance\\uploads\\quarantine\\1263eab2-fda9-494c-ac87-9e5589da2c84\\944ada3c41b14a3899dda5bc00bb457a.txt",
+            "sha256": "2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b",
+            "integrity_verified": true,
+            "stored_size_bytes": 6,
+            "bytes_analyzed": 6,
+            "truncated": false
+          },
+          "threat_assessment": {
+            "severity": "low",
+            "reason": "0 high and 0 medium confidence forensic indicator(s) were identified.",
+            "entropy": 2.2516,
+            "signature": "Unknown"
+          },
+          "technical_summary": "Unknown analyzed; entropy 2.2516. 0 notable findings, 0 possible flags, 0 extracted child item(s).",
+          "evidence_summary": {
+            "signature": "Unknown",
+            "entropy": 2.2516,
+            "size_bytes": 6
+          },
+          "recovered_files": [],
+          "chain_of_custody": [
+            "Evidence bytes were read from quarantine custody storage without execution.",
+            "The full stored object was rehashed and matched the persisted SHA-256 custody value.",
+            "Analysis was read-only; extracted children were analyzed in memory."
+          ],
+          "root": {
+            "name": "private.txt",
+            "size_bytes": 6,
+            "magic_bytes": "73 65 63 72 65 74",
+            "file_signature": "Unknown",
+            "entropy": 2.2516,
+            "encoding": {
+              "detected": true,
+              "encoding": "utf-8"
+            },
+            "compression": {
+              "detected": false,
+              "type": null
+            },
+            "archive": {
+              "detected": false,
+              "type": null,
+              "filename_hint": ".txt"
+            },
+            "encryption_indicators": [],
+            "steganography_indicators": [],
+            "embedded_file_indicators": [],
+            "metadata": {
+              "extension": ".txt"
+            },
+            "hidden_strings": [
+              "secret"
+            ],
+            "suspicious_commands": [],
+            "decoded_payloads": [],
+            "flags": [],
+            "children": []
+          },
+          "findings": [],
+          "forensic_findings": [],
+          "recovered_artifacts": [],
+          "confidence_score": 55,
+          "risk_score": 10,
+          "ioc_table": [],
+          "mitre_mapping": [],
+          "yara_results": [],
+          "sigma_results": [],
+          "timeline_summary": "Analysis completion is recorded in the investigation timeline with evidence provenance.",
+          "recommendations": [
+            "Preserve the original evidence and retain hash verification in the case record."
+          ],
+          "explanation": [
+            "Magic bytes identify the root artifact as: Unknown.",
+            "Entropy is 2.2516; values near 8.0 often indicate compressed, encrypted, or packed data.",
+            "Printable strings and supported encodings were inspected without executing content.",
+            "No strong hidden-content, flag, encryption, archive, or embedded-file indicators were detected."
+          ],
+          "appendix": {
+            "analysis_limits": {
+              "max_bytes": 8388608,
+              "max_depth": 4,
+              "max_children": 40
+            }
+          }
+        },
+        "acquired_at": "2026-07-25T19:10:47.440890",
+        "deleted_at": null
+      }
+    ],
+    "timeline": [
+      {
+        "id": "08d53aa1-1085-4e37-a744-bc64d26b2c31",
+        "case_id": "1263eab2-fda9-494c-ac87-9e5589da2c84",
+        "owner_user_id": "233606b4-4adf-43a6-b961-9cef7400ecb4",
+        "created_by": "233606b4-4adf-43a6-b961-9cef7400ecb4",
+        "created_at": "2026-07-25T19:10:47.488080",
+        "updated_at": "2026-07-25T19:10:47.491624",
+        "status": "active",
+        "case_number": "RBAC-ONE",
+        "evidence_id": "e3b7ad0f-2710-449a-818d-8a24d58199dc",
+        "evidence_number": "EV-RBAC",
+        "artifact_id": null,
+        "occurred_at": "2026-07-25T19:10:47.487731",
+        "event_type": "evidence.analysis.completed",
+        "group": "evidence",
+        "threat_weight": 0,
+        "threat_level": "unassessed",
+        "certainty": "confirmed",
+        "summary": "Forensic analysis completed for EV-RBAC",
+        "details": "Unknown analyzed; entropy 2.2516. 0 notable findings, 0 possible flags, 0 extracted child item(s)."
+      },
+      {
+        "id": "5822b989-ff67-48ff-bff3-603a7cde751a",
+        "case_id": "1263eab2-fda9-494c-ac87-9e5589da2c84",
+        "owner_user_id": "233606b4-4adf-43a6-b961-9cef7400ecb4",
+        "created_by": "233606b4-4adf-43a6-b961-9cef7400ecb4",
+        "created_at": "2026-07-25T19:10:47.486809",
+        "updated_at": "2026-07-25T19:10:47.491610",
+        "status": "active",
+        "case_number": "RBAC-ONE",
+        "evidence_id": null,
+        "evidence_number": null,
+        "artifact_id": null,
+        "occurred_at": "2026-07-25T19:10:47.486395",
+        "event_type": "observation.manual",
+        "group": "observation",
+        "threat_weight": 0,
+        "threat_level": "unassessed",
+        "certainty": "confirmed",
+        "summary": "private event",
+        "details": null
+      },
+      {
+        "id": "104a8036-fa84-4b25-a55a-3b49a0751246",
+        "case_id": "1263eab2-fda9-494c-ac87-9e5589da2c84",
+        "owner_user_id": "233606b4-4adf-43a6-b961-9cef7400ecb4",
+        "created_by": "233606b4-4adf-43a6-b961-9cef7400ecb4",
+        "created_at": "2026-07-25T19:10:47.444884",
+        "updated_at": "2026-07-25T19:10:47.448675",
+        "status": "active",
+        "case_number": "RBAC-ONE",
+        "evidence_id": "e3b7ad0f-2710-449a-818d-8a24d58199dc",
+        "evidence_number": "EV-RBAC",
+        "artifact_id": null,
+        "occurred_at": "2026-07-25T19:10:47.444412",
+        "event_type": "evidence.added",
+        "group": "evidence",
+        "threat_weight": 0,
+        "threat_level": "unassessed",
+        "certainty": "confirmed",
+        "summary": "Evidence EV-RBAC added",
+        "details": "private.txt"
+      },
+      {
+        "id": "32131d22-76b1-4824-afe5-721beee83f18",
+        "case_id": "1263eab2-fda9-494c-ac87-9e5589da2c84",
+        "owner_user_id": "233606b4-4adf-43a6-b961-9cef7400ecb4",
+        "created_by": "233606b4-4adf-43a6-b961-9cef7400ecb4",
+        "created_at": "2026-07-25T19:10:47.409642",
+        "updated_at": "2026-07-25T19:10:47.416135",
+        "status": "active",
+        "case_number": "RBAC-ONE",
+        "evidence_id": null,
+        "evidence_number": null,
+        "artifact_id": null,
+        "occurred_at": "2026-07-25T19:10:47.408585",
+        "event_type": "case.created",
+        "group": "case",
+        "threat_weight": 0,
+        "threat_level": "unassessed",
+        "certainty": "confirmed",
+        "summary": "Case RBAC-ONE created",
+        "details": "Private"
+      }
+    ],
+    "reports": [
+      {
+        "id": "1c3c5d1d-47e1-49e8-900c-d5d0771312a4",
+        "case_id": "1263eab2-fda9-494c-ac87-9e5589da2c84",
+        "owner_user_id": "233606b4-4adf-43a6-b961-9cef7400ecb4",
+        "created_by": "233606b4-4adf-43a6-b961-9cef7400ecb4",
+        "created_at": "2026-07-25T19:10:47.505742",
+        "updated_at": "2026-07-25T19:10:47.505727",
+        "status": "generating",
+        "report_type": "investigation",
+        "version": 1,
+        "title": "RBAC-ONE Investigation Report v1",
+        "storage_path": "1263eab2-fda9-494c-ac87-9e5589da2c84\\investigation-v1.json",
+        "generated_at": "2026-07-25T19:10:47.505731"
+      }
+    ],
+    "plugins": []
+  },
+  "investigator_notes": [],
+  "evidence": [
+    {
+      "id": "e3b7ad0f-2710-449a-818d-8a24d58199dc",
+      "case_id": "1263eab2-fda9-494c-ac87-9e5589da2c84",
+      "owner_user_id": "233606b4-4adf-43a6-b961-9cef7400ecb4",
+      "created_by": "233606b4-4adf-43a6-b961-9cef7400ecb4",
+      "created_at": "2026-07-25T19:10:47.440902",
+      "updated_at": "2026-07-25T19:10:47.479748",
+      "status": "active",
+      "evidence_number": "EV-RBAC",
+      "original_filename": "private.txt",
+      "storage_path": "1263eab2-fda9-494c-ac87-9e5589da2c84\\944ada3c41b14a3899dda5bc00bb457a.txt",
+      "media_type": "text/plain",
+      "size_bytes": 6,
+      "sha256": "2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b",
+      "source_description": null,
+      "analysis_status": "completed",
+      "analysis_summary": "Unknown analyzed; entropy 2.2516. 0 notable findings, 0 possible flags, 0 extracted child item(s).",
+      "analysis_report": {
+        "generated_at": "2026-07-25T19:10:47.478575+00:00",
+        "executive_summary": "Read-only forensic triage identified 0 notable indicator(s) in a Unknown artifact with entropy 2.2516. The report includes evidence context, recovered artifacts, confidence scoring, and recommended actions.",
+        "evidence": {
+          "evidence_number": "EV-RBAC",
+          "original_filename": "private.txt",
+          "stored_path": "C:\\Users\\RANJITH REDDY\\OneDrive\\Desktop\\AIcyberinvestigator\\instance\\uploads\\quarantine\\1263eab2-fda9-494c-ac87-9e5589da2c84\\944ada3c41b14a3899dda5bc00bb457a.txt",
+          "sha256": "2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b",
+          "integrity_verified": true,
+          "stored_size_bytes": 6,
+          "bytes_analyzed": 6,
+          "truncated": false
+        },
+        "threat_assessment": {
+          "severity": "low",
+          "reason": "0 high and 0 medium confidence forensic indicator(s) were identified.",
+          "entropy": 2.2516,
+          "signature": "Unknown"
+        },
+        "technical_summary": "Unknown analyzed; entropy 2.2516. 0 notable findings, 0 possible flags, 0 extracted child item(s).",
+        "evidence_summary": {
+          "signature": "Unknown",
+          "entropy": 2.2516,
+          "size_bytes": 6
+        },
+        "recovered_files": [],
+        "chain_of_custody": [
+          "Evidence bytes were read from quarantine custody storage without execution.",
+          "The full stored object was rehashed and matched the persisted SHA-256 custody value.",
+          "Analysis was read-only; extracted children were analyzed in memory."
+        ],
+        "root": {
+          "name": "private.txt",
+          "size_bytes": 6,
+          "magic_bytes": "73 65 63 72 65 74",
+          "file_signature": "Unknown",
+          "entropy": 2.2516,
+          "encoding": {
+            "detected": true,
+            "encoding": "utf-8"
+          },
+          "compression": {
+            "detected": false,
+            "type": null
+          },
+          "archive": {
+            "detected": false,
+            "type": null,
+            "filename_hint": ".txt"
+          },
+          "encryption_indicators": [],
+          "steganography_indicators": [],
+          "embedded_file_indicators": [],
+          "metadata": {
+            "extension": ".txt"
+          },
+          "hidden_strings": [
+            "secret"
+          ],
+          "suspicious_commands": [],
+          "decoded_payloads": [],
+          "flags": [],
+          "children": []
+        },
+        "findings": [],
+        "forensic_findings": [],
+        "recovered_artifacts": [],
+        "confidence_score": 55,
+        "risk_score": 10,
+        "ioc_table": [],
+        "mitre_mapping": [],
+        "yara_results": [],
+        "sigma_results": [],
+        "timeline_summary": "Analysis completion is recorded in the investigation timeline with evidence provenance.",
+        "recommendations": [
+          "Preserve the original evidence and retain hash verification in the case record."
+        ],
+        "explanation": [
+          "Magic bytes identify the root artifact as: Unknown.",
+          "Entropy is 2.2516; values near 8.0 often indicate compressed, encrypted, or packed data.",
+          "Printable strings and supported encodings were inspected without executing content.",
+          "No strong hidden-content, flag, encryption, archive, or embedded-file indicators were detected."
+        ],
+        "appendix": {
+          "analysis_limits": {
+            "max_bytes": 8388608,
+            "max_depth": 4,
+            "max_children": 40
+          }
+        }
+      },
+      "acquired_at": "2026-07-25T19:10:47.440890",
+      "deleted_at": null
+    }
+  ],
+  "timeline": {
+    "events": [
+      {
+        "id": "32131d22-76b1-4824-afe5-721beee83f18",
+        "case_id": "1263eab2-fda9-494c-ac87-9e5589da2c84",
+        "owner_user_id": "233606b4-4adf-43a6-b961-9cef7400ecb4",
+        "created_by": "233606b4-4adf-43a6-b961-9cef7400ecb4",
+        "created_at": "2026-07-25T19:10:47.409642",
+        "updated_at": "2026-07-25T19:10:47.416135",
+        "status": "active",
+        "case_number": "RBAC-ONE",
+        "evidence_id": null,
+        "evidence_number": null,
+        "artifact_id": null,
+        "occurred_at": "2026-07-25T19:10:47.408585",
+        "event_type": "case.created",
+        "group": "case",
+        "threat_weight": 0,
+        "threat_level": "unassessed",
+        "certainty": "confirmed",
+        "summary": "Case RBAC-ONE created",
+        "details": "Private",
+        "source_type": "system",
+        "related_event_ids": [],
+        "provenance": {
+          "case_id": "1263eab2-fda9-494c-ac87-9e5589da2c84",
+          "evidence_id": null,
+          "artifact_id": null,
+          "created_by": "233606b4-4adf-43a6-b961-9cef7400ecb4"
+        }
+      },
+      {
+        "id": "104a8036-fa84-4b25-a55a-3b49a0751246",
+        "case_id": "1263eab2-fda9-494c-ac87-9e5589da2c84",
+        "owner_user_id": "233606b4-4adf-43a6-b961-9cef7400ecb4",
+        "created_by": "233606b4-4adf-43a6-b961-9cef7400ecb4",
+        "created_at": "2026-07-25T19:10:47.444884",
+        "updated_at": "2026-07-25T19:10:47.448675",
+        "status": "active",
+        "case_number": "RBAC-ONE",
+        "evidence_id": "e3b7ad0f-2710-449a-818d-8a24d58199dc",
+        "evidence_number": "EV-RBAC",
+        "artifact_id": null,
+        "occurred_at": "2026-07-25T19:10:47.444412",
+        "event_type": "evidence.added",
+        "group": "evidence",
+        "threat_weight": 0,
+        "threat_level": "unassessed",
+        "certainty": "confirmed",
+        "summary": "Evidence EV-RBAC added",
+        "details": "private.txt",
+        "source_type": "evidence",
+        "related_event_ids": [
+          "08d53aa1-1085-4e37-a744-bc64d26b2c31"
+        ],
+        "provenance": {
+          "case_id": "1263eab2-fda9-494c-ac87-9e5589da2c84",
+          "evidence_id": "e3b7ad0f-2710-449a-818d-8a24d58199dc",
+          "artifact_id": null,
+          "created_by": "233606b4-4adf-43a6-b961-9cef7400ecb4"
+        }
+      },
+      {
+        "id": "5822b989-ff67-48ff-bff3-603a7cde751a",
+        "case_id": "1263eab2-fda9-494c-ac87-9e5589da2c84",
+        "owner_user_id": "233606b4-4adf-43a6-b961-9cef7400ecb4",
+        "created_by": "233606b4-4adf-43a6-b961-9cef7400ecb4",
+        "created_at": "2026-07-25T19:10:47.486809",
+        "updated_at": "2026-07-25T19:10:47.491610",
+        "status": "active",
+        "case_number": "RBAC-ONE",
+        "evidence_id": null,
+        "evidence_number": null,
+        "artifact_id": null,
+        "occurred_at": "2026-07-25T19:10:47.486395",
+        "event_type": "observation.manual",
+        "group": "observation",
+        "threat_weight": 0,
+        "threat_level": "unassessed",
+        "certainty": "confirmed",
+        "summary": "private event",
+        "details": null,
+        "source_type": "manual",
+        "related_event_ids": [],
+        "provenance": {
+          "case_id": "1263eab2-fda9-494c-ac87-9e5589da2c84",
+          "evidence_id": null,
+          "artifact_id": null,
+          "created_by": "233606b4-4adf-43a6-b961-9cef7400ecb4"
+        }
+      },
+      {
+        "id": "08d53aa1-1085-4e37-a744-bc64d26b2c31",
+        "case_id": "1263eab2-fda9-494c-ac87-9e5589da2c84",
+        "owner_user_id": "233606b4-4adf-43a6-b961-9cef7400ecb4",
+        "created_by": "233606b4-4adf-43a6-b961-9cef7400ecb4",
+        "created_at": "2026-07-25T19:10:47.488080",
+        "updated_at": "2026-07-25T19:10:47.491624",
+        "status": "active",
+        "case_number": "RBAC-ONE",
+        "evidence_id": "e3b7ad0f-2710-449a-818d-8a24d58199dc",
+        "evidence_number": "EV-RBAC",
+        "artifact_id": null,
+        "occurred_at": "2026-07-25T19:10:47.487731",
+        "event_type": "evidence.analysis.completed",
+        "group": "evidence",
+        "threat_weight": 0,
+        "threat_level": "unassessed",
+        "certainty": "confirmed",
+        "summary": "Forensic analysis completed for EV-RBAC",
+        "details": "Unknown analyzed; entropy 2.2516. 0 notable findings, 0 possible flags, 0 extracted child item(s).",
+        "source_type": "evidence",
+        "related_event_ids": [
+          "104a8036-fa84-4b25-a55a-3b49a0751246"
+        ],
+        "provenance": {
+          "case_id": "1263eab2-fda9-494c-ac87-9e5589da2c84",
+          "evidence_id": "e3b7ad0f-2710-449a-818d-8a24d58199dc",
+          "artifact_id": null,
+          "created_by": "233606b4-4adf-43a6-b961-9cef7400ecb4"
+        }
+      }
+    ],
+    "summary": {
+      "confirmed_events": 4,
+      "hypotheses": 0,
+      "correlated_events": 2,
+      "evidence_links": 1,
+      "artifact_links": 0
+    },
+    "attack_path": [],
+    "hypotheses": [],
+    "explainability": "Attack progression includes only ATT&CK mappings recorded by evidence analysis. Persisted events are confirmed records; no attack stages were inferred.",
+    "graph": {
+      "nodes": [
+        {
+          "id": "32131d22-76b1-4824-afe5-721beee83f18",
+          "type": "timeline_event",
+          "label": "Case RBAC-ONE created"
+        },
+        {
+          "id": "104a8036-fa84-4b25-a55a-3b49a0751246",
+          "type": "timeline_event",
+          "label": "Evidence EV-RBAC added"
+        },
+        {
+          "id": "5822b989-ff67-48ff-bff3-603a7cde751a",
+          "type": "timeline_event",
+          "label": "private event"
+        },
+        {
+          "id": "08d53aa1-1085-4e37-a744-bc64d26b2c31",
+          "type": "timeline_event",
+          "label": "Forensic analysis completed for EV-RBAC"
+        }
+      ],
+      "edges": [
+        {
+          "source": "08d53aa1-1085-4e37-a744-bc64d26b2c31",
+          "target": "104a8036-fa84-4b25-a55a-3b49a0751246",
+          "type": "shared_source"
+        }
+      ]
+    }
+  },
+  "findings": [],
+  "threat_assessment": {
+    "status": "not_scored",
+    "explanation": "No synthetic threat score is generated. Review source-linked findings and provider intelligence."
+  },
+  "threat_score": null,
+  "threat_intelligence": {
+    "indicators": [
+      {
+        "type": "sha256",
+        "value": "2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b",
+        "original_value": "2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b",
+        "status": "unknown",
+        "findings": [],
+        "sources": [
+          {
+            "evidence_id": "e3b7ad0f-2710-449a-818d-8a24d58199dc",
+            "evidence_number": "EV-RBAC",
+            "filename": "private.txt"
+          }
+        ]
+      }
+    ],
+    "findings": [],
+    "summary": {
+      "total": 1,
+      "enriched": 0,
+      "unknown": 1,
+      "providers_queried": 0
+    },
+    "providers": [],
+    "errors": [],
+    "explainability": "Unknown means no configured provider returned a finding; it does not mean benign.",
+    "graph": {
+      "nodes": [],
+      "edges": []
+    },
+    "reputation_counts": {
+      "malicious": 0,
+      "suspicious": 0,
+      "benign": 0
+    },
+    "attack_mappings": [],
+    "case_id": "1263eab2-fda9-494c-ac87-9e5589da2c84"
+  },
+  "iocs": [],
+  "mitre_attack": [],
+  "ai_explanation": {
+    "available": false,
+    "provider": {
+      "provider": "ollama",
+      "available": false,
+      "configured": true,
+      "model": "qwen3:8b",
+      "message": "Ollama is running and ready.",
+      "endpoint": "http://localhost:11434",
+      "installed_models": [
+        "qwen3:8b"
+      ]
+    },
+    "content": "No AI provider available. Local deterministic analysis is available and the workflow can continue."
+  },
+  "recommendations": [],
+  "authorship": {
+    "executive_summary": "system-generated from recorded counts",
+    "findings": "forensic analysis",
+    "investigator_notes": "investigator-authored",
+    "ai_explanation": "AI-generated; requires investigator review"
+  },
+  "traceability": {
+    "requirement": "Every finding includes an evidence ID, evidence number, and SHA-256 source reference.",
+    "finding_sources_complete": true
+  },
+  "review": {
+    "status": "draft",
+    "approved_by": null,
+    "approved_at": null,
+    "digital_signature": null,
+    "signature_status": "not_configured"
+  },
+  "appendix": {
+    "chain_of_custody": "Evidence hashes, acquisition timestamps, and analysis reports are retained in the evidence records.",
+    "plugins": []
+  },
+  "charts": {
+    "timeline_by_group": {
+      "case": 1,
+      "evidence": 2,
+      "observation": 1
+    },
+    "evidence_by_type": {
+      "text/plain": 1
+    }
+  },
+  "report": {
+    "id": "1c3c5d1d-47e1-49e8-900c-d5d0771312a4",
+    "case_id": "1263eab2-fda9-494c-ac87-9e5589da2c84",
+    "owner_user_id": "233606b4-4adf-43a6-b961-9cef7400ecb4",
+    "created_by": "233606b4-4adf-43a6-b961-9cef7400ecb4",
+    "created_at": "2026-07-25T19:10:47.505742",
+    "updated_at": "2026-07-25T19:10:47.505727",
+    "status": "generating",
+    "report_type": "investigation",
+    "version": 1,
+    "title": "RBAC-ONE Investigation Report v1",
+    "storage_path": "1263eab2-fda9-494c-ac87-9e5589da2c84\\investigation-v1.json",
+    "generated_at": "2026-07-25T19:10:47.505731"
+  },
+  "ai_summary": {
+    "available": false,
+    "provider": {
+      "provider": "ollama",
+      "available": false,
+      "configured": true,
+      "model": "qwen3:8b",
+      "message": "Ollama is running and ready.",
+      "endpoint": "http://localhost:11434",
+      "installed_models": [
+        "qwen3:8b"
+      ]
+    },
+    "content": "No AI provider available. Local deterministic analysis is available and the workflow can continue."
+  }
+}

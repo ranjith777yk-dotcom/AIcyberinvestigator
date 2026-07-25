@@ -1,0 +1,524 @@
+{
+  "title": "CASE-TR-1 Technical Report",
+  "report_type": "technical",
+  "generated_at": "2026-07-19T07:16:12.306992+00:00",
+  "executive_summary": "CASE-TR-1 contains 1 evidence item(s), 4 timeline event(s), and a threat score of 50/100.",
+  "investigation_summary": {
+    "case_id": "9d273537-5a4a-46fa-9f5c-3a90e8cfee38",
+    "case_number": "CASE-TR-1",
+    "case": {
+      "id": "9d273537-5a4a-46fa-9f5c-3a90e8cfee38",
+      "case_number": "CASE-TR-1",
+      "title": "Timeline Report",
+      "description": null,
+      "severity": "high",
+      "priority": "medium",
+      "owner": null,
+      "tags": [],
+      "notes": [],
+      "relationships": [],
+      "attachments": [
+        {
+          "id": "847f9791-6432-475b-b9de-3b931bd454ed",
+          "case_id": "9d273537-5a4a-46fa-9f5c-3a90e8cfee38",
+          "evidence_number": "EV-TR-1",
+          "original_filename": "artifact.txt",
+          "storage_path": "9d273537-5a4a-46fa-9f5c-3a90e8cfee38\\15c2799fe8cc4c85aac8ed7981f6bd53.txt",
+          "media_type": "text/plain",
+          "size_bytes": 20,
+          "sha256": "ab0ca14c398145383ac0ae07310c6edc6028cbebec7ade0998a51a2e66bfb895",
+          "source_description": null,
+          "analysis_status": "completed",
+          "analysis_summary": "Unknown analyzed; entropy 3.7842. 1 notable findings, 1 possible flags, 0 extracted child item(s).",
+          "analysis_report": {
+            "generated_at": "2026-07-19T07:16:12.220957+00:00",
+            "evidence": {
+              "evidence_number": "EV-TR-1",
+              "original_filename": "artifact.txt",
+              "stored_path": "C:\\Users\\RANJITH REDDY\\OneDrive\\Desktop\\AIcyberinvestigator\\instance\\uploads\\incoming\\9d273537-5a4a-46fa-9f5c-3a90e8cfee38\\15c2799fe8cc4c85aac8ed7981f6bd53.txt",
+              "sha256": "ab0ca14c398145383ac0ae07310c6edc6028cbebec7ade0998a51a2e66bfb895",
+              "bytes_analyzed": 20,
+              "truncated": false
+            },
+            "chain_of_custody": [
+              "Evidence bytes were read from immutable local custody storage.",
+              "The persisted SHA-256 hash was retained and included in this report.",
+              "Analysis was read-only; extracted children were analyzed in memory."
+            ],
+            "root": {
+              "name": "artifact.txt",
+              "size_bytes": 20,
+              "magic_bytes": "43 54 46 7B 74 69 6D 65 6C 69 6E 65 5F 72 65 70",
+              "file_signature": "Unknown",
+              "entropy": 3.7842,
+              "encoding": {
+                "detected": true,
+                "encoding": "utf-8"
+              },
+              "compression": {
+                "detected": false,
+                "type": null
+              },
+              "archive": {
+                "detected": false,
+                "type": null,
+                "filename_hint": ".txt"
+              },
+              "encryption_indicators": [],
+              "steganography_indicators": [],
+              "embedded_file_indicators": [],
+              "metadata": {
+                "extension": ".txt"
+              },
+              "hidden_strings": [
+                "CTF{timeline_report}"
+              ],
+              "decoded_payloads": [],
+              "flags": [
+                "CTF{timeline_report}"
+              ],
+              "children": []
+            },
+            "findings": [
+              {
+                "severity": "high",
+                "path": "artifact.txt",
+                "type": "ctf_flag",
+                "detail": "CTF{timeline_report}"
+              }
+            ],
+            "explanation": [
+              "Magic bytes identify the root artifact as: Unknown.",
+              "Entropy is 3.7842; values near 8.0 often indicate compressed, encrypted, or packed data.",
+              "Printable strings and supported encodings were inspected without executing content.",
+              "Findings are ranked by indicator type and include path context for extracted children."
+            ]
+          },
+          "acquired_at": "2026-07-19T07:16:12.178362",
+          "deleted_at": null
+        }
+      ],
+      "history": [
+        {
+          "id": "7fd3a650-6068-404b-addc-f30074371a02",
+          "case_id": "9d273537-5a4a-46fa-9f5c-3a90e8cfee38",
+          "case_number": "CASE-TR-1",
+          "evidence_id": "847f9791-6432-475b-b9de-3b931bd454ed",
+          "evidence_number": "EV-TR-1",
+          "artifact_id": null,
+          "occurred_at": "2026-07-19T07:16:12.225014",
+          "event_type": "evidence.analysis.completed",
+          "group": "evidence",
+          "threat_weight": 15,
+          "threat_level": "high",
+          "summary": "Forensic analysis completed for EV-TR-1",
+          "details": "Unknown analyzed; entropy 3.7842. 1 notable findings, 1 possible flags, 0 extracted child item(s)."
+        },
+        {
+          "id": "1abe9ba8-b863-4d80-857a-b3b771ab2c26",
+          "case_id": "9d273537-5a4a-46fa-9f5c-3a90e8cfee38",
+          "case_number": "CASE-TR-1",
+          "evidence_id": "847f9791-6432-475b-b9de-3b931bd454ed",
+          "evidence_number": "EV-TR-1",
+          "artifact_id": null,
+          "occurred_at": "2026-07-19T07:16:12.186589",
+          "event_type": "evidence.added",
+          "group": "evidence",
+          "threat_weight": 15,
+          "threat_level": "high",
+          "summary": "Evidence EV-TR-1 added",
+          "details": "artifact.txt"
+        },
+        {
+          "id": "faf23c4d-0b0b-4be1-893b-4d697996adfd",
+          "case_id": "9d273537-5a4a-46fa-9f5c-3a90e8cfee38",
+          "case_number": "CASE-TR-1",
+          "evidence_id": null,
+          "evidence_number": null,
+          "artifact_id": null,
+          "occurred_at": "2026-07-19T07:16:12.148545",
+          "event_type": "observation.manual",
+          "group": "observation",
+          "threat_weight": 10,
+          "threat_level": "medium",
+          "summary": "Manual observation",
+          "details": "Possible phishing credential activity"
+        },
+        {
+          "id": "fd95b87c-abdd-48f4-a6f7-954ceec18bdd",
+          "case_id": "9d273537-5a4a-46fa-9f5c-3a90e8cfee38",
+          "case_number": "CASE-TR-1",
+          "evidence_id": null,
+          "evidence_number": null,
+          "artifact_id": null,
+          "occurred_at": "2026-07-19T07:16:12.124963",
+          "event_type": "case.created",
+          "group": "case",
+          "threat_weight": 6,
+          "threat_level": "low",
+          "summary": "Case CASE-TR-1 created",
+          "details": "Timeline Report"
+        }
+      ],
+      "opened_at": "2026-07-19T07:16:12.104563",
+      "closed_at": null,
+      "archived_at": null,
+      "deleted_at": null,
+      "status": "active"
+    },
+    "evidence": [
+      {
+        "id": "847f9791-6432-475b-b9de-3b931bd454ed",
+        "case_id": "9d273537-5a4a-46fa-9f5c-3a90e8cfee38",
+        "evidence_number": "EV-TR-1",
+        "original_filename": "artifact.txt",
+        "storage_path": "9d273537-5a4a-46fa-9f5c-3a90e8cfee38\\15c2799fe8cc4c85aac8ed7981f6bd53.txt",
+        "media_type": "text/plain",
+        "size_bytes": 20,
+        "sha256": "ab0ca14c398145383ac0ae07310c6edc6028cbebec7ade0998a51a2e66bfb895",
+        "source_description": null,
+        "analysis_status": "completed",
+        "analysis_summary": "Unknown analyzed; entropy 3.7842. 1 notable findings, 1 possible flags, 0 extracted child item(s).",
+        "analysis_report": {
+          "generated_at": "2026-07-19T07:16:12.220957+00:00",
+          "evidence": {
+            "evidence_number": "EV-TR-1",
+            "original_filename": "artifact.txt",
+            "stored_path": "C:\\Users\\RANJITH REDDY\\OneDrive\\Desktop\\AIcyberinvestigator\\instance\\uploads\\incoming\\9d273537-5a4a-46fa-9f5c-3a90e8cfee38\\15c2799fe8cc4c85aac8ed7981f6bd53.txt",
+            "sha256": "ab0ca14c398145383ac0ae07310c6edc6028cbebec7ade0998a51a2e66bfb895",
+            "bytes_analyzed": 20,
+            "truncated": false
+          },
+          "chain_of_custody": [
+            "Evidence bytes were read from immutable local custody storage.",
+            "The persisted SHA-256 hash was retained and included in this report.",
+            "Analysis was read-only; extracted children were analyzed in memory."
+          ],
+          "root": {
+            "name": "artifact.txt",
+            "size_bytes": 20,
+            "magic_bytes": "43 54 46 7B 74 69 6D 65 6C 69 6E 65 5F 72 65 70",
+            "file_signature": "Unknown",
+            "entropy": 3.7842,
+            "encoding": {
+              "detected": true,
+              "encoding": "utf-8"
+            },
+            "compression": {
+              "detected": false,
+              "type": null
+            },
+            "archive": {
+              "detected": false,
+              "type": null,
+              "filename_hint": ".txt"
+            },
+            "encryption_indicators": [],
+            "steganography_indicators": [],
+            "embedded_file_indicators": [],
+            "metadata": {
+              "extension": ".txt"
+            },
+            "hidden_strings": [
+              "CTF{timeline_report}"
+            ],
+            "decoded_payloads": [],
+            "flags": [
+              "CTF{timeline_report}"
+            ],
+            "children": []
+          },
+          "findings": [
+            {
+              "severity": "high",
+              "path": "artifact.txt",
+              "type": "ctf_flag",
+              "detail": "CTF{timeline_report}"
+            }
+          ],
+          "explanation": [
+            "Magic bytes identify the root artifact as: Unknown.",
+            "Entropy is 3.7842; values near 8.0 often indicate compressed, encrypted, or packed data.",
+            "Printable strings and supported encodings were inspected without executing content.",
+            "Findings are ranked by indicator type and include path context for extracted children."
+          ]
+        },
+        "acquired_at": "2026-07-19T07:16:12.178362",
+        "deleted_at": null
+      }
+    ],
+    "timeline": [
+      {
+        "id": "7fd3a650-6068-404b-addc-f30074371a02",
+        "case_id": "9d273537-5a4a-46fa-9f5c-3a90e8cfee38",
+        "case_number": "CASE-TR-1",
+        "evidence_id": "847f9791-6432-475b-b9de-3b931bd454ed",
+        "evidence_number": "EV-TR-1",
+        "artifact_id": null,
+        "occurred_at": "2026-07-19T07:16:12.225014",
+        "event_type": "evidence.analysis.completed",
+        "group": "evidence",
+        "threat_weight": 15,
+        "threat_level": "high",
+        "summary": "Forensic analysis completed for EV-TR-1",
+        "details": "Unknown analyzed; entropy 3.7842. 1 notable findings, 1 possible flags, 0 extracted child item(s)."
+      },
+      {
+        "id": "1abe9ba8-b863-4d80-857a-b3b771ab2c26",
+        "case_id": "9d273537-5a4a-46fa-9f5c-3a90e8cfee38",
+        "case_number": "CASE-TR-1",
+        "evidence_id": "847f9791-6432-475b-b9de-3b931bd454ed",
+        "evidence_number": "EV-TR-1",
+        "artifact_id": null,
+        "occurred_at": "2026-07-19T07:16:12.186589",
+        "event_type": "evidence.added",
+        "group": "evidence",
+        "threat_weight": 15,
+        "threat_level": "high",
+        "summary": "Evidence EV-TR-1 added",
+        "details": "artifact.txt"
+      },
+      {
+        "id": "faf23c4d-0b0b-4be1-893b-4d697996adfd",
+        "case_id": "9d273537-5a4a-46fa-9f5c-3a90e8cfee38",
+        "case_number": "CASE-TR-1",
+        "evidence_id": null,
+        "evidence_number": null,
+        "artifact_id": null,
+        "occurred_at": "2026-07-19T07:16:12.148545",
+        "event_type": "observation.manual",
+        "group": "observation",
+        "threat_weight": 10,
+        "threat_level": "medium",
+        "summary": "Manual observation",
+        "details": "Possible phishing credential activity"
+      },
+      {
+        "id": "fd95b87c-abdd-48f4-a6f7-954ceec18bdd",
+        "case_id": "9d273537-5a4a-46fa-9f5c-3a90e8cfee38",
+        "case_number": "CASE-TR-1",
+        "evidence_id": null,
+        "evidence_number": null,
+        "artifact_id": null,
+        "occurred_at": "2026-07-19T07:16:12.124963",
+        "event_type": "case.created",
+        "group": "case",
+        "threat_weight": 6,
+        "threat_level": "low",
+        "summary": "Case CASE-TR-1 created",
+        "details": "Timeline Report"
+      }
+    ],
+    "reports": [
+      {
+        "id": "379e1940-3213-4f19-90e1-bfe593a3f4d3",
+        "case_id": "9d273537-5a4a-46fa-9f5c-3a90e8cfee38",
+        "report_type": "technical",
+        "version": 1,
+        "title": "Production Report",
+        "storage_path": "9d273537-5a4a-46fa-9f5c-3a90e8cfee38\\technical-v1.json",
+        "generated_at": "2026-07-19T07:16:12.280891"
+      }
+    ],
+    "plugins": []
+  },
+  "evidence": [
+    {
+      "id": "847f9791-6432-475b-b9de-3b931bd454ed",
+      "case_id": "9d273537-5a4a-46fa-9f5c-3a90e8cfee38",
+      "evidence_number": "EV-TR-1",
+      "original_filename": "artifact.txt",
+      "storage_path": "9d273537-5a4a-46fa-9f5c-3a90e8cfee38\\15c2799fe8cc4c85aac8ed7981f6bd53.txt",
+      "media_type": "text/plain",
+      "size_bytes": 20,
+      "sha256": "ab0ca14c398145383ac0ae07310c6edc6028cbebec7ade0998a51a2e66bfb895",
+      "source_description": null,
+      "analysis_status": "completed",
+      "analysis_summary": "Unknown analyzed; entropy 3.7842. 1 notable findings, 1 possible flags, 0 extracted child item(s).",
+      "analysis_report": {
+        "generated_at": "2026-07-19T07:16:12.220957+00:00",
+        "evidence": {
+          "evidence_number": "EV-TR-1",
+          "original_filename": "artifact.txt",
+          "stored_path": "C:\\Users\\RANJITH REDDY\\OneDrive\\Desktop\\AIcyberinvestigator\\instance\\uploads\\incoming\\9d273537-5a4a-46fa-9f5c-3a90e8cfee38\\15c2799fe8cc4c85aac8ed7981f6bd53.txt",
+          "sha256": "ab0ca14c398145383ac0ae07310c6edc6028cbebec7ade0998a51a2e66bfb895",
+          "bytes_analyzed": 20,
+          "truncated": false
+        },
+        "chain_of_custody": [
+          "Evidence bytes were read from immutable local custody storage.",
+          "The persisted SHA-256 hash was retained and included in this report.",
+          "Analysis was read-only; extracted children were analyzed in memory."
+        ],
+        "root": {
+          "name": "artifact.txt",
+          "size_bytes": 20,
+          "magic_bytes": "43 54 46 7B 74 69 6D 65 6C 69 6E 65 5F 72 65 70",
+          "file_signature": "Unknown",
+          "entropy": 3.7842,
+          "encoding": {
+            "detected": true,
+            "encoding": "utf-8"
+          },
+          "compression": {
+            "detected": false,
+            "type": null
+          },
+          "archive": {
+            "detected": false,
+            "type": null,
+            "filename_hint": ".txt"
+          },
+          "encryption_indicators": [],
+          "steganography_indicators": [],
+          "embedded_file_indicators": [],
+          "metadata": {
+            "extension": ".txt"
+          },
+          "hidden_strings": [
+            "CTF{timeline_report}"
+          ],
+          "decoded_payloads": [],
+          "flags": [
+            "CTF{timeline_report}"
+          ],
+          "children": []
+        },
+        "findings": [
+          {
+            "severity": "high",
+            "path": "artifact.txt",
+            "type": "ctf_flag",
+            "detail": "CTF{timeline_report}"
+          }
+        ],
+        "explanation": [
+          "Magic bytes identify the root artifact as: Unknown.",
+          "Entropy is 3.7842; values near 8.0 often indicate compressed, encrypted, or packed data.",
+          "Printable strings and supported encodings were inspected without executing content.",
+          "Findings are ranked by indicator type and include path context for extracted children."
+        ]
+      },
+      "acquired_at": "2026-07-19T07:16:12.178362",
+      "deleted_at": null
+    }
+  ],
+  "timeline": [
+    {
+      "id": "7fd3a650-6068-404b-addc-f30074371a02",
+      "case_id": "9d273537-5a4a-46fa-9f5c-3a90e8cfee38",
+      "case_number": "CASE-TR-1",
+      "evidence_id": "847f9791-6432-475b-b9de-3b931bd454ed",
+      "evidence_number": "EV-TR-1",
+      "artifact_id": null,
+      "occurred_at": "2026-07-19T07:16:12.225014",
+      "event_type": "evidence.analysis.completed",
+      "group": "evidence",
+      "threat_weight": 15,
+      "threat_level": "high",
+      "summary": "Forensic analysis completed for EV-TR-1",
+      "details": "Unknown analyzed; entropy 3.7842. 1 notable findings, 1 possible flags, 0 extracted child item(s)."
+    },
+    {
+      "id": "1abe9ba8-b863-4d80-857a-b3b771ab2c26",
+      "case_id": "9d273537-5a4a-46fa-9f5c-3a90e8cfee38",
+      "case_number": "CASE-TR-1",
+      "evidence_id": "847f9791-6432-475b-b9de-3b931bd454ed",
+      "evidence_number": "EV-TR-1",
+      "artifact_id": null,
+      "occurred_at": "2026-07-19T07:16:12.186589",
+      "event_type": "evidence.added",
+      "group": "evidence",
+      "threat_weight": 15,
+      "threat_level": "high",
+      "summary": "Evidence EV-TR-1 added",
+      "details": "artifact.txt"
+    },
+    {
+      "id": "faf23c4d-0b0b-4be1-893b-4d697996adfd",
+      "case_id": "9d273537-5a4a-46fa-9f5c-3a90e8cfee38",
+      "case_number": "CASE-TR-1",
+      "evidence_id": null,
+      "evidence_number": null,
+      "artifact_id": null,
+      "occurred_at": "2026-07-19T07:16:12.148545",
+      "event_type": "observation.manual",
+      "group": "observation",
+      "threat_weight": 10,
+      "threat_level": "medium",
+      "summary": "Manual observation",
+      "details": "Possible phishing credential activity"
+    },
+    {
+      "id": "fd95b87c-abdd-48f4-a6f7-954ceec18bdd",
+      "case_id": "9d273537-5a4a-46fa-9f5c-3a90e8cfee38",
+      "case_number": "CASE-TR-1",
+      "evidence_id": null,
+      "evidence_number": null,
+      "artifact_id": null,
+      "occurred_at": "2026-07-19T07:16:12.124963",
+      "event_type": "case.created",
+      "group": "case",
+      "threat_weight": 6,
+      "threat_level": "low",
+      "summary": "Case CASE-TR-1 created",
+      "details": "Timeline Report"
+    }
+  ],
+  "threat_score": 50,
+  "iocs": [
+    "CTF{timeline_report}"
+  ],
+  "mitre_attack": [
+    {
+      "technique_id": "T1566",
+      "technique_name": "Phishing",
+      "tactic": "Initial Access"
+    },
+    {
+      "technique_id": "T1027",
+      "technique_name": "Obfuscated Files or Information",
+      "tactic": "Defense Evasion"
+    }
+  ],
+  "ai_explanation": {
+    "available": false,
+    "provider": {
+      "provider": "openai",
+      "available": false,
+      "configured": true,
+      "model": "gpt-4.1-mini",
+      "message": "AI is disabled by configuration; using local fallback."
+    },
+    "content": "OpenAI is not configured. Local deterministic analysis is available and the workflow can continue."
+  },
+  "recommendations": [
+    "Preserve original evidence and verify SHA-256 before every transfer.",
+    "Review timeline gaps and correlate suspicious events with source evidence.",
+    "Escalate high-entropy, embedded-content, or flag-bearing artifacts for deeper manual review."
+  ],
+  "appendix": {
+    "chain_of_custody": "Evidence hashes, acquisition timestamps, and analysis reports are retained in the evidence records.",
+    "plugins": []
+  },
+  "charts": {
+    "threat_score": 50,
+    "timeline_by_group": {
+      "case": 1,
+      "evidence": 2,
+      "observation": 1
+    },
+    "evidence_by_type": {
+      "text/plain": 1
+    }
+  },
+  "report": {
+    "id": "379e1940-3213-4f19-90e1-bfe593a3f4d3",
+    "case_id": "9d273537-5a4a-46fa-9f5c-3a90e8cfee38",
+    "report_type": "technical",
+    "version": 1,
+    "title": "Production Report",
+    "storage_path": "9d273537-5a4a-46fa-9f5c-3a90e8cfee38\\technical-v1.json",
+    "generated_at": "2026-07-19T07:16:12.280891"
+  }
+}

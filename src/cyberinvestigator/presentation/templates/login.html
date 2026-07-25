@@ -3,100 +3,187 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#111b2e">
-  <title>Login - CyberInvestigator</title>
+  <meta name="theme-color" content="#09111f">
+  <meta name="description" content="CyberInvestigator is an AI-powered digital forensics and incident response workspace for evidence intelligence, threat hunting, timeline analysis, and professional reporting.">
+  <title>{% if auth_mode == 'register' %}Create account{% elif auth_mode == 'forgot' %}Recover access{% else %}Sign in{% endif %} · CyberInvestigator</title>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
-  <link href="{{ url_for('static', filename='css/dashboard.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='css/dashboard_polish.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='css/design_system.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='css/login.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='css/responsive.css') }}" rel="stylesheet">
 </head>
 <body class="auth-body">
-  <main class="auth-shell">
-    <section class="auth-hero" aria-label="CyberInvestigator overview">
-      <div class="brand auth-brand">
-        <span class="brand-mark"><i class="bi bi-shield-lock-fill"></i></span>
-        <span><strong>Cyber</strong>Investigator<small>Enterprise DFIR Platform</small></span>
+  <a class="auth-skip" href="#auth-form">Skip to authentication</a>
+  <header class="auth-header">
+    <a class="auth-logo" href="{{ url_for('web.login') }}" aria-label="CyberInvestigator home">
+      <span class="auth-logo-mark"><i class="bi bi-shield-lock-fill"></i></span>
+      <span><strong>Cyber</strong>Investigator<small>Enterprise DFIR Platform</small></span>
+    </a>
+    <nav class="auth-nav" aria-label="Entry page">
+      <a href="#capabilities">Capabilities</a>
+      <a href="#workflow">Workflow</a>
+      <a href="#trust">Security</a>
+    </nav>
+    <a class="auth-header-action" href="#auth-form">Access workspace <i class="bi bi-arrow-down"></i></a>
+  </header>
+
+  <main>
+    <section class="auth-stage">
+      <div class="auth-hero" aria-labelledby="platform-title">
+        <div class="auth-hero-copy">
+          <div class="auth-kicker"><span class="auth-live-dot"></span> Secure investigation workspace</div>
+          <h1 id="platform-title">Move from evidence to <span>defensible findings.</span></h1>
+          <p class="auth-lead">CyberInvestigator brings digital evidence, AI-assisted analysis, incident timelines, threat context, and professional reporting into one controlled workspace.</p>
+          <div class="auth-capabilities" id="capabilities" aria-label="Platform capabilities">
+            <article><i class="bi bi-cpu"></i><div><strong>AI Investigation</strong><span>Cyber-aware analysis and guided next actions</span></div></article>
+            <article><i class="bi bi-fingerprint"></i><div><strong>Evidence Intelligence</strong><span>Integrity-first artifacts and chain of custody</span></div></article>
+            <article><i class="bi bi-clock-history"></i><div><strong>Timeline Analysis</strong><span>Reconstruct activity across every signal</span></div></article>
+            <article><i class="bi bi-crosshair"></i><div><strong>Threat Hunting</strong><span>Correlate indicators, behaviors, and context</span></div></article>
+            <article><i class="bi bi-file-earmark-bar-graph"></i><div><strong>Investigation Reporting</strong><span>Technical and executive-ready case outputs</span></div></article>
+            <article><i class="bi bi-shield-check"></i><div><strong>Controlled Operations</strong><span>Role-aware access and traceable security events</span></div></article>
+          </div>
+          <div class="auth-trust-row">
+            <span><i class="bi bi-shield-check"></i> Role-based access</span>
+            <span><i class="bi bi-file-earmark-lock2"></i> Evidence integrity</span>
+            <span><i class="bi bi-journal-check"></i> Auditable workflows</span>
+          </div>
+        </div>
+
+        <div class="auth-visual" aria-hidden="true">
+          <div class="visual-grid"></div>
+          <div class="visual-orbit orbit-one"></div>
+          <div class="visual-orbit orbit-two"></div>
+          <div class="visual-status"><span class="auth-live-dot"></span> Investigation pipeline</div>
+          <div class="visual-core"><span><i class="bi bi-shield-shaded"></i></span><strong>Case workspace</strong><small>Findings correlated</small></div>
+          <div class="visual-node node-evidence"><i class="bi bi-fingerprint"></i><span><strong>Evidence</strong><small>Integrity recorded</small></span></div>
+          <div class="visual-node node-ai"><i class="bi bi-stars"></i><span><strong>AI assist</strong><small>Context enriched</small></span></div>
+          <div class="visual-node node-timeline"><i class="bi bi-clock-history"></i><span><strong>Timeline</strong><small>Events ordered</small></span></div>
+          <div class="visual-signal signal-one"></div>
+          <div class="visual-signal signal-two"></div>
+        </div>
       </div>
-      <div>
-        <p class="eyebrow">Secure Investigation Workspace</p>
-        <h1>AI-assisted incident response for modern security teams.</h1>
-        <p>Manage cases, evidence, timelines, reports, and AI analysis from one controlled cybersecurity workspace.</p>
-      </div>
+
+      <aside class="auth-panel" aria-label="Account access">
+        <div class="auth-card" id="auth-form">
+          <div class="auth-card-head">
+            <div class="auth-access-icon"><i class="bi bi-person-lock"></i></div>
+            <p class="auth-eyebrow">Secure workspace access</p>
+            <h2>{% if auth_mode == 'register' %}Create your account{% elif auth_mode == 'forgot' %}Recover your access{% else %}Welcome back{% endif %}</h2>
+            <p>{% if auth_mode == 'register' %}Create an investigator account for the standard user workspace.{% elif auth_mode == 'forgot' %}Submit your account identifier for administrator-assisted recovery.{% else %}Authenticate to continue to your role-authorized workspace.{% endif %}</p>
+          </div>
+
+          {% if auth_mode != 'forgot' %}
+          <nav class="auth-tabs" aria-label="Authentication options">
+            <a class="{% if not auth_mode %}active{% endif %}" href="{{ url_for('web.login') }}" {% if not auth_mode %}aria-current="page"{% endif %}>Sign in</a>
+            {% if registration_enabled %}
+            <a class="{% if auth_mode == 'register' %}active{% endif %}" href="{{ url_for('web.register') }}" {% if auth_mode == 'register' %}aria-current="page"{% endif %}>Create account</a>
+            {% else %}
+            <span class="auth-tab-disabled" aria-disabled="true">Registration managed</span>
+            {% endif %}
+          </nav>
+          {% endif %}
+
+          {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+              <div class="auth-alerts" aria-live="polite">
+              {% for category, message in messages %}
+                <div class="auth-alert auth-alert-{{ category }}" role="alert"><i class="bi bi-{% if category == 'success' %}check-circle{% else %}exclamation-circle{% endif %}"></i><span>{{ message }}</span></div>
+              {% endfor %}
+              </div>
+            {% endif %}
+          {% endwith %}
+
+          {% if auth_mode == 'forgot' %}
+          <form method="post" action="{{ url_for('web.forgot_password') }}" class="auth-form" data-auth-form novalidate>
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <div class="auth-recovery-notice"><i class="bi bi-info-circle"></i><span><strong>Administrator-assisted recovery</strong>No reset email is sent by this deployment. The request is handled without disclosing whether an account exists.</span></div>
+            <div class="auth-field">
+              <label for="email">Username or email</label>
+              <div class="auth-input-wrap"><i class="bi bi-envelope"></i><input id="email" name="email" autocomplete="username" required autofocus placeholder="you@company.com" aria-describedby="email-error"></div>
+              <span class="auth-field-error" id="email-error">Enter your username or email.</span>
+            </div>
+            <button class="auth-submit" type="submit"><span>Request recovery</span><i class="bi bi-arrow-right"></i><span class="auth-spinner"></span></button>
+            <a class="auth-secondary-action" href="{{ url_for('web.login') }}"><i class="bi bi-arrow-left"></i> Back to sign in</a>
+          </form>
+          {% elif auth_mode == 'register' %}
+          <form method="post" action="{{ url_for('web.register') }}" class="auth-form" data-auth-form novalidate>
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <div class="auth-field">
+              <label for="reg-username">Username</label>
+              <div class="auth-input-wrap"><i class="bi bi-person"></i><input id="reg-username" name="username" autocomplete="username" required minlength="3" autofocus placeholder="investigator.name" aria-describedby="reg-username-error"></div>
+              <span class="auth-field-error" id="reg-username-error">Use at least 3 characters.</span>
+            </div>
+            <div class="auth-field">
+              <label for="reg-email">Work email</label>
+              <div class="auth-input-wrap"><i class="bi bi-envelope"></i><input id="reg-email" name="email" type="email" autocomplete="email" required placeholder="you@company.com" aria-describedby="reg-email-error reg-email-help"></div>
+              <span class="auth-field-error" id="reg-email-error">Enter a valid email address.</span>
+              <span class="auth-field-help" id="reg-email-help">Used as your account identity. Automated email verification is not enabled in this deployment.</span>
+            </div>
+            <div class="auth-field">
+              <div class="auth-label-row"><label for="reg-password">Password</label><span>8+ characters</span></div>
+              <div class="auth-input-wrap"><i class="bi bi-key"></i><input id="reg-password" name="password" type="password" autocomplete="new-password" required minlength="8" placeholder="Create a secure password" aria-describedby="reg-password-error"><button class="password-toggle" type="button" aria-label="Show password" aria-controls="reg-password" aria-pressed="false" data-password-toggle="reg-password"><i class="bi bi-eye"></i></button></div>
+              <span class="auth-field-error" id="reg-password-error">Use at least 8 characters.</span>
+            </div>
+            <button class="auth-submit" type="submit"><span>Create account</span><i class="bi bi-arrow-right"></i><span class="auth-spinner"></span></button>
+            {% if google_oauth_configured %}
+            <div class="auth-divider"><span>or continue with</span></div>
+            <a class="auth-google" href="{{ url_for('web.google_auth') }}"><i class="bi bi-google"></i> Google</a>
+            {% endif %}
+          </form>
+          {% else %}
+          <form method="post" action="{{ url_for('web.login') }}" class="auth-form" data-auth-form novalidate>
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="next" value="{{ request.args.get('next', '') }}">
+            <div class="auth-field">
+              <label for="username">Username or email</label>
+              <div class="auth-input-wrap"><i class="bi bi-person"></i><input id="username" name="username" autocomplete="username" required autofocus placeholder="you@company.com" aria-describedby="username-error"></div>
+              <span class="auth-field-error" id="username-error">Enter your username or email.</span>
+            </div>
+            <div class="auth-field">
+              <div class="auth-label-row"><label for="password">Password</label><a href="{{ url_for('web.forgot_password') }}">Forgot password?</a></div>
+              <div class="auth-input-wrap"><i class="bi bi-key"></i><input id="password" name="password" type="password" autocomplete="current-password" required placeholder="Enter your password" aria-describedby="password-error"><button class="password-toggle" type="button" aria-label="Show password" aria-controls="password" aria-pressed="false" data-password-toggle="password"><i class="bi bi-eye"></i></button></div>
+              <span class="auth-field-error" id="password-error">Enter your password.</span>
+            </div>
+            <label class="auth-remember" for="remember"><input type="checkbox" id="remember" name="remember"><span>Keep me signed in on this device</span></label>
+            <button class="auth-submit" type="submit"><span>Sign in securely</span><i class="bi bi-arrow-right"></i><span class="auth-spinner"></span></button>
+            {% if google_oauth_configured %}
+            <div class="auth-divider"><span>or continue with</span></div>
+            <a class="auth-google" href="{{ url_for('web.google_auth') }}"><i class="bi bi-google"></i> Google</a>
+            {% endif %}
+          </form>
+          {% endif %}
+
+          <div class="auth-session-note"><i class="bi bi-lock"></i><span><strong>Protected session</strong>Access is role-aware. Authentication and security-relevant events are audited.</span></div>
+        </div>
+      </aside>
     </section>
 
-    <section class="auth-panel">
-      <div class="auth-card-heading">
-        <p class="eyebrow">Secure Access</p>
-        <h2>{% if auth_mode == 'register' %}Create account{% elif auth_mode == 'forgot' %}Recover access{% else %}Welcome back{% endif %}</h2>
-        <p>{% if auth_mode == 'register' %}New accounts enter the User investigation workspace.{% elif auth_mode == 'forgot' %}Enter your account email to start recovery.{% else %}Sign in to continue your investigation or administration work.{% endif %}</p>
+    <section class="auth-proof" id="workflow" aria-label="Platform workflow">
+      <div class="proof-intro"><p>Built for the investigation lifecycle</p><h2>From first signal to final report.</h2></div>
+      <div class="proof-grid">
+        <article><span>01</span><i class="bi bi-inboxes"></i><h3>Collect</h3><p>Register case-linked artifacts with integrity and custody context.</p></article>
+        <article><span>02</span><i class="bi bi-search"></i><h3>Analyze</h3><p>Extract forensic findings, indicators, and behavioral signals.</p></article>
+        <article><span>03</span><i class="bi bi-diagram-3"></i><h3>Correlate</h3><p>Connect evidence and activity into a defensible incident timeline.</p></article>
+        <article><span>04</span><i class="bi bi-file-earmark-bar-graph"></i><h3>Report</h3><p>Deliver clear technical and executive investigation findings.</p></article>
       </div>
-      <div class="auth-tabs" role="tablist" aria-label="Authentication options">
-        <a class="{% if not auth_mode %}active{% endif %}" href="{{ url_for('web.login') }}">Login</a>
-        <a class="{% if auth_mode == 'register' %}active{% endif %}" href="{{ url_for('web.register') }}">Register</a>
+      <div class="auth-assurance" id="trust">
+        <div class="assurance-copy"><p>Security by workflow</p><h2>Built to keep investigation actions controlled and traceable.</h2></div>
+        <div class="assurance-controls">
+          <span><i class="bi bi-person-check"></i><strong>Role-aware access</strong>Workspace authorization follows assigned roles.</span>
+          <span><i class="bi bi-fingerprint"></i><strong>Integrity metadata</strong>Evidence records include SHA-256 identifiers.</span>
+          <span><i class="bi bi-journal-text"></i><strong>Security audit trail</strong>Relevant access and control events are recorded.</span>
+          <span><i class="bi bi-box-seam"></i><strong>Quarantine-first storage</strong>Uploaded evidence is treated as untrusted.</span>
+        </div>
       </div>
-      {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-          {% for category, message in messages %}
-            <div class="alert alert-{{ category }}" role="alert">{{ message }}</div>
-          {% endfor %}
-        {% endif %}
-      {% endwith %}
-      {% if auth_mode == 'forgot' %}
-      <form method="post" action="{{ url_for('web.forgot_password') }}" class="auth-form" novalidate>
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <div>
-          <label class="form-label" for="email">Username or email</label>
-          <input class="form-control" id="email" name="email" autocomplete="email" required autofocus>
-        </div>
-        <button class="btn btn-primary w-100" type="submit"><i class="bi bi-life-preserver"></i> Request recovery</button>
-        <a class="btn btn-outline-secondary w-100" href="{{ url_for('web.login') }}">Back to sign in</a>
-      </form>
-      {% elif auth_mode == 'register' %}
-      <form method="post" action="{{ url_for('web.register') }}" class="auth-form" novalidate>
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <div>
-          <label class="form-label" for="reg-username">Username</label>
-          <input class="form-control" id="reg-username" name="username" autocomplete="username" required autofocus>
-        </div>
-        <div>
-          <label class="form-label" for="reg-email">Email</label>
-          <input class="form-control" id="reg-email" name="email" type="email" autocomplete="email" required>
-        </div>
-        <div>
-          <label class="form-label" for="reg-password">Password</label>
-          <input class="form-control" id="reg-password" name="password" type="password" autocomplete="new-password" required minlength="8">
-        </div>
-        <button class="btn btn-primary w-100" type="submit"><i class="bi bi-person-plus"></i> Create account</button>
-        {% if google_oauth_configured %}
-        <a class="btn btn-outline-secondary w-100" href="{{ url_for('web.google_auth') }}"><i class="bi bi-google"></i> Continue with Google</a>
-        {% endif %}
-      </form>
-      {% else %}
-      <form method="post" action="{{ url_for('web.login') }}" class="auth-form" novalidate>
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <input type="hidden" name="next" value="{{ request.args.get('next', '') }}">
-        <div>
-          <label class="form-label" for="username">Username or email</label>
-          <input class="form-control" id="username" name="username" autocomplete="username" required autofocus>
-        </div>
-        <div>
-          <label class="form-label" for="password">Password</label>
-          <input class="form-control" id="password" name="password" type="password" autocomplete="current-password" required>
-        </div>
-        <div class="d-flex justify-content-between align-items-center">
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" id="remember" name="remember">
-            <label class="form-check-label" for="remember">Remember me</label>
-          </div>
-          <a class="auth-link" href="{{ url_for('web.forgot_password') }}">Forgot password?</a>
-        </div>
-        <button class="btn btn-primary w-100" type="submit"><i class="bi bi-box-arrow-in-right"></i> Sign in</button>
-        {% if google_oauth_configured %}
-        <a class="btn btn-outline-secondary w-100" href="{{ url_for('web.google_auth') }}"><i class="bi bi-google"></i> Continue with Google</a>
-        {% endif %}
-      </form>
-      {% endif %}
     </section>
   </main>
+
+  <footer class="auth-footer">
+    <div class="auth-footer-brand"><span class="auth-logo-mark small"><i class="bi bi-shield-lock-fill"></i></span><span><strong>CyberInvestigator</strong><small>AI-powered digital investigation</small></span></div>
+    <p>Designed for evidence integrity, operational clarity, and defensible outcomes.</p>
+    <div><span><i class="bi bi-circle-fill"></i> Access portal ready</span><span>CyberInvestigator</span></div>
+  </footer>
+  <script src="{{ url_for('static', filename='js/login.js') }}" defer></script>
 </body>
 </html>

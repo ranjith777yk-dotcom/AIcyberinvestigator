@@ -1,48 +1,69 @@
 {% extends "base.html" %}
+{% block page_styles %}<link href="{{ url_for('static', filename='css/ai_investigation.css') }}" rel="stylesheet">{% endblock %}
 {% block content %}
-<div data-module="ai-chat">
+<div class="ai-engine" data-module="ai-chat">
   <div class="page-heading">
     <div>
-      <p class="eyebrow">AI assistance</p>
-      <h2>Investigation chat</h2>
-      <p class="text-muted mb-0">Chat naturally, ask cybersecurity questions, or bring in case context when the investigation needs it.</p>
+      <p class="eyebrow">Evidence-grounded assistance</p>
+      <h2>AI Investigation Engine</h2>
+      <p class="text-muted mb-0">Explore recorded evidence, test hypotheses, and identify the next defensible investigative step.</p>
     </div>
+    <span class="ai-provider-pill" id="ai-provider-status"><span></span>Checking provider</span>
   </div>
 
-  <div class="chat-layout ai-chat-layout">
-    <aside class="surface-card chat-sidebar">
-      <div class="card-head"><div><h3>Context</h3><p>Case-scoped session</p></div><button class="btn btn-sm btn-outline-secondary" type="button" data-ui-action="conversation"><i class="bi bi-plus-lg"></i></button></div>
+  <section class="surface-card ai-engine-summary" aria-labelledby="ai-summary-title">
+    <div><p class="eyebrow">Active context</p><h3 id="ai-summary-title">No investigation selected</h3><p id="ai-summary-copy">Select an investigation to ground responses in its recorded evidence.</p></div>
+    <dl class="ai-context-metrics">
+      <div><dt>Evidence</dt><dd id="ai-count-evidence">—</dd></div>
+      <div><dt>Timeline</dt><dd id="ai-count-timeline">—</dd></div>
+      <div><dt>Reports</dt><dd id="ai-count-reports">—</dd></div>
+      <div><dt>Source coverage</dt><dd id="ai-confidence-level">Insufficient</dd></div>
+    </dl>
+  </section>
+
+  <div class="ai-engine-grid">
+    <article class="surface-card chat-panel ai-chat-panel">
+      <div class="chat-messages" id="chat-messages" aria-live="polite">
+        <div class="chat-empty"><span class="ai-orb"><i class="bi bi-stars"></i></span><h3>Begin an evidence-grounded conversation</h3><p>Select an investigation, then ask for a summary, evidence comparison, hypothesis review, or next-step recommendation.</p></div>
+      </div>
+      <form class="chat-composer" id="ai-chat-form">
+        <button class="btn btn-icon" type="button" data-ui-action="attachment" aria-label="Attach evidence"><i class="bi bi-paperclip"></i></button>
+        <label class="visually-hidden" for="chat-message">Investigation question</label>
+        <textarea id="chat-message" class="form-control" rows="1" placeholder="Ask about recorded findings, gaps, or next steps…"></textarea>
+        <button class="btn btn-outline-danger d-none" id="stop-generation" type="button" aria-label="Stop generation"><i class="bi bi-stop-fill"></i></button>
+        <button class="btn btn-primary" type="submit" aria-label="Send message"><i class="bi bi-arrow-up"></i></button>
+      </form>
+      <p class="ai-caution"><i class="bi bi-shield-check"></i> AI output supports analysis; validate conclusions against original evidence.</p>
+    </article>
+
+    <section class="surface-card ai-suggestions" aria-labelledby="suggestions-title">
+      <div class="card-head"><div><h3 id="suggestions-title">Suggested questions</h3><p>Prompts that preserve investigative discipline</p></div></div>
+      <div class="quick-actions mt-3">
+        <button class="quick-action" type="button" data-chat-prompt="Summarize the recorded facts, clearly separate hypotheses, cite supporting evidence, and identify investigation gaps."><i class="bi bi-card-checklist"></i><span>Grounded summary</span></button>
+        <button class="quick-action" type="button" data-chat-prompt="List the recorded indicators and explain how each can be validated without claiming unrecorded threat intelligence."><i class="bi bi-bullseye"></i><span>Validate indicators</span></button>
+        <button class="quick-action" type="button" data-chat-prompt="Map only supported findings to MITRE ATT&CK, cite the source records, and mark uncertain mappings as hypotheses."><i class="bi bi-diagram-3"></i><span>ATT&CK mapping</span></button>
+        <button class="quick-action" type="button" data-chat-prompt="Recommend the next evidence collection and analysis steps based on the current investigation gaps."><i class="bi bi-signpost-split"></i><span>Next steps</span></button>
+      </div>
+    </section>
+
+    <aside class="surface-card chat-sidebar ai-context-panel">
+      <div class="card-head"><div><h3>Investigation context</h3><p>Access-controlled source records</p></div><button class="btn btn-sm btn-outline-secondary" type="button" data-ui-action="conversation" aria-label="Start new conversation"><i class="bi bi-plus-lg"></i></button></div>
       <label class="form-label mt-3" for="chat-case">Current case</label>
       <select class="form-select" id="chat-case"></select>
       <div class="upload-zone chat-drop-zone mt-3" id="chat-drop-zone">
         <i class="bi bi-cloud-arrow-up"></i>
-        <div><strong>Drop evidence</strong><small>Files are registered as evidence, hashed, analyzed, and added to chat context.</small></div>
+        <div><strong>Add evidence to context</strong><small>Uploads follow the existing evidence validation and preservation workflow.</small></div>
         <input id="chat-files" type="file" multiple hidden>
       </div>
       <div class="compact-list mt-3" id="chat-upload-list"></div>
+      <div class="ai-source-panel mt-3">
+        <div class="d-flex justify-content-between"><strong>Supporting records</strong><span id="ai-source-count">0</span></div>
+        <div id="ai-source-list"><p>No source records loaded.</p></div>
+      </div>
       <label class="form-label mt-3" for="conversation-search">Recent conversations</label>
       <input class="form-control form-control-sm" id="conversation-search" type="search" placeholder="Search conversations">
       <div class="compact-list mt-2 conversation-list" id="conversation-list"><div class="skeleton skeleton-line"></div></div>
-      <div class="quick-actions mt-3">
-        <button class="quick-action" type="button" data-chat-prompt="Summarize the current investigation with evidence, timeline, threat score, recommendations, and gaps."><i class="bi bi-card-checklist"></i><span>Summary</span></button>
-        <button class="quick-action" type="button" data-chat-prompt="Explain the most important IOCs and how to validate them safely."><i class="bi bi-bullseye"></i><span>IOCs</span></button>
-        <button class="quick-action" type="button" data-chat-prompt="Map the current findings to MITRE ATT&CK techniques and explain the rationale."><i class="bi bi-diagram-3"></i><span>MITRE</span></button>
-        <button class="quick-action" type="button" data-chat-prompt="Generate a forensic report draft for the current evidence and timeline."><i class="bi bi-file-earmark-text"></i><span>Report</span></button>
-      </div>
     </aside>
-
-    <article class="surface-card chat-panel ai-chat-panel">
-      <div class="chat-messages" id="chat-messages">
-        <div class="chat-empty"><span class="ai-orb"><i class="bi bi-stars"></i></span><h3>Start a conversation</h3><p>Say hello, ask a cybersecurity question, or request help with evidence, timelines, IOCs, MITRE ATT&CK, and reports.</p></div>
-      </div>
-      <form class="chat-composer" id="ai-chat-form">
-        <button class="btn btn-icon" type="button" data-ui-action="attachment" aria-label="Attach evidence"><i class="bi bi-paperclip"></i></button>
-        <label class="visually-hidden" for="chat-message">Message</label>
-        <textarea id="chat-message" class="form-control" rows="1" placeholder="Message AI Cyber Investigator..."></textarea>
-        <button class="btn btn-outline-danger d-none" id="stop-generation" type="button" aria-label="Stop generation"><i class="bi bi-stop-fill"></i></button>
-        <button class="btn btn-primary" type="submit" aria-label="Send message"><i class="bi bi-arrow-up"></i></button>
-      </form>
-    </article>
   </div>
 </div>
 {% endblock %}

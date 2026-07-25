@@ -1,0 +1,109 @@
+{
+  "case": {
+    "id": "e65c1027-3285-4172-b876-72a0515c45f6",
+    "case_number": "CASE-API-1",
+    "title": "API Workflow",
+    "description": "Integrated workflow smoke test",
+    "severity": "high",
+    "opened_at": "2026-07-19T06:27:38.617896",
+    "closed_at": null,
+    "archived_at": null,
+    "deleted_at": null,
+    "status": "active"
+  },
+  "report": {
+    "id": "366bda79-a7f8-4e7a-b4b6-77caeac10414",
+    "case_id": "e65c1027-3285-4172-b876-72a0515c45f6",
+    "report_type": "technical",
+    "version": 1,
+    "title": "Technical Report",
+    "storage_path": "e65c1027-3285-4172-b876-72a0515c45f6\\technical-v1.json",
+    "generated_at": "2026-07-19T06:27:38.663448"
+  },
+  "ai_summary": {
+    "available": false,
+    "provider": {
+      "provider": "openai",
+      "available": false,
+      "configured": true,
+      "model": "gpt-4.1-mini",
+      "message": "AI is disabled by configuration; using local fallback."
+    },
+    "content": "OpenAI is not configured. Local deterministic analysis is available and the workflow can continue."
+  },
+  "context": {
+    "case_id": "e65c1027-3285-4172-b876-72a0515c45f6",
+    "case_number": "CASE-API-1",
+    "case": {
+      "id": "e65c1027-3285-4172-b876-72a0515c45f6",
+      "case_number": "CASE-API-1",
+      "title": "API Workflow",
+      "description": "Integrated workflow smoke test",
+      "severity": "high",
+      "opened_at": "2026-07-19T06:27:38.617896",
+      "closed_at": null,
+      "archived_at": null,
+      "deleted_at": null,
+      "status": "active"
+    },
+    "evidence": [
+      {
+        "id": "34fa1502-3688-41a8-9e69-7b0c7c303888",
+        "case_id": "e65c1027-3285-4172-b876-72a0515c45f6",
+        "evidence_number": "EV-API-1",
+        "original_filename": "artifact.txt",
+        "storage_path": "e65c1027-3285-4172-b876-72a0515c45f6\\97cb31f21747419292dd6d8add54af42.txt",
+        "media_type": "text/plain",
+        "size_bytes": 16,
+        "sha256": "40c0b16b730cf331485f8df1ebd9e3c600a768c5498cdccfb64ecb2b760b5938",
+        "source_description": "Collected during workflow test",
+        "acquired_at": "2026-07-19T06:27:38.641499",
+        "deleted_at": null
+      }
+    ],
+    "timeline": [
+      {
+        "id": "8741edfd-39bb-43f3-8605-5bb63effa474",
+        "case_id": "e65c1027-3285-4172-b876-72a0515c45f6",
+        "evidence_id": null,
+        "artifact_id": null,
+        "occurred_at": "2026-07-19T06:27:38.651813",
+        "event_type": "observation.manual",
+        "summary": "Manual analyst observation",
+        "details": "Observation is linked to the same case."
+      },
+      {
+        "id": "fc07e733-3c26-4c2d-bea3-280f530fb13e",
+        "case_id": "e65c1027-3285-4172-b876-72a0515c45f6",
+        "evidence_id": "34fa1502-3688-41a8-9e69-7b0c7c303888",
+        "artifact_id": null,
+        "occurred_at": "2026-07-19T06:27:38.646137",
+        "event_type": "evidence.added",
+        "summary": "Evidence EV-API-1 added",
+        "details": "artifact.txt"
+      },
+      {
+        "id": "6760d73f-fa60-4d13-b9ce-17d3488fe1e9",
+        "case_id": "e65c1027-3285-4172-b876-72a0515c45f6",
+        "evidence_id": null,
+        "artifact_id": null,
+        "occurred_at": "2026-07-19T06:27:38.621011",
+        "event_type": "case.created",
+        "summary": "Case CASE-API-1 created",
+        "details": "API Workflow"
+      }
+    ],
+    "reports": [
+      {
+        "id": "366bda79-a7f8-4e7a-b4b6-77caeac10414",
+        "case_id": "e65c1027-3285-4172-b876-72a0515c45f6",
+        "report_type": "technical",
+        "version": 1,
+        "title": "Technical Report",
+        "storage_path": "e65c1027-3285-4172-b876-72a0515c45f6\\technical-v1.json",
+        "generated_at": "2026-07-19T06:27:38.663448"
+      }
+    ],
+    "plugins": []
+  }
+}

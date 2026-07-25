@@ -1,0 +1,379 @@
+{
+  "title": "CASE-API-1 Technical Report",
+  "report_type": "technical",
+  "generated_at": "2026-07-25T18:35:04.071684+00:00",
+  "executive_summary": "CASE-API-1 contains 1 evidence item(s), 3 timeline event(s), and a threat score of 35/100.",
+  "investigation_summary": {
+    "case_id": "3a1cf60d-75e3-40a5-9520-b40bbb37ca48",
+    "case_number": "CASE-API-1",
+    "case": {
+      "id": "3a1cf60d-75e3-40a5-9520-b40bbb37ca48",
+      "case_number": "CASE-API-1",
+      "title": "API Workflow",
+      "description": "Integrated workflow smoke test",
+      "severity": "high",
+      "priority": "medium",
+      "owner": null,
+      "owner_user_id": null,
+      "created_by": null,
+      "created_at": "2026-07-25T18:35:03.963916",
+      "updated_at": "2026-07-25T18:35:03.966908",
+      "tags": [],
+      "notes": [],
+      "relationships": [],
+      "review_status": "pending",
+      "reviewer_user_id": null,
+      "investigation_notes": null,
+      "attachments": [
+        {
+          "id": "8da6667b-9814-4edf-8159-eb035bd55210",
+          "case_id": "3a1cf60d-75e3-40a5-9520-b40bbb37ca48",
+          "owner_user_id": null,
+          "created_by": null,
+          "created_at": "2026-07-25T18:35:03.993926",
+          "updated_at": "2026-07-25T18:35:04.033177",
+          "status": "active",
+          "evidence_number": "EV-API-1",
+          "original_filename": "artifact.txt",
+          "storage_path": "3a1cf60d-75e3-40a5-9520-b40bbb37ca48\\10b51f0695dd4fe59ad6cf8c956b1693.txt",
+          "media_type": "text/plain",
+          "size_bytes": 16,
+          "sha256": "40c0b16b730cf331485f8df1ebd9e3c600a768c5498cdccfb64ecb2b760b5938",
+          "source_description": "Collected during workflow test",
+          "analysis_status": "pending",
+          "analysis_summary": null,
+          "analysis_report": null,
+          "acquired_at": "2026-07-25T18:35:03.993884",
+          "deleted_at": null
+        }
+      ],
+      "history": [
+        {
+          "id": "a901d5c1-7573-41b7-924f-5e26086ffeeb",
+          "case_id": "3a1cf60d-75e3-40a5-9520-b40bbb37ca48",
+          "owner_user_id": null,
+          "created_by": null,
+          "created_at": "2026-07-25T18:35:04.028339",
+          "updated_at": "2026-07-25T18:35:04.035905",
+          "status": "active",
+          "case_number": "CASE-API-1",
+          "evidence_id": null,
+          "evidence_number": null,
+          "artifact_id": null,
+          "occurred_at": "2026-07-25T18:35:04.026749",
+          "event_type": "observation.manual",
+          "group": "observation",
+          "threat_weight": 10,
+          "threat_level": "medium",
+          "summary": "Manual analyst observation",
+          "details": "Observation is linked to the same case."
+        },
+        {
+          "id": "e81c9cce-6b0b-41b8-82ce-8f7e07e3cd7f",
+          "case_id": "3a1cf60d-75e3-40a5-9520-b40bbb37ca48",
+          "owner_user_id": null,
+          "created_by": null,
+          "created_at": "2026-07-25T18:35:04.002847",
+          "updated_at": "2026-07-25T18:35:04.035880",
+          "status": "active",
+          "case_number": "CASE-API-1",
+          "evidence_id": "8da6667b-9814-4edf-8159-eb035bd55210",
+          "evidence_number": "EV-API-1",
+          "artifact_id": null,
+          "occurred_at": "2026-07-25T18:35:04.001734",
+          "event_type": "evidence.added",
+          "group": "evidence",
+          "threat_weight": 15,
+          "threat_level": "high",
+          "summary": "Evidence EV-API-1 added",
+          "details": "artifact.txt"
+        },
+        {
+          "id": "106e25ac-4533-46d9-b48a-6bc5e7bbce07",
+          "case_id": "3a1cf60d-75e3-40a5-9520-b40bbb37ca48",
+          "owner_user_id": null,
+          "created_by": null,
+          "created_at": "2026-07-25T18:35:03.969175",
+          "updated_at": "2026-07-25T18:35:04.035840",
+          "status": "active",
+          "case_number": "CASE-API-1",
+          "evidence_id": null,
+          "evidence_number": null,
+          "artifact_id": null,
+          "occurred_at": "2026-07-25T18:35:03.968421",
+          "event_type": "case.created",
+          "group": "case",
+          "threat_weight": 6,
+          "threat_level": "low",
+          "summary": "Case CASE-API-1 created",
+          "details": "API Workflow"
+        }
+      ],
+      "opened_at": "2026-07-25T18:35:03.963907",
+      "closed_at": null,
+      "archived_at": null,
+      "deleted_at": null,
+      "status": "active"
+    },
+    "evidence": [
+      {
+        "id": "8da6667b-9814-4edf-8159-eb035bd55210",
+        "case_id": "3a1cf60d-75e3-40a5-9520-b40bbb37ca48",
+        "owner_user_id": null,
+        "created_by": null,
+        "created_at": "2026-07-25T18:35:03.993926",
+        "updated_at": "2026-07-25T18:35:04.033177",
+        "status": "active",
+        "evidence_number": "EV-API-1",
+        "original_filename": "artifact.txt",
+        "storage_path": "3a1cf60d-75e3-40a5-9520-b40bbb37ca48\\10b51f0695dd4fe59ad6cf8c956b1693.txt",
+        "media_type": "text/plain",
+        "size_bytes": 16,
+        "sha256": "40c0b16b730cf331485f8df1ebd9e3c600a768c5498cdccfb64ecb2b760b5938",
+        "source_description": "Collected during workflow test",
+        "analysis_status": "pending",
+        "analysis_summary": null,
+        "analysis_report": null,
+        "acquired_at": "2026-07-25T18:35:03.993884",
+        "deleted_at": null
+      }
+    ],
+    "timeline": [
+      {
+        "id": "a901d5c1-7573-41b7-924f-5e26086ffeeb",
+        "case_id": "3a1cf60d-75e3-40a5-9520-b40bbb37ca48",
+        "owner_user_id": null,
+        "created_by": null,
+        "created_at": "2026-07-25T18:35:04.028339",
+        "updated_at": "2026-07-25T18:35:04.035905",
+        "status": "active",
+        "case_number": "CASE-API-1",
+        "evidence_id": null,
+        "evidence_number": null,
+        "artifact_id": null,
+        "occurred_at": "2026-07-25T18:35:04.026749",
+        "event_type": "observation.manual",
+        "group": "observation",
+        "threat_weight": 10,
+        "threat_level": "medium",
+        "summary": "Manual analyst observation",
+        "details": "Observation is linked to the same case."
+      },
+      {
+        "id": "e81c9cce-6b0b-41b8-82ce-8f7e07e3cd7f",
+        "case_id": "3a1cf60d-75e3-40a5-9520-b40bbb37ca48",
+        "owner_user_id": null,
+        "created_by": null,
+        "created_at": "2026-07-25T18:35:04.002847",
+        "updated_at": "2026-07-25T18:35:04.035880",
+        "status": "active",
+        "case_number": "CASE-API-1",
+        "evidence_id": "8da6667b-9814-4edf-8159-eb035bd55210",
+        "evidence_number": "EV-API-1",
+        "artifact_id": null,
+        "occurred_at": "2026-07-25T18:35:04.001734",
+        "event_type": "evidence.added",
+        "group": "evidence",
+        "threat_weight": 15,
+        "threat_level": "high",
+        "summary": "Evidence EV-API-1 added",
+        "details": "artifact.txt"
+      },
+      {
+        "id": "106e25ac-4533-46d9-b48a-6bc5e7bbce07",
+        "case_id": "3a1cf60d-75e3-40a5-9520-b40bbb37ca48",
+        "owner_user_id": null,
+        "created_by": null,
+        "created_at": "2026-07-25T18:35:03.969175",
+        "updated_at": "2026-07-25T18:35:04.035840",
+        "status": "active",
+        "case_number": "CASE-API-1",
+        "evidence_id": null,
+        "evidence_number": null,
+        "artifact_id": null,
+        "occurred_at": "2026-07-25T18:35:03.968421",
+        "event_type": "case.created",
+        "group": "case",
+        "threat_weight": 6,
+        "threat_level": "low",
+        "summary": "Case CASE-API-1 created",
+        "details": "API Workflow"
+      }
+    ],
+    "reports": [
+      {
+        "id": "7fe11489-67d4-4859-8f59-12b1fb9dca29",
+        "case_id": "3a1cf60d-75e3-40a5-9520-b40bbb37ca48",
+        "owner_user_id": null,
+        "created_by": null,
+        "created_at": "2026-07-25T18:35:04.057412",
+        "updated_at": "2026-07-25T18:35:04.057385",
+        "status": "generating",
+        "report_type": "technical",
+        "version": 1,
+        "title": "Technical Report",
+        "storage_path": "3a1cf60d-75e3-40a5-9520-b40bbb37ca48\\technical-v1.json",
+        "generated_at": "2026-07-25T18:35:04.057391"
+      }
+    ],
+    "plugins": []
+  },
+  "evidence": [
+    {
+      "id": "8da6667b-9814-4edf-8159-eb035bd55210",
+      "case_id": "3a1cf60d-75e3-40a5-9520-b40bbb37ca48",
+      "owner_user_id": null,
+      "created_by": null,
+      "created_at": "2026-07-25T18:35:03.993926",
+      "updated_at": "2026-07-25T18:35:04.033177",
+      "status": "active",
+      "evidence_number": "EV-API-1",
+      "original_filename": "artifact.txt",
+      "storage_path": "3a1cf60d-75e3-40a5-9520-b40bbb37ca48\\10b51f0695dd4fe59ad6cf8c956b1693.txt",
+      "media_type": "text/plain",
+      "size_bytes": 16,
+      "sha256": "40c0b16b730cf331485f8df1ebd9e3c600a768c5498cdccfb64ecb2b760b5938",
+      "source_description": "Collected during workflow test",
+      "analysis_status": "pending",
+      "analysis_summary": null,
+      "analysis_report": null,
+      "acquired_at": "2026-07-25T18:35:03.993884",
+      "deleted_at": null
+    }
+  ],
+  "timeline": [
+    {
+      "id": "a901d5c1-7573-41b7-924f-5e26086ffeeb",
+      "case_id": "3a1cf60d-75e3-40a5-9520-b40bbb37ca48",
+      "owner_user_id": null,
+      "created_by": null,
+      "created_at": "2026-07-25T18:35:04.028339",
+      "updated_at": "2026-07-25T18:35:04.035905",
+      "status": "active",
+      "case_number": "CASE-API-1",
+      "evidence_id": null,
+      "evidence_number": null,
+      "artifact_id": null,
+      "occurred_at": "2026-07-25T18:35:04.026749",
+      "event_type": "observation.manual",
+      "group": "observation",
+      "threat_weight": 10,
+      "threat_level": "medium",
+      "summary": "Manual analyst observation",
+      "details": "Observation is linked to the same case."
+    },
+    {
+      "id": "e81c9cce-6b0b-41b8-82ce-8f7e07e3cd7f",
+      "case_id": "3a1cf60d-75e3-40a5-9520-b40bbb37ca48",
+      "owner_user_id": null,
+      "created_by": null,
+      "created_at": "2026-07-25T18:35:04.002847",
+      "updated_at": "2026-07-25T18:35:04.035880",
+      "status": "active",
+      "case_number": "CASE-API-1",
+      "evidence_id": "8da6667b-9814-4edf-8159-eb035bd55210",
+      "evidence_number": "EV-API-1",
+      "artifact_id": null,
+      "occurred_at": "2026-07-25T18:35:04.001734",
+      "event_type": "evidence.added",
+      "group": "evidence",
+      "threat_weight": 15,
+      "threat_level": "high",
+      "summary": "Evidence EV-API-1 added",
+      "details": "artifact.txt"
+    },
+    {
+      "id": "106e25ac-4533-46d9-b48a-6bc5e7bbce07",
+      "case_id": "3a1cf60d-75e3-40a5-9520-b40bbb37ca48",
+      "owner_user_id": null,
+      "created_by": null,
+      "created_at": "2026-07-25T18:35:03.969175",
+      "updated_at": "2026-07-25T18:35:04.035840",
+      "status": "active",
+      "case_number": "CASE-API-1",
+      "evidence_id": null,
+      "evidence_number": null,
+      "artifact_id": null,
+      "occurred_at": "2026-07-25T18:35:03.968421",
+      "event_type": "case.created",
+      "group": "case",
+      "threat_weight": 6,
+      "threat_level": "low",
+      "summary": "Case CASE-API-1 created",
+      "details": "API Workflow"
+    }
+  ],
+  "threat_score": 35,
+  "iocs": [],
+  "mitre_attack": [
+    {
+      "technique_id": "Triage",
+      "technique_name": "No direct ATT&CK mapping detected",
+      "tactic": "Analysis"
+    }
+  ],
+  "ai_explanation": {
+    "available": false,
+    "provider": {
+      "provider": "ollama",
+      "available": false,
+      "configured": true,
+      "model": "qwen3:8b",
+      "message": "Ollama is running and ready.",
+      "endpoint": "http://localhost:11434",
+      "installed_models": [
+        "qwen3:8b"
+      ]
+    },
+    "content": "No AI provider available. Local deterministic analysis is available and the workflow can continue."
+  },
+  "recommendations": [
+    "Preserve original evidence and verify SHA-256 before every transfer.",
+    "Review timeline gaps and correlate suspicious events with source evidence.",
+    "Escalate high-entropy, embedded-content, or flag-bearing artifacts for deeper manual review."
+  ],
+  "appendix": {
+    "chain_of_custody": "Evidence hashes, acquisition timestamps, and analysis reports are retained in the evidence records.",
+    "plugins": []
+  },
+  "charts": {
+    "threat_score": 35,
+    "timeline_by_group": {
+      "case": 1,
+      "evidence": 1,
+      "observation": 1
+    },
+    "evidence_by_type": {
+      "text/plain": 1
+    }
+  },
+  "report": {
+    "id": "7fe11489-67d4-4859-8f59-12b1fb9dca29",
+    "case_id": "3a1cf60d-75e3-40a5-9520-b40bbb37ca48",
+    "owner_user_id": null,
+    "created_by": null,
+    "created_at": "2026-07-25T18:35:04.057412",
+    "updated_at": "2026-07-25T18:35:04.057385",
+    "status": "generating",
+    "report_type": "technical",
+    "version": 1,
+    "title": "Technical Report",
+    "storage_path": "3a1cf60d-75e3-40a5-9520-b40bbb37ca48\\technical-v1.json",
+    "generated_at": "2026-07-25T18:35:04.057391"
+  },
+  "ai_summary": {
+    "available": false,
+    "provider": {
+      "provider": "ollama",
+      "available": false,
+      "configured": true,
+      "model": "qwen3:8b",
+      "message": "Ollama is running and ready.",
+      "endpoint": "http://localhost:11434",
+      "installed_models": [
+        "qwen3:8b"
+      ]
+    },
+    "content": "No AI provider available. Local deterministic analysis is available and the workflow can continue."
+  }
+}

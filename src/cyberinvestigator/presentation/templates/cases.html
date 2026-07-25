@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
+<link href="{{ url_for('static', filename='css/investigation_workspace.css') }}" rel="stylesheet">
 <div data-module="cases">
   <div class="page-heading">
     <div>
@@ -35,9 +36,86 @@
     </div>
   </article>
 
-  <article class="surface-card mt-4 case-detail-panel">
-    <div class="card-head"><div><h3>Case details</h3><p>History, notes, relationships, and attachments for the selected case.</p></div><span class="badge text-bg-light" id="case-detail-status">No selection</span></div>
-    <div id="case-detail" class="empty-state compact"><i class="bi bi-kanban"></i><h3>Select a case</h3><p>Use Details on any row to inspect notes, history, relationships, and evidence attachments.</p></div>
+  <article class="surface-card mt-4 investigation-workspace" aria-labelledby="workspace-title">
+    <div id="case-detail" class="empty-state compact investigation-workspace-empty">
+      <i class="bi bi-kanban"></i>
+      <h3>Select an investigation</h3>
+      <p>Open a case from the table to review its evidence, findings, timeline, reports, notes, and lifecycle context.</p>
+    </div>
+    <div id="investigation-workspace-content" class="d-none">
+      <header class="investigation-header">
+        <div class="investigation-identity">
+          <div class="investigation-kicker"><span id="workspace-case-number">Case</span><span id="case-detail-status" class="workspace-status">Active</span></div>
+          <h3 id="workspace-title">Investigation workspace</h3>
+          <p id="workspace-description">Case context</p>
+          <div class="investigation-meta" id="workspace-meta"></div>
+        </div>
+        <div class="investigation-header-actions">
+          <button class="btn btn-outline-secondary" type="button" id="workspace-edit"><i class="bi bi-pencil"></i> Edit investigation</button>
+          {% if can('ai.chat') %}<a class="btn btn-primary" href="{{ url_for('web.ai_chat') }}"><i class="bi bi-stars"></i> Continue with AI</a>{% endif %}
+        </div>
+      </header>
+
+      <nav class="investigation-tabs" aria-label="Investigation workspace sections" role="tablist">
+        <button type="button" class="active" role="tab" data-workspace-tab="overview" aria-selected="true">Overview</button>
+        <button type="button" role="tab" data-workspace-tab="evidence" aria-selected="false">Evidence <span data-workspace-count="evidence">0</span></button>
+        <button type="button" role="tab" data-workspace-tab="ai" aria-selected="false">AI Summary <span data-workspace-count="ai_findings">0</span></button>
+        <button type="button" role="tab" data-workspace-tab="timeline" aria-selected="false">Timeline <span data-workspace-count="timeline">0</span></button>
+        <button type="button" role="tab" data-workspace-tab="reports" aria-selected="false">Reports <span data-workspace-count="reports">0</span></button>
+        <button type="button" role="tab" data-workspace-tab="activity" aria-selected="false">Activity</button>
+        <button type="button" role="tab" data-workspace-tab="settings" aria-selected="false">Settings</button>
+      </nav>
+
+      <div class="investigation-sections">
+        <section class="investigation-section active" data-workspace-section="overview" aria-labelledby="workspace-overview-title">
+          <div class="workspace-section-head"><div><p>Executive overview</p><h4 id="workspace-overview-title">Investigation posture</h4></div><span>Persisted case data</span></div>
+          <div class="workspace-kpis" id="workspace-kpis"></div>
+          <div class="workspace-quick-actions" aria-label="Investigation quick actions">
+            <button type="button" data-workspace-edit-shortcut><i class="bi bi-pencil"></i><span><strong>Edit</strong><small>Update case context</small></span></button>
+            {% if can('evidence.read') %}<a href="{{ url_for('web.evidence') }}" data-workspace-route="evidence"><i class="bi bi-fingerprint"></i><span><strong>Evidence</strong><small>Open case artifacts</small></span></a>{% endif %}
+            {% if can('timeline.read') %}<a href="{{ url_for('web.timeline') }}" data-workspace-route="timeline"><i class="bi bi-clock-history"></i><span><strong>Timeline</strong><small>Review activity</small></span></a>{% endif %}
+            {% if can('reports.read') %}<a href="{{ url_for('web.reports') }}" data-workspace-route="reports"><i class="bi bi-file-earmark-text"></i><span><strong>Reports</strong><small>Open deliverables</small></span></a>{% endif %}
+            {% if can('ai.chat') %}<a href="{{ url_for('web.ai_chat') }}" data-workspace-route="ai-chat"><i class="bi bi-stars"></i><span><strong>Ask AI</strong><small>Continue analysis</small></span></a>{% endif %}
+          </div>
+          <div class="workspace-overview-grid">
+            <article><h5>Scope and objective</h5><p id="workspace-scope"></p></article>
+            <article><h5>Threat signals</h5><div id="workspace-threats"></div></article>
+            <article class="workspace-notes"><h5>Structured notes</h5><div id="workspace-notes"></div></article>
+            <article><h5>Relationships</h5><div id="workspace-relationships"></div></article>
+          </div>
+        </section>
+
+        <section class="investigation-section" data-workspace-section="evidence" aria-labelledby="workspace-evidence-title">
+          <div class="workspace-section-head"><div><p>Evidence summary</p><h4 id="workspace-evidence-title">Case-linked artifacts</h4></div><a href="{{ url_for('web.evidence') }}">Open repository <i class="bi bi-arrow-right"></i></a></div>
+          <div class="workspace-list" id="workspace-evidence"></div>
+        </section>
+
+        <section class="investigation-section" data-workspace-section="ai" aria-labelledby="workspace-ai-title">
+          <div class="workspace-section-head"><div><p>AI investigation summary</p><h4 id="workspace-ai-title">Recorded findings and recommendations</h4></div><a href="{{ url_for('web.ai_chat') }}">Open AI workspace <i class="bi bi-arrow-right"></i></a></div>
+          <div class="workspace-list" id="workspace-ai"></div>
+        </section>
+
+        <section class="investigation-section" data-workspace-section="timeline" aria-labelledby="workspace-timeline-title">
+          <div class="workspace-section-head"><div><p>Timeline preview</p><h4 id="workspace-timeline-title">Chronological investigation events</h4></div><a href="{{ url_for('web.timeline') }}">Open timeline <i class="bi bi-arrow-right"></i></a></div>
+          <div class="workspace-list workspace-timeline" id="workspace-timeline"></div>
+        </section>
+
+        <section class="investigation-section" data-workspace-section="reports" aria-labelledby="workspace-reports-title">
+          <div class="workspace-section-head"><div><p>Investigation reports</p><h4 id="workspace-reports-title">Case deliverables</h4></div><a href="{{ url_for('web.reports') }}">Open reports <i class="bi bi-arrow-right"></i></a></div>
+          <div class="workspace-list" id="workspace-reports"></div>
+        </section>
+
+        <section class="investigation-section" data-workspace-section="activity" aria-labelledby="workspace-activity-title">
+          <div class="workspace-section-head"><div><p>Activity</p><h4 id="workspace-activity-title">Recorded case history</h4></div><span>Newest first</span></div>
+          <div class="workspace-list workspace-timeline" id="workspace-activity"></div>
+        </section>
+
+        <section class="investigation-section" data-workspace-section="settings" aria-labelledby="workspace-settings-title">
+          <div class="workspace-section-head"><div><p>Investigation settings</p><h4 id="workspace-settings-title">Ownership and lifecycle</h4></div><span>Access remains role-controlled</span></div>
+          <div class="workspace-settings-grid" id="workspace-settings"></div>
+        </section>
+      </div>
+    </div>
   </article>
 
   <div class="modal fade" id="case-modal" tabindex="-1" aria-hidden="true">
@@ -54,7 +132,7 @@
             <div class="col-md-4"><label class="form-label" for="case-owner">Owner</label><input class="form-control" id="case-owner" maxlength="255" placeholder="Investigator"></div>
             <div class="col-12"><label class="form-label" for="case-tags">Tags</label><input class="form-control" id="case-tags" placeholder="phishing, endpoint, ctf"></div>
             <div class="col-12"><label class="form-label" for="case-description">Description</label><textarea class="form-control" id="case-description" rows="3"></textarea></div>
-            <div class="col-md-6"><label class="form-label" for="case-notes">Notes</label><textarea class="form-control" id="case-notes" rows="4"></textarea></div>
+            <div class="col-md-6"><label class="form-label" for="case-notes">Structured notes</label><textarea class="form-control" id="case-notes" rows="4" placeholder="One finding, decision, or follow-up per line" aria-describedby="case-notes-help"></textarea><div class="form-text" id="case-notes-help">Each non-empty line becomes a separate investigation note.</div></div>
             <div class="col-md-6"><label class="form-label" for="case-relationships">Relationships</label><textarea class="form-control" id="case-relationships" rows="4" placeholder="Linked cases, assets, people, systems"></textarea></div>
           </div>
         </div>

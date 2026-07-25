@@ -1,0 +1,282 @@
+/*
+ * CyberInvestigator Responsive Framework
+ *
+ * Viewport tiers:
+ * mobile  < 576px
+ * tablet  576px–991px
+ * laptop  992px–1399px
+ * desktop >= 1400px
+ *
+ * Public API: .ci-r-* classes and --ci-viewport-* tokens.
+ */
+:root {
+  --ci-viewport-mobile: 575.98px;
+  --ci-viewport-tablet: 991.98px;
+  --ci-viewport-laptop: 1399.98px;
+  --ci-page-gutter: clamp(1rem, 2.4vw, 2.35rem);
+  --ci-section-gap: clamp(1rem, 1.5vw, 1.5rem);
+  --ci-readable-width: 72ch;
+  --ci-report-width: 960px;
+}
+
+/* Reusable adaptive layout primitives */
+.ci-r-container {
+  width: min(100%, var(--ci-content-max, 1800px));
+  margin-inline: auto;
+  padding-inline: var(--ci-page-gutter);
+}
+.ci-r-stack { display: grid; gap: var(--ci-section-gap); }
+.ci-r-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--ci-r-columns, 12), minmax(0, 1fr));
+  gap: var(--ci-section-gap);
+}
+.ci-r-auto-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--ci-r-min, 240px)), 1fr));
+  gap: var(--ci-section-gap);
+}
+.ci-r-split {
+  display: grid;
+  grid-template-columns: minmax(0, var(--ci-r-primary, 2fr)) minmax(260px, var(--ci-r-secondary, 1fr));
+  gap: var(--ci-section-gap);
+  align-items: start;
+}
+.ci-r-sidebar {
+  display: grid;
+  grid-template-columns: minmax(220px, var(--ci-r-sidebar-width, 280px)) minmax(0, 1fr);
+  gap: var(--ci-section-gap);
+  align-items: start;
+}
+.ci-r-cluster { display: flex; flex-wrap: wrap; align-items: center; gap: var(--ci-space-3, .75rem); }
+.ci-r-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+.ci-r-priority { min-width: 0; }
+.ci-r-secondary { min-width: 0; }
+.ci-r-readable { width: min(100%, var(--ci-readable-width)); }
+
+/* Existing shell adaptation */
+.page-content { padding-inline: var(--ci-page-gutter); }
+.sidebar-nav { overscroll-behavior: contain; }
+.topbar { gap: var(--ci-space-3, .75rem); }
+.breadcrumb-wrap { min-width: 0; }
+.breadcrumb-wrap h1 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.topbar-actions { min-width: 0; }
+
+/* Toolbars and forms */
+.ci-r-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ci-space-3, .75rem);
+}
+.ci-r-toolbar__primary { min-width: min(100%, 240px); flex: 1; }
+.ci-r-toolbar__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--ci-space-2, .5rem); }
+.ci-r-form-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--ci-r-form-columns, 12), minmax(0, 1fr));
+  gap: var(--ci-space-4, 1rem);
+}
+.ci-r-field-full { grid-column: 1 / -1; }
+.form-control,.form-select,.ci-input,.ci-select,.ci-textarea { max-width: 100%; }
+textarea { resize: vertical; }
+
+/* Charts retain accessible geometry without overflowing their card. */
+.soc-svg-chart,.soc-svg-chart svg,
+[data-chart] svg,.chart-container svg,.ci-chart svg {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+}
+[data-chart],.chart-container,.ci-chart { min-width: 0; max-width: 100%; overflow: hidden; }
+.ci-chart { min-height: clamp(180px, 28vw, 320px); }
+.ci-chart__scroll { overflow-x: auto; }
+.ci-chart__scroll > * { min-width: var(--ci-chart-min-width, 560px); }
+
+/* Dialogs: constrained desktop, task-focused mobile. */
+.modal-dialog { max-width: min(var(--bs-modal-width, 720px), calc(100vw - 2rem)); margin-inline: auto; }
+.modal-content { max-height: calc(100dvh - 2rem); }
+.modal-body { overflow-y: auto; overscroll-behavior: contain; }
+.modal-header,.modal-footer { flex: 0 0 auto; }
+.modal-footer { gap: var(--ci-space-2, .5rem); }
+
+/* Reports prioritize readable line length and stable print layout. */
+.ci-report,.report-shell,.report-document {
+  width: min(100%, var(--ci-report-width));
+  margin-inline: auto;
+  overflow-wrap: anywhere;
+}
+.ci-report :is(p,li),.report-shell :is(p,li),.report-document :is(p,li) {
+  max-width: var(--ci-readable-width);
+  line-height: 1.65;
+}
+.ci-report :is(pre,code),.report-shell :is(pre,code),.report-document :is(pre,code) {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Progressive table enhancement. JavaScript supplies data-label from headers. */
+.table-responsive,.ci-table-wrap {
+  max-width: 100%;
+  overscroll-behavior-inline: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.professional-table td,.ci-table td { overflow-wrap: anywhere; }
+.professional-table code,.ci-table code {
+  font-family: var(--ci-font-mono, monospace);
+  font-size: .92em;
+  word-break: break-all;
+}
+
+/* Laptop: retain capability, optimize density. */
+@media (min-width: 992px) and (max-width: 1399.98px) {
+  :root { --ci-page-gutter: 1.35rem; --ci-section-gap: 1rem; }
+  .page-content { padding-top: 1.5rem; }
+  .topbar { padding-inline: 1.35rem; }
+  .command-trigger { min-width: 185px; }
+  .ci-r-grid { --ci-r-columns: 8; }
+  .ci-r-split { --ci-r-primary: 1.65fr; --ci-r-secondary: .85fr; }
+  .soc2-kpi-grid { gap: .75rem; }
+}
+
+/* Tablet: touch-first and reduced simultaneous context. */
+@media (min-width: 576px) and (max-width: 991.98px) {
+  :root { --ci-page-gutter: 1.25rem; --ci-section-gap: 1rem; }
+  .ci-r-grid { --ci-r-columns: 6; }
+  .ci-r-split,.ci-r-sidebar { grid-template-columns: 1fr; }
+  .ci-r-toolbar { align-items: stretch; flex-direction: column; }
+  .ci-r-toolbar__actions { justify-content: flex-start; }
+  .ci-r-form-grid { --ci-r-form-columns: 6; }
+  .sidebar { width: min(320px, 86vw); }
+  .topbar { min-height: 72px; height: auto; padding-block: .65rem; }
+  .topbar-actions .security-context { display: none !important; }
+  .page-heading { align-items: flex-start; }
+  .page-heading > :last-child { flex: 0 0 auto; }
+  .modal-dialog { max-width: calc(100vw - 2rem); }
+  .modal-content { max-height: calc(100dvh - 2rem); }
+}
+
+/* Mobile: one prioritized workflow, labelled records, full-width actions. */
+@media (max-width: 575.98px) {
+  :root { --ci-page-gutter: 1rem; --ci-section-gap: .85rem; }
+  .ci-r-grid,.ci-r-split,.ci-r-sidebar,.ci-r-form-grid { grid-template-columns: minmax(0, 1fr); }
+  .ci-r-secondary[data-mobile-priority="low"] { order: 2; }
+  .ci-r-toolbar { align-items: stretch; flex-direction: column; }
+  .ci-r-toolbar__actions { display: grid; grid-template-columns: 1fr; }
+  .ci-r-toolbar__actions > :is(.btn,.ci-button) { width: 100%; min-height: var(--ci-touch-target, 44px); }
+
+  .topbar { min-height: 64px; height: auto; padding: .55rem .75rem; }
+  .topbar > .btn-icon { min-width: 42px; min-height: 42px; }
+  .breadcrumb-wrap .eyebrow { display: none; }
+  .breadcrumb-wrap h1 { max-width: 38vw; }
+  .topbar-actions { gap: .1rem; }
+  .topbar-actions .theme-control { display: none; }
+  .profile-menu { padding-inline: .15rem; }
+  .profile-menu > i { display: none; }
+  .page-content { padding-top: 1rem; padding-bottom: 5rem; }
+  .page-heading { align-items: stretch; margin-bottom: 1.1rem; }
+  .page-heading > .btn,.page-heading > :last-child:is(.btn,.ci-button) { width: 100%; min-height: 44px; }
+
+  .modal { padding: 0 !important; }
+  .modal-dialog,.modal-dialog.modal-lg,.modal-dialog.modal-xl {
+    width: 100%;
+    max-width: none;
+    min-height: 100%;
+    margin: 0;
+  }
+  .modal-content {
+    min-height: 100dvh;
+    max-height: 100dvh;
+    border: 0;
+    border-radius: 0;
+  }
+  .modal-header { padding: 1rem; }
+  .modal-body { padding: 1rem; }
+  .modal-footer { display: grid; grid-template-columns: 1fr; padding: .75rem 1rem max(.75rem, env(safe-area-inset-bottom)); }
+  .modal-footer > :is(.btn,.ci-button) { width: 100%; min-height: 44px; margin: 0; }
+  .modal-footer > :is(.btn-primary,.ci-button--primary) { order: -1; }
+
+  .table-responsive { overflow: visible; border: 0; }
+  .professional-table thead,.ci-table--responsive thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .professional-table,.professional-table tbody,.professional-table tr,.professional-table td,
+  .ci-table--responsive,.ci-table--responsive tbody,.ci-table--responsive tr,.ci-table--responsive td {
+    display: block;
+    width: 100%;
+  }
+  .professional-table tbody { display: grid; gap: .7rem; }
+  .professional-table tbody tr {
+    padding: .7rem;
+    border: 1px solid var(--ci-color-border, #dfe6ef);
+    border-radius: var(--ci-radius-md, 10px);
+    background: var(--ci-color-surface, #fff);
+    box-shadow: var(--ci-shadow-xs, 0 1px 2px rgba(16,24,40,.04));
+  }
+  .professional-table tbody td,.ci-table--responsive td {
+    display: grid;
+    grid-template-columns: minmax(92px, .38fr) minmax(0, 1fr);
+    gap: .75rem;
+    align-items: start;
+    padding: .42rem .25rem;
+    border: 0;
+    text-align: left !important;
+  }
+  .professional-table tbody td::before,.ci-table--responsive td::before {
+    content: attr(data-label);
+    color: var(--ci-color-text-secondary, #67758a);
+    font-size: var(--ci-text-xs, .6875rem);
+    font-weight: var(--ci-weight-semibold, 650);
+  }
+  .professional-table tbody td:empty { display: none; }
+  .professional-table tbody td.text-end > * { justify-self: start; }
+  .professional-table tbody td[colspan] { display: block; }
+  .professional-table tbody td[colspan]::before { content: none; }
+  .soc-pagination,.soc2-pagination { align-items: stretch; flex-direction: column; }
+  .soc-pagination > div,.soc2-pagination > div { display: grid; grid-template-columns: 1fr 1fr; }
+
+  .ci-report,.report-shell,.report-document { padding-inline: .25rem; }
+  .ci-report table,.report-shell table,.report-document table { display: block; max-width: 100%; overflow-x: auto; }
+}
+
+/* Touch devices: hover-independent controls and safe targets. */
+@media (pointer: coarse) {
+  :is(button,.btn,.ci-button,.nav-link,.dropdown-item,input,select,.form-control,.form-select) { min-height: var(--ci-touch-target, 44px); }
+  [title] { -webkit-tap-highlight-color: transparent; }
+  .table tbody tr:hover,.ci-card--interactive:hover { transform: none; }
+}
+
+/* Device orientation and constrained-height handling. */
+@media (max-height: 620px) and (orientation: landscape) {
+  .modal-content { max-height: 100dvh; }
+  .sidebar-head { padding-bottom: .75rem; }
+  .sidebar-nav .nav-link { min-height: 38px; padding-block: .45rem; }
+}
+
+@media print {
+  .sidebar,.topbar,.auth-header,.auth-footer,.page-progress,.toast-container,
+  .ci-r-toolbar,.modal,.offcanvas-backdrop,[data-bs-toggle] { display: none !important; }
+  .main-content { margin: 0 !important; }
+  .page-content { max-width: none; padding: 0; }
+  body { background: #fff !important; color: #111 !important; font-size: 10pt; }
+  .ci-report,.report-shell,.report-document { width: 100%; max-width: none; color: #111; }
+  a { color: inherit; text-decoration: none; }
+  table { break-inside: auto; }
+  tr,.ci-panel,.surface-card { break-inside: avoid; }
+  @page { size: A4; margin: 16mm; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .offcanvas,.modal.fade .modal-dialog,.collapsing { transition: none !important; }
+}

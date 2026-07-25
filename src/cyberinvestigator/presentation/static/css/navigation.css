@@ -1,0 +1,31 @@
+/* Investigation-centric information architecture */
+.nav-group + .nav-group { margin-top: .3rem; }
+.nav-group .nav-caption { margin-top: .75rem; }
+.nav-lifecycle { position: relative; }
+.nav-stage { margin-left: auto; color: #60728f; font: 650 .55rem/1 var(--ci-font-mono, monospace); letter-spacing: .04em; }
+.nav-attention-link { position: relative; }
+.nav-attention-dot { width: 6px !important; height: 6px; margin-left: auto; border-radius: 50%; background: #f07878; box-shadow: 0 0 0 3px rgba(240,120,120,.08); }
+.mobile-nav-actions { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: .4rem; margin: 0 .5rem .65rem; }
+.mobile-nav-actions a { min-width: 0; display: grid; justify-items: center; gap: .3rem; padding: .55rem .25rem; border: 1px solid rgba(139,165,207,.14); border-radius: 8px; background: rgba(255,255,255,.035); color: #bac7d9; font-size: .57rem; font-weight: 650; text-decoration: none; }
+.mobile-nav-actions a i { color: #8eafff; font-size: .8rem; }
+.app-breadcrumb { display: flex; align-items: center; gap: .3rem; min-width: 0; margin-bottom: .2rem; color: var(--ci-color-text-secondary,#67758a); font-size: .61rem; line-height: 1; }
+.app-breadcrumb a { color: inherit; text-decoration: none; }
+.app-breadcrumb a:hover { color: var(--ci-color-primary,#356df3); }
+.app-breadcrumb i { flex: 0 0 auto; font-size: .48rem; }
+.app-breadcrumb span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.app-breadcrumb span[aria-current="page"] { color: var(--ci-color-primary,#356df3); }
+.command-entity-results:empty { display: none; }
+.command-entity-results { margin-top: .4rem; padding-top: .35rem; border-top: 1px solid var(--ci-color-border,#dfe6ef); }
+.command-search-state { display: flex; align-items: center; gap: .6rem; padding: .7rem .75rem; color: var(--ci-color-text-secondary,#67758a); font-size: .68rem; }
+.command-result-type { width: auto !important; height: auto !important; padding: .15rem .35rem; border: 1px solid var(--ci-color-border,#dfe6ef); border-radius: 4px !important; background: var(--ci-color-surface-subtle,#f8fafc) !important; color: var(--ci-color-text-secondary,#67758a) !important; font: 650 .52rem/1.3 var(--ci-font-sans,sans-serif); text-transform: uppercase; }
+body.sidebar-collapsed .nav-stage,body.sidebar-collapsed .nav-attention-dot { display: none; }
+@media(max-width:991.98px) {
+  .sidebar-nav { padding-bottom: 1rem; }
+  .nav-group .nav-caption { margin-top: .9rem; }
+}
+@media(max-width:575.98px) {
+  .app-breadcrumb span:not([aria-current="page"]),.app-breadcrumb i { display: none; }
+  .app-breadcrumb a { display: none; }
+  .app-breadcrumb { margin-bottom: .15rem; }
+  .breadcrumb-wrap h1 { max-width: 42vw; }
+}

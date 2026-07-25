@@ -1,0 +1,23 @@
+{
+  "case": {
+    "id": "64be9999-dabd-4ae4-b7ce-fd9e3437962c",
+    "case_number": "CASE-API-1",
+    "title": "API Workflow",
+    "description": "Integrated workflow smoke test",
+    "severity": "high",
+    "opened_at": "2026-07-19T05:04:02.474658",
+    "closed_at": null,
+    "archived_at": null,
+    "deleted_at": null,
+    "status": "active"
+  },
+  "report": {
+    "id": "7cb153ea-fc6b-40dd-a615-af2a5f4cf9c7",
+    "case_id": "64be9999-dabd-4ae4-b7ce-fd9e3437962c",
+    "report_type": "technical",
+    "version": 1,
+    "title": "Technical Report",
+    "storage_path": "64be9999-dabd-4ae4-b7ce-fd9e3437962c\\technical-v1.json",
+    "generated_at": "2026-07-19T05:04:02.518941"
+  }
+}

@@ -25,9 +25,11 @@ from cyberinvestigator.infrastructure.database.models import (
     Role,
     RolePermission,
     SecurityAlert,
+    Setting,
     User,
     UserSession,
 )
+from cyberinvestigator.infrastructure.security.audit import SecurityAuditEvent, StructuredAuditWriter
 
 try:
     import bcrypt
@@ -67,6 +69,8 @@ SYSTEM_PERMISSIONS = {
         "reports.read",
         "reports.write",
         "ai.chat",
+        "threat_intelligence.read",
+        "threat_intelligence.enrich",
     },
     "admin": {
         "dashboard.read",
@@ -81,10 +85,14 @@ SYSTEM_PERMISSIONS = {
         "plugins.read",
         "plugins.manage",
         "ai.chat",
+        "threat_intelligence.read",
+        "threat_intelligence.enrich",
         "admin.access",
         "settings.manage",
         "users.manage",
         "security.monitor",
+        "storage.manage",
+        "deployments.manage",
     },
 }
 ENDPOINT_PERMISSIONS = {
@@ -100,6 +108,12 @@ ENDPOINT_PERMISSIONS = {
     "api_v1.dashboard_snapshot": ("dashboard.read",),
     "api_v1.openapi_spec": ("dashboard.read",),
     "api_v1.ai_status": ("ai.chat",),
+    "api_v1.ai_test_connection": ("settings.manage",),
+    "api_v1.ai_management": ("settings.manage",),
+    "api_v1.update_ai_provider": ("settings.manage",),
+    "api_v1.update_ai_workload": ("settings.manage",),
+    "api_v1.create_ai_prompt_version": ("settings.manage",),
+    "api_v1.update_ai_failover": ("settings.manage",),
     "api_v1.ai_chat": ("ai.chat",),
     "api_v1.ai_chat_stream": ("ai.chat",),
     "api_v1.list_ai_conversations": ("ai.chat",),
@@ -109,6 +123,8 @@ ENDPOINT_PERMISSIONS = {
     "api_v1.ai_analyze": ("ai.chat",),
     "api_v1.ai_timeline_summary": ("ai.chat",),
     "api_v1.ai_explain_ioc": ("ai.chat",),
+    "api_v1.threat_intelligence_snapshot": ("threat_intelligence.read",),
+    "api_v1.enrich_threat_intelligence": ("threat_intelligence.enrich",),
     "api_v1.ai_explain_malware": ("ai.chat",),
     "api_v1.ai_analyze_log": ("ai.chat",),
     "api_v1.ai_analyze_email_header": ("ai.chat",),
@@ -116,7 +132,12 @@ ENDPOINT_PERMISSIONS = {
     "api_v1.reload_plugins": ("plugins.manage",),
     "api_v1.upload_plugin": ("plugins.manage",),
     "api_v1.plugin_lifecycle": ("plugins.manage",),
+    "api_v1.plugin_management": ("plugins.manage",),
+    "api_v1.update_plugin_configuration": ("plugins.manage",),
+    "api_v1.run_plugin_operation": ("plugins.manage",),
+    "api_v1.plugin_operation_job": ("plugins.manage",),
     "api_v1.list_cases": ("cases.read",),
+    "api_v1.case_workspace": ("cases.read",),
     "api_v1.create_case": ("cases.write",),
     "api_v1.update_case": ("cases.write",),
     "api_v1.case_action": ("cases.write",),
@@ -124,6 +145,8 @@ ENDPOINT_PERMISSIONS = {
     "api_v1.create_evidence": ("evidence.write",),
     "api_v1.delete_evidence": ("evidence.write",),
     "api_v1.evidence_analysis": ("evidence.write",),
+    "api_v1.start_evidence_analysis": ("evidence.write",),
+    "api_v1.evidence_analysis_job": ("evidence.read",),
     "api_v1.export_evidence": ("evidence.read",),
     "api_v1.list_timeline": ("timeline.read",),
     "api_v1.export_timeline": ("timeline.read",),
@@ -132,22 +155,44 @@ ENDPOINT_PERMISSIONS = {
     "api_v1.list_reports": ("reports.read",),
     "api_v1.create_report": ("reports.write",),
     "api_v1.get_report": ("reports.read",),
+    "api_v1.update_report": ("reports.write",),
     "api_v1.analyze_report": ("reports.read",),
     "api_v1.export_report": ("reports.read",),
     "api_v1.get_settings": ("settings.manage",),
     "api_v1.update_settings": ("settings.manage",),
     "api_v1.monitoring_metrics": ("security.monitor",),
+    "api_v1.observability_workspace": ("security.monitor",),
+    "api_v1.storage_workspace": ("storage.manage",),
+    "api_v1.update_storage_policy": ("storage.manage",),
+    "api_v1.update_legal_hold": ("storage.manage",),
+    "api_v1.create_storage_backup": ("storage.manage",),
+    "api_v1.verify_storage_backup": ("storage.manage",),
+    "api_v1.create_restore_plan": ("storage.manage",),
+    "api_v1.verify_evidence_integrity": ("storage.manage",),
+    "api_v1.deployment_workspace": ("deployments.manage",),
+    "api_v1.verify_deployment": ("deployments.manage",),
+    "api_v1.create_rollback_plan": ("deployments.manage",),
     "api_v1.admin_overview": ("admin.access",),
+    "api_v1.admin_operations_center": ("admin.access",),
+    "api_v1.update_security_alert": ("security.monitor",),
+    "api_v1.admin_maintenance": ("admin.access",),
     "api_v1.admin_logs": ("admin.access",),
     "api_v1.admin_audit_logs": ("admin.access",),
     "api_v1.admin_database": ("admin.access",),
     "api_v1.list_users": ("users.manage",),
     "api_v1.create_user": ("users.manage",),
     "api_v1.update_user": ("users.manage",),
+    "api_v1.identity_workspace": ("users.manage",),
+    "api_v1.identity_user_detail": ("users.manage",),
+    "api_v1.create_role": ("users.manage",),
+    "api_v1.update_role": ("users.manage",),
+    "api_v1.delete_role": ("users.manage",),
+    "api_v1.revoke_managed_session": ("users.manage",),
     "api_v1.secrets_inventory": ("admin.access",),
     "api_v1.admin_investigations": ("admin.access",),
     "api_v1.review_investigation": ("admin.access",),
     "api_v1.list_notifications": ("dashboard.read",),
+    "api_v1.investigation_history": ("dashboard.read",),
     "api_v1.account_workspace": ("dashboard.read",),
     "api_v1.update_account_preferences": ("dashboard.read",),
     "api_v1.revoke_account_session": ("dashboard.read",),
@@ -200,16 +245,46 @@ def register_web_security(app: Flask) -> None:
         window_seconds=int(app.config.get("RATE_LIMIT_WINDOW_SECONDS", 60)),
     )
     app.extensions["cyberinvestigator_rate_limiter"] = limiter
+    app.extensions["cyberinvestigator_audit_writer"] = StructuredAuditWriter(Path(app.config["LOGS_FOLDER"]))
 
     @app.before_request
     def establish_request_security():  # type: ignore[no-untyped-def]
-        g.request_id = request.headers.get("X-Request-ID") or str(uuid4())
+        g.request_id = getattr(g, "request_id", None) or request.headers.get("X-Request-ID") or str(uuid4())
         g.current_user = _resolve_user(app)
 
         auth_response = _validate_authenticated(app)
         if auth_response is not None:
             _audit(app, "auth.required", status=401, result="blocked", reason="Authentication required.")
             return auth_response
+
+        maintenance = database_setting = None
+        database = app.extensions.get("cyberinvestigator_database")
+        if database is not None:
+            database_setting = database.session.scalar(
+                select(Setting).where(Setting.namespace == "platform", Setting.key == "maintenance")
+            )
+        if database_setting is not None:
+            try:
+                maintenance = json.loads(database_setting.value)
+            except (TypeError, ValueError):
+                maintenance = None
+        if (
+            isinstance(maintenance, dict)
+            and maintenance.get("enabled") is True
+            and request.endpoint not in PUBLIC_ENDPOINTS
+            and getattr(g.current_user, "role", "user") != "admin"
+        ):
+            _audit(app, "maintenance.blocked", status=503, result="blocked", reason="Platform maintenance mode.")
+            return (
+                jsonify(
+                    {
+                        "error": "platform maintenance",
+                        "message": maintenance.get("message") or "The platform is temporarily unavailable.",
+                        "request_id": g.request_id,
+                    }
+                ),
+                503,
+            )
 
         allowed, remaining = limiter.allow(_rate_limit_key())
         g.rate_limit_remaining = remaining
@@ -249,6 +324,7 @@ def register_web_security(app: Flask) -> None:
             "google_oauth_configured": bool(
                 app.config.get("GOOGLE_CLIENT_ID") and app.config.get("GOOGLE_CLIENT_SECRET")
             ),
+            "registration_enabled": bool(app.config.get("REGISTRATION_ENABLED", True)),
         }
 
 
@@ -271,7 +347,8 @@ def _allowed_roles(role: str) -> set[str]:
 
 
 def _normalize_role(role: object) -> str:
-    return ROLE_ALIASES.get(str(role or "user").strip().lower(), "user")
+    normalized = str(role or "user").strip().lower()
+    return ROLE_ALIASES.get(normalized, normalized or "user")
 
 
 def _resolve_user(app: Flask) -> UserPrincipal:
@@ -362,7 +439,11 @@ def _validate_rbac(app: Flask):
     view = app.view_functions.get(endpoint or "")
     allowed_roles = getattr(view, "_cyberinvestigator_allowed_roles", None)
     user = getattr(g, "current_user", UserPrincipal("anonymous", "user"))
-    if allowed_roles and user.role not in allowed_roles:
+    required_permissions = ENDPOINT_PERMISSIONS.get(endpoint or "", ())
+    permission_grant = bool(required_permissions) and all(
+        _has_permission(user, permission) for permission in required_permissions
+    )
+    if allowed_roles and user.role not in allowed_roles and not permission_grant:
         _record_alert(
             app,
             "high",
@@ -372,7 +453,6 @@ def _validate_rbac(app: Flask):
             70,
         )
         return jsonify({"error": "insufficient role", "request_id": getattr(g, "request_id", None)}), 403
-    required_permissions = ENDPOINT_PERMISSIONS.get(endpoint or "", ())
     if not required_permissions:
         return None
     if all(_has_permission(user, permission) for permission in required_permissions):
@@ -398,24 +478,22 @@ def _permissions_for_role(role: Role) -> set[str]:
 
 def _audit(app: Flask, event: str, *, status: int, result: str | None = None, reason: str | None = None) -> None:
     try:
-        log_dir = Path(app.config["LOGS_FOLDER"])
-        log_dir.mkdir(parents=True, exist_ok=True)
         user = getattr(g, "current_user", UserPrincipal("anonymous", "user"))
-        record = {
-            "ts": time.time(),
-            "event": event,
-            "request_id": getattr(g, "request_id", None),
-            "method": request.method,
-            "path": request.path,
-            "status": status,
-            "user": user.username,
-            "role": user.role,
-            "remote_addr": request.remote_addr,
-            "user_agent": request.headers.get("User-Agent"),
-            "reason": reason,
-        }
-        with (log_dir / "audit.log").open("a", encoding="utf-8") as audit_file:
-            audit_file.write(json.dumps(record, separators=(",", ":")) + "\n")
+        app.extensions["cyberinvestigator_audit_writer"].write(
+            SecurityAuditEvent(
+                timestamp=time.time(),
+                event=event,
+                request_id=getattr(g, "request_id", None),
+                method=request.method,
+                path=request.path,
+                status=status,
+                user=user.username,
+                role=user.role,
+                remote_address=request.remote_addr,
+                user_agent=request.headers.get("User-Agent"),
+                reason=reason,
+            )
+        )
         database = app.extensions.get("cyberinvestigator_database")
         if database is not None and event != "request.completed":
             database.session.add(
@@ -475,6 +553,12 @@ def authenticate_user(app: Flask, username_or_email: str, password: str, *, reme
             .order_by(Role.name.asc(), User.created_at.asc())
         )
     )
+    if not candidates:
+        dummy_hash = app.extensions.get("cyberinvestigator_dummy_password_hash")
+        if dummy_hash is None:
+            dummy_hash = hash_password(secrets.token_urlsafe(32))
+            app.extensions["cyberinvestigator_dummy_password_hash"] = dummy_hash
+        verify_password(password, str(dummy_hash))
     user = next((candidate for candidate in candidates if verify_password(password, candidate.password_hash)), None)
     now = utc_now()
     if user is None:
@@ -517,7 +601,21 @@ def authenticate_user(app: Flask, username_or_email: str, password: str, *, reme
         )
         session_db.commit()
         return False, "Account is disabled."
-    if user.locked_until and user.locked_until > now:
+    if user.locked_until and _aware_utc(user.locked_until) > now:
+        session_db.add(
+            AuditLog(
+                user_id=user.id,
+                username=user.username,
+                role=user.role.name,
+                action="auth.login",
+                result="blocked",
+                ip_address=request.remote_addr,
+                user_agent=request.headers.get("User-Agent"),
+                affected_object=f"user:{user.id}",
+                reason="locked account",
+            )
+        )
+        session_db.commit()
         return False, "Account is temporarily locked."
     user.failed_login_count = 0
     user.locked_until = None
@@ -534,6 +632,17 @@ def login_user_account(app: Flask, user: User, *, remember: bool = False, action
 
 def _open_user_session(app: Flask, user: User, *, remember: bool, action: str) -> None:
     now = utc_now()
+    database_session = app.extensions["cyberinvestigator_database"].session
+    previous_token = session.get("session_token")
+    if previous_token:
+        previous = database_session.scalar(
+            select(UserSession).where(UserSession.session_token_hash == _token_hash(str(previous_token)))
+        )
+        if previous is not None:
+            previous.active = False
+            previous.status = "replaced"
+            previous.updated_at = now
+    session.clear()
     token = secrets.token_urlsafe(32)
     expires = now + timedelta(days=30 if remember else 1)
     user.last_login_at = now
@@ -542,7 +651,7 @@ def _open_user_session(app: Flask, user: User, *, remember: bool, action: str) -
     session["role"] = role_name
     session["session_token"] = token
     session.permanent = remember
-    app.extensions["cyberinvestigator_database"].session.add(
+    database_session.add(
         UserSession(
             user_id=user.id,
             owner_user_id=user.id,
@@ -553,7 +662,7 @@ def _open_user_session(app: Flask, user: User, *, remember: bool, action: str) -
             expires_at=expires,
         )
     )
-    app.extensions["cyberinvestigator_database"].session.add(
+    database_session.add(
         AuditLog(
             user_id=user.id,
             username=user.username,

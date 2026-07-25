@@ -1,31 +1,56 @@
 {% extends "base.html" %}
+{% block page_styles %}<link href="{{ url_for('static', filename='css/timeline_workspace.css') }}" rel="stylesheet">{% endblock %}
 {% block content %}
-<div data-module="timeline">
+<div class="timeline-workspace" data-module="timeline">
   <div class="page-heading">
-    <div><p class="eyebrow">Event correlation</p><h2>Investigation timeline</h2><p class="text-muted mb-0">Interactive chronology with evidence, case, and threat correlation.</p></div>
+    <div><p class="eyebrow">Evidence-backed reconstruction</p><h2>Timeline Reconstruction &amp; Attack Path Analysis</h2><p class="text-muted mb-0">Reconstruct recorded activity with source provenance, explicit correlations, and defensible ATT&amp;CK mappings.</p></div>
     <div class="dashboard-heading-actions">
       <a class="btn btn-outline-secondary" id="timeline-export" href="/api/v1/timeline/export"><i class="bi bi-download"></i> Export</a>
-      <button class="btn btn-outline-secondary" id="timeline-ai-summary" type="button"><i class="bi bi-stars"></i> AI summary</button>
-      <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#timeline-modal"><i class="bi bi-plus-lg"></i> Add event</button>
+      <button class="btn btn-outline-secondary" id="timeline-ai-summary" type="button"><i class="bi bi-stars"></i> Generate summary</button>
+      <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#timeline-modal"><i class="bi bi-plus-lg"></i> Add observation</button>
     </div>
   </div>
-  <article class="surface-card">
-    <div class="timeline-toolbar timeline-control-grid">
-      <select class="form-select" id="timeline-case-filter" aria-label="Select case"></select>
-      <select class="form-select" id="timeline-type-filter" aria-label="Filter events"><option value="all">All event types</option><option value="case.created">Case created</option><option value="case.updated">Case updated</option><option value="evidence.added">Evidence added</option><option value="evidence.analysis.completed">Evidence analyzed</option><option value="observation.manual">Manual observation</option><option value="report.generated">Report generated</option></select>
-      <select class="form-select" id="timeline-group-filter" aria-label="Filter groups"><option value="all">All groups</option><option value="case">Case</option><option value="evidence">Evidence</option><option value="observation">Observation</option><option value="report">Report</option></select>
-      <select class="form-select" id="timeline-threat-filter" aria-label="Filter threat"><option value="all">All threat</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select>
-      <select class="form-select" id="timeline-zoom" aria-label="Zoom timeline"><option value="compact">Compact</option><option value="normal" selected>Normal</option><option value="expanded">Expanded</option></select>
-      <input class="form-control" id="timeline-search" placeholder="Search timeline, evidence, case">
-    </div>
+
+  <section class="surface-card timeline-overview" aria-labelledby="timeline-overview-title">
+    <div><p class="eyebrow">Timeline summary</p><h3 id="timeline-overview-title">Recorded investigation chronology</h3><p id="timeline-explainability">Loading evidence provenance and correlations.</p></div>
     <div class="timeline-summary-strip" id="timeline-correlations"></div>
-    <div id="timeline-state" class="empty-state large"><i class="bi bi-hourglass-split"></i><h3>Loading timeline</h3><p>Fetching correlated events.</p></div>
-    <div id="timeline-list" class="timeline-list interactive-timeline d-none"></div>
-  </article>
-  <article class="surface-card mt-4">
-    <div class="card-head"><div><h3>AI timeline summary</h3><p>Case-aware summary of gaps, correlations, and next actions.</p></div><span class="badge text-bg-light" id="timeline-summary-status">Idle</span></div>
-    <div id="timeline-summary-panel" class="empty-state compact"><i class="bi bi-stars"></i><h3>No summary generated</h3><p>Use AI summary after selecting a case or reviewing the full timeline.</p></div>
-  </article>
-  <div class="modal fade" id="timeline-modal" tabindex="-1" aria-hidden="true"><div class="modal-dialog"><form class="modal-content" id="timeline-form"><div class="modal-header"><h5 class="modal-title">Add timeline event</h5><button class="btn-close" type="button" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><div class="mb-3"><label class="form-label" for="timeline-case">Case</label><select class="form-select" id="timeline-case" required></select></div><div class="mb-3"><label class="form-label" for="timeline-summary">Summary</label><input class="form-control" id="timeline-summary" required maxlength="1024"></div><div><label class="form-label" for="timeline-details">Details</label><textarea class="form-control" id="timeline-details" rows="3"></textarea></div></div><div class="modal-footer"><button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary" type="submit">Add event</button></div></form></div></div>
+  </section>
+
+  <div class="timeline-workspace-grid">
+    <section class="surface-card timeline-events-pane" aria-labelledby="latest-events-title">
+      <div class="card-head"><div><h3 id="latest-events-title">Latest events</h3><p>Confirmed persisted events ordered by occurrence time.</p></div></div>
+      <div class="timeline-toolbar timeline-control-grid">
+        <select class="form-select" id="timeline-case-filter" aria-label="Select case"></select>
+        <select class="form-select" id="timeline-type-filter" aria-label="Filter events"><option value="all">All event types</option><option value="case.created">Case created</option><option value="case.updated">Case updated</option><option value="evidence.added">Evidence added</option><option value="evidence.analysis.completed">Evidence analyzed</option><option value="observation.manual">Manual observation</option><option value="report.generated">Report generated</option></select>
+        <select class="form-select" id="timeline-group-filter" aria-label="Filter groups"><option value="all">All groups</option><option value="case">Case</option><option value="evidence">Evidence</option><option value="observation">Observation</option><option value="report">Report</option></select>
+        <select class="form-select" id="timeline-threat-filter" aria-label="Filter assessment"><option value="all">All assessments</option><option value="unassessed">Unassessed</option></select>
+        <select class="form-select" id="timeline-zoom" aria-label="Timeline density"><option value="compact">Compact</option><option value="normal" selected>Normal</option><option value="expanded">Expanded</option></select>
+        <input class="form-control" id="timeline-search" placeholder="Search events and source records">
+      </div>
+      <div id="timeline-state" class="empty-state large"><i class="bi bi-hourglass-split"></i><h3>Loading timeline</h3><p>Fetching recorded events.</p></div>
+      <div id="timeline-list" class="timeline-list interactive-timeline d-none"></div>
+    </section>
+
+    <aside class="timeline-detail-column">
+      <section class="surface-card timeline-ai-pane" aria-labelledby="timeline-ai-title">
+        <div class="card-head"><div><h3 id="timeline-ai-title">AI timeline summary</h3><p>Facts, labeled hypotheses, gaps, and next actions.</p></div><span class="badge text-bg-light" id="timeline-summary-status">Idle</span></div>
+        <div id="timeline-summary-panel" class="empty-state compact"><i class="bi bi-stars"></i><h3>No summary generated</h3><p>Select an investigation and generate an evidence-grounded summary.</p></div>
+      </section>
+      <section class="surface-card timeline-event-detail" aria-labelledby="event-detail-title">
+        <div class="card-head"><div><h3 id="event-detail-title">Event details</h3><p>Provenance and explicit relationships.</p></div></div>
+        <div id="timeline-event-detail" class="empty-state compact"><i class="bi bi-cursor"></i><h3>No event selected</h3><p>Select a recorded event to inspect its source.</p></div>
+      </section>
+      <section class="surface-card timeline-related-evidence" aria-labelledby="related-evidence-title">
+        <div class="card-head"><div><h3 id="related-evidence-title">Related evidence</h3><p>Direct links only; no inferred associations.</p></div></div>
+        <div id="timeline-related-evidence" class="empty-state compact"><i class="bi bi-folder2-open"></i><h3>No source selected</h3><p>Evidence links appear for explicitly associated events.</p></div>
+      </section>
+      <section class="surface-card timeline-attack-path" aria-labelledby="attack-path-title">
+        <div class="card-head"><div><h3 id="attack-path-title">Supported attack progression</h3><p>ATT&amp;CK mappings recorded by evidence analysis.</p></div></div>
+        <div id="timeline-attack-path" class="empty-state compact"><i class="bi bi-diagram-3"></i><h3>No supported mappings</h3><p>No attack stages are inferred from event categories.</p></div>
+      </section>
+    </aside>
+  </div>
+
+  <div class="modal fade" id="timeline-modal" tabindex="-1" aria-hidden="true"><div class="modal-dialog"><form class="modal-content" id="timeline-form"><div class="modal-header"><div><h5 class="modal-title">Add investigator observation</h5><p class="text-muted small mb-0">Manual observations are confirmed records, not confirmed attacker activity.</p></div><button class="btn-close" type="button" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><div class="mb-3"><label class="form-label" for="timeline-case">Investigation</label><select class="form-select" id="timeline-case" required></select></div><div class="mb-3"><label class="form-label" for="timeline-summary">Observation summary</label><input class="form-control" id="timeline-summary" required maxlength="1024"></div><div><label class="form-label" for="timeline-details">Source details and rationale</label><textarea class="form-control" id="timeline-details" rows="4" maxlength="8000"></textarea></div></div><div class="modal-footer"><button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary" type="submit">Record observation</button></div></form></div></div>
 </div>
 {% endblock %}

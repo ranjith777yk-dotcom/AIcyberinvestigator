@@ -27,6 +27,10 @@ def test_ai_chat_never_requires_provider_key() -> None:
     assert payload["available"] is False
     assert payload["reply"]
     assert "8.8.8.8" in payload["analysis"]["iocs"]["ipv4"]
+    assert payload["grounding"]["confidence"]["level"] == "insufficient"
+    assert payload["grounding"]["confidence"]["basis"] == "available investigation data coverage"
+    assert payload["grounding"]["sources"] == []
+    assert "threat_score" not in payload["context"]
 
 
 def test_ai_analyze_accepts_text() -> None:

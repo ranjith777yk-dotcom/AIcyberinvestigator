@@ -15,7 +15,7 @@ from enum import Enum
 from pathlib import Path
 from threading import RLock
 from types import ModuleType
-from typing import Any
+from typing import Any, Callable
 
 from cyberinvestigator.infrastructure.plugins.registry import (
     Plugin,
@@ -67,10 +67,16 @@ class LoadedPlugin:
 class PluginLoader:
     """Discover, validate, load, activate, deactivate, and unload trusted plugins."""
 
-    def __init__(self, plugin_root: Path, registry: PluginRegistry) -> None:
+    def __init__(
+        self,
+        plugin_root: Path,
+        registry: PluginRegistry,
+        permission_resolver: Callable[[str], set[str]] | None = None,
+    ) -> None:
         """Create a loader constrained to one trusted plugin root directory."""
         self._plugin_root = plugin_root.resolve()
         self._registry = registry
+        self._permission_resolver = permission_resolver or (lambda _identifier: set())
         self._loaded: dict[str, LoadedPlugin] = {}
         self._lock = RLock()
 
@@ -144,6 +150,13 @@ class PluginLoader:
             record = self._get_loaded(identifier)
             if record.status is PluginStatus.ENABLED:
                 return
+            requested = set(record.plugin.metadata.permissions)
+            granted = self._permission_resolver(identifier)
+            missing = requested - granted
+            if missing:
+                raise PluginLoadError(
+                    f"Plugin {identifier!r} requires permissions that were not granted: {', '.join(sorted(missing))}."
+                )
             try:
                 self._registry.register(record.plugin)
             except PluginRegistrationError as error:

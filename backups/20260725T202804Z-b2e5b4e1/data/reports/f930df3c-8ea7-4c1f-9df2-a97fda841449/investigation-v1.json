@@ -1,0 +1,109 @@
+{
+  "case": {
+    "id": "f930df3c-8ea7-4c1f-9df2-a97fda841449",
+    "case_number": "1",
+    "title": "codex",
+    "description": "hi how are you",
+    "severity": "high",
+    "opened_at": "2026-07-19T05:35:20.257662",
+    "closed_at": null,
+    "archived_at": null,
+    "deleted_at": null,
+    "status": "active"
+  },
+  "report": {
+    "id": "8b691274-7239-43b7-9314-20577f570c0a",
+    "case_id": "f930df3c-8ea7-4c1f-9df2-a97fda841449",
+    "report_type": "investigation",
+    "version": 1,
+    "title": "codex",
+    "storage_path": "f930df3c-8ea7-4c1f-9df2-a97fda841449\\investigation-v1.json",
+    "generated_at": "2026-07-19T05:37:50.221882"
+  },
+  "ai_summary": {
+    "available": false,
+    "provider": {
+      "provider": "openai",
+      "available": false,
+      "configured": true,
+      "model": "gpt-4.1-mini",
+      "message": "AI is disabled by configuration; using local fallback."
+    },
+    "content": "OpenAI is not configured. Local deterministic analysis is available and the workflow can continue."
+  },
+  "context": {
+    "case_id": "f930df3c-8ea7-4c1f-9df2-a97fda841449",
+    "case_number": "1",
+    "case": {
+      "id": "f930df3c-8ea7-4c1f-9df2-a97fda841449",
+      "case_number": "1",
+      "title": "codex",
+      "description": "hi how are you",
+      "severity": "high",
+      "opened_at": "2026-07-19T05:35:20.257662",
+      "closed_at": null,
+      "archived_at": null,
+      "deleted_at": null,
+      "status": "active"
+    },
+    "evidence": [
+      {
+        "id": "7306c9c2-ffd3-4622-88dd-5305dbebb001",
+        "case_id": "f930df3c-8ea7-4c1f-9df2-a97fda841449",
+        "evidence_number": "1",
+        "original_filename": "digits.bin",
+        "storage_path": "f930df3c-8ea7-4c1f-9df2-a97fda841449\\dc087c4112cf493aa62d3e3933a02685.bin",
+        "media_type": "application/octet-stream",
+        "size_bytes": 71192,
+        "sha256": "6a7d7e272a2a5e5c5e889f55808baa5884d6484aa365478b9663b675459b28ea",
+        "source_description": "find what are there in it",
+        "acquired_at": "2026-07-19T05:36:11.881125",
+        "deleted_at": null
+      }
+    ],
+    "timeline": [
+      {
+        "id": "00b68d67-889a-43fd-aa0f-f6dd4c5efc89",
+        "case_id": "f930df3c-8ea7-4c1f-9df2-a97fda841449",
+        "evidence_id": "7306c9c2-ffd3-4622-88dd-5305dbebb001",
+        "artifact_id": null,
+        "occurred_at": "2026-07-19T05:36:21.729945",
+        "event_type": "ai.analysis.completed",
+        "summary": "AI analysis completed for 1",
+        "details": "Local analysis for dc087c4112cf493aa62d3e3933a02685.bin found 0 IOC(s), 0 ATT&CK mapping(s), and a threat score of 10/100."
+      },
+      {
+        "id": "0b1f2c07-4cac-47c5-8e94-feac666c7ccd",
+        "case_id": "f930df3c-8ea7-4c1f-9df2-a97fda841449",
+        "evidence_id": "7306c9c2-ffd3-4622-88dd-5305dbebb001",
+        "artifact_id": null,
+        "occurred_at": "2026-07-19T05:36:11.921519",
+        "event_type": "evidence.added",
+        "summary": "Evidence 1 added",
+        "details": "digits.bin"
+      },
+      {
+        "id": "e27e5e47-ea6e-4526-92f2-a068938b838c",
+        "case_id": "f930df3c-8ea7-4c1f-9df2-a97fda841449",
+        "evidence_id": null,
+        "artifact_id": null,
+        "occurred_at": "2026-07-19T05:35:20.290774",
+        "event_type": "case.created",
+        "summary": "Case 1 created",
+        "details": "codex"
+      }
+    ],
+    "reports": [
+      {
+        "id": "8b691274-7239-43b7-9314-20577f570c0a",
+        "case_id": "f930df3c-8ea7-4c1f-9df2-a97fda841449",
+        "report_type": "investigation",
+        "version": 1,
+        "title": "codex",
+        "storage_path": "f930df3c-8ea7-4c1f-9df2-a97fda841449\\investigation-v1.json",
+        "generated_at": "2026-07-19T05:37:50.221882"
+      }
+    ],
+    "plugins": []
+  }
+}

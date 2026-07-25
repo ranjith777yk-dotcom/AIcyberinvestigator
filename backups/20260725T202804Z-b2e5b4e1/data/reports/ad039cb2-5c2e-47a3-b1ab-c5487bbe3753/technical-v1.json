@@ -1,0 +1,111 @@
+{
+  "case": {
+    "id": "ad039cb2-5c2e-47a3-b1ab-c5487bbe3753",
+    "case_number": "REPORT-EXPORT-1",
+    "title": "Report Export",
+    "description": null,
+    "severity": "medium",
+    "priority": "medium",
+    "owner": null,
+    "tags": [],
+    "notes": [],
+    "relationships": [],
+    "attachments": [],
+    "history": [
+      {
+        "id": "65dbba6e-850e-4f12-aea6-c9041fe292ad",
+        "case_id": "ad039cb2-5c2e-47a3-b1ab-c5487bbe3753",
+        "evidence_id": null,
+        "artifact_id": null,
+        "occurred_at": "2026-07-19T07:06:00.409987",
+        "event_type": "case.created",
+        "summary": "Case REPORT-EXPORT-1 created",
+        "details": "Report Export"
+      }
+    ],
+    "opened_at": "2026-07-19T07:06:00.404548",
+    "closed_at": null,
+    "archived_at": null,
+    "deleted_at": null,
+    "status": "active"
+  },
+  "report": {
+    "id": "86f6e643-8986-46de-92c7-f227ae234aae",
+    "case_id": "ad039cb2-5c2e-47a3-b1ab-c5487bbe3753",
+    "report_type": "technical",
+    "version": 1,
+    "title": "Exportable Report",
+    "storage_path": "ad039cb2-5c2e-47a3-b1ab-c5487bbe3753\\technical-v1.json",
+    "generated_at": "2026-07-19T07:06:00.423649"
+  },
+  "ai_summary": {
+    "available": false,
+    "provider": {
+      "provider": "openai",
+      "available": false,
+      "configured": true,
+      "model": "gpt-4.1-mini",
+      "message": "AI is disabled by configuration; using local fallback."
+    },
+    "content": "OpenAI is not configured. Local deterministic analysis is available and the workflow can continue."
+  },
+  "context": {
+    "case_id": "ad039cb2-5c2e-47a3-b1ab-c5487bbe3753",
+    "case_number": "REPORT-EXPORT-1",
+    "case": {
+      "id": "ad039cb2-5c2e-47a3-b1ab-c5487bbe3753",
+      "case_number": "REPORT-EXPORT-1",
+      "title": "Report Export",
+      "description": null,
+      "severity": "medium",
+      "priority": "medium",
+      "owner": null,
+      "tags": [],
+      "notes": [],
+      "relationships": [],
+      "attachments": [],
+      "history": [
+        {
+          "id": "65dbba6e-850e-4f12-aea6-c9041fe292ad",
+          "case_id": "ad039cb2-5c2e-47a3-b1ab-c5487bbe3753",
+          "evidence_id": null,
+          "artifact_id": null,
+          "occurred_at": "2026-07-19T07:06:00.409987",
+          "event_type": "case.created",
+          "summary": "Case REPORT-EXPORT-1 created",
+          "details": "Report Export"
+        }
+      ],
+      "opened_at": "2026-07-19T07:06:00.404548",
+      "closed_at": null,
+      "archived_at": null,
+      "deleted_at": null,
+      "status": "active"
+    },
+    "evidence": [],
+    "timeline": [
+      {
+        "id": "65dbba6e-850e-4f12-aea6-c9041fe292ad",
+        "case_id": "ad039cb2-5c2e-47a3-b1ab-c5487bbe3753",
+        "evidence_id": null,
+        "artifact_id": null,
+        "occurred_at": "2026-07-19T07:06:00.409987",
+        "event_type": "case.created",
+        "summary": "Case REPORT-EXPORT-1 created",
+        "details": "Report Export"
+      }
+    ],
+    "reports": [
+      {
+        "id": "86f6e643-8986-46de-92c7-f227ae234aae",
+        "case_id": "ad039cb2-5c2e-47a3-b1ab-c5487bbe3753",
+        "report_type": "technical",
+        "version": 1,
+        "title": "Exportable Report",
+        "storage_path": "ad039cb2-5c2e-47a3-b1ab-c5487bbe3753\\technical-v1.json",
+        "generated_at": "2026-07-19T07:06:00.423649"
+      }
+    ],
+    "plugins": []
+  }
+}

@@ -1,0 +1,53 @@
+{# Canonical server-rendered UI primitives. All content is auto-escaped by Jinja. #}
+
+{% macro icon(name, label=None) -%}
+<i class="bi bi-{{ name }}" {% if label %}role="img" aria-label="{{ label }}"{% else %}aria-hidden="true"{% endif %}></i>
+{%- endmacro %}
+
+{% macro button(label, variant='primary', icon_name=None, type='button', size=None, id=None, disabled=False) -%}
+<button class="ci-button ci-button--{{ variant }}{% if size %} ci-button--{{ size }}{% endif %}" type="{{ type }}"{% if id %} id="{{ id }}"{% endif %}{% if disabled %} disabled{% endif %}>
+  {% if icon_name %}{{ icon(icon_name) }}{% endif %}<span>{{ label }}</span>
+</button>
+{%- endmacro %}
+
+{% macro action_link(label, href, variant='secondary', icon_name=None, size=None) -%}
+<a class="ci-button ci-button--{{ variant }}{% if size %} ci-button--{{ size }}{% endif %}" href="{{ href }}">
+  {% if icon_name %}{{ icon(icon_name) }}{% endif %}<span>{{ label }}</span>
+</a>
+{%- endmacro %}
+
+{% macro status(label, intent='neutral', dot=True) -%}
+<span class="ci-status ci-status--{{ intent }}">{% if dot %}<i aria-hidden="true"></i>{% endif %}{{ label }}</span>
+{%- endmacro %}
+
+{% macro panel(title, description=None, icon_name=None, class_name='') -%}
+<article class="ci-panel {{ class_name }}">
+  <header class="ci-panel__header">
+    <div class="ci-panel__heading">{% if icon_name %}<span class="ci-panel__icon">{{ icon(icon_name) }}</span>{% endif %}<div><h3>{{ title }}</h3>{% if description %}<p>{{ description }}</p>{% endif %}</div></div>
+    {% if caller %}<div class="ci-panel__actions">{{ caller('actions') }}</div>{% endif %}
+  </header>
+  <div class="ci-panel__body">{% if caller %}{{ caller('body') }}{% endif %}</div>
+</article>
+{%- endmacro %}
+
+{% macro empty_state(title, description, icon_name='inbox', action_label=None, action_href=None) -%}
+<div class="ci-state ci-state--empty">
+  <span class="ci-state__icon">{{ icon(icon_name) }}</span>
+  <h3>{{ title }}</h3><p>{{ description }}</p>
+  {% if action_label and action_href %}{{ action_link(action_label, action_href, 'secondary') }}{% endif %}
+</div>
+{%- endmacro %}
+
+{% macro error_state(title='Something went wrong', description='The requested information could not be loaded.', retry_id=None) -%}
+<div class="ci-state ci-state--error" role="alert">
+  <span class="ci-state__icon">{{ icon('exclamation-triangle') }}</span>
+  <h3>{{ title }}</h3><p>{{ description }}</p>
+  {% if retry_id %}{{ button('Try again', 'secondary', 'arrow-clockwise', id=retry_id) }}{% endif %}
+</div>
+{%- endmacro %}
+
+{% macro skeleton(lines=3, label='Loading content') -%}
+<div class="ci-skeleton" role="status" aria-label="{{ label }}">
+  {% for line in range(lines) %}<span style="--ci-skeleton-width:{{ 100 if line == 0 else 84 - (line * 7) }}%"></span>{% endfor %}
+</div>
+{%- endmacro %}

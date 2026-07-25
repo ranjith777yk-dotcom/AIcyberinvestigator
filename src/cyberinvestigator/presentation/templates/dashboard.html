@@ -1,225 +1,151 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="soc-dashboard" data-dashboard-root aria-live="polite">
-  <section class="soc-command-strip">
-    <article class="soc-critical-banner skeleton" data-dashboard-card="threat">
-      <div class="soc-banner-icon"><i class="bi bi-shield-exclamation"></i></div>
-      <div>
-        <p class="eyebrow">Security Operations Center</p>
-        <h2 data-dashboard-headline>Threat posture loading</h2>
-        <p data-dashboard-subtitle>Correlating cases, evidence, timeline activity, AI signals, and platform health.</p>
-      </div>
-      <div class="soc-banner-score">
-        <small>AI Threat Score</small>
-        <strong data-metric="threat-score">-</strong>
-        <span data-metric-note="threat">Loading signal</span>
-      </div>
-    </article>
-
-    <article class="soc-command-card soc-quick-actions">
-      <div class="soc-card-head compact">
-        <div><h3>Quick Actions</h3><p>High-frequency SOC workflows</p></div>
-      </div>
-      <div class="soc-action-grid">
-        <a href="{{ url_for('web.cases') }}" class="soc-action"><i class="bi bi-plus-lg"></i><span>New Case</span></a>
-        <a href="{{ url_for('web.evidence') }}" class="soc-action"><i class="bi bi-cloud-arrow-up"></i><span>Upload</span></a>
-        <a href="{{ url_for('web.timeline') }}" class="soc-action"><i class="bi bi-clock-history"></i><span>Timeline</span></a>
-        <a href="{{ url_for('web.ai_chat') }}" class="soc-action"><i class="bi bi-stars"></i><span>Ask AI</span></a>
-      </div>
-    </article>
-
-    <article class="soc-command-card soc-profile-card">
-      <div class="soc-profile-row">
-        <span class="avatar">{{ current_user.username[:2]|upper }}</span>
-        <div>
-          <h3>{{ current_user.username }}</h3>
-          <p>{{ 'Administrator' if current_user.role == 'admin' else 'Investigator' }} workspace</p>
-        </div>
-      </div>
-      <div class="soc-mini-kv">
-        <span>Session</span><strong>Active</strong>
-        <span>Role</span><strong>{{ current_user.role|title }}</strong>
-      </div>
-    </article>
-
-    <article class="soc-command-card soc-notification-card">
-      <div class="soc-card-head compact">
-        <div><h3>Notifications</h3><p>Workspace signal</p></div>
-        <a href="{{ url_for('web.profile') }}#notifications" aria-label="Open notifications"><i class="bi bi-arrow-up-right"></i></a>
-      </div>
-      <strong data-dashboard-notification-count>-</strong>
-      <span data-dashboard-notification-label>Loading notifications</span>
-    </article>
-    <a class="soc-command-card soc-current-case" href="{{ url_for('web.cases') }}" data-current-investigation>
-      <div class="soc-card-head compact"><div><h3>Current Investigation</h3><p>Active workspace focus</p></div><i class="bi bi-arrow-up-right"></i></div>
-      <strong data-current-case-number>Loading</strong><span data-current-case-title>Resolving latest active case</span>
-    </a>
-  </section>
-
-  <section class="soc-metric-grid">
-    <a class="soc-metric-card skeleton" href="{{ url_for('web.cases') }}" data-dashboard-card="cases">
-      <span class="soc-metric-icon blue"><i class="bi bi-briefcase"></i></span>
-      <div><small>Active Investigations</small><strong data-metric="cases-count">-</strong><span data-metric-note="cases">Loading cases</span></div>
-      <em data-trend="cases">-</em>
-    </a>
-    <a class="soc-metric-card skeleton" href="{{ url_for('web.profile') }}#notifications" data-dashboard-card="alerts">
-      <span class="soc-metric-icon red"><i class="bi bi-exclamation-triangle"></i></span>
-      <div><small>Critical Alerts</small><strong data-metric="critical-alerts">-</strong><span data-metric-note="alerts">Loading alerts</span></div>
-      <em data-trend="alerts">-</em>
-    </a>
-    <a class="soc-metric-card skeleton" href="{{ url_for('web.ai_chat') }}" data-dashboard-card="ai">
-      <span class="soc-metric-icon violet"><i class="bi bi-cpu"></i></span>
-      <div><small>AI Provider</small><strong data-metric="ai-status">-</strong><span data-metric-note="ai">Loading assistant</span></div>
-      <em data-trend="ai">-</em>
-    </a>
-    <a class="soc-metric-card skeleton" href="{{ url_for('web.evidence') }}" data-dashboard-card="evidence">
-      <span class="soc-metric-icon green"><i class="bi bi-folder2-open"></i></span>
-      <div><small>Evidence Count</small><strong data-metric="evidence-count">-</strong><span data-metric-note="evidence">Loading inventory</span></div>
-      <em data-trend="evidence">-</em>
-    </a>
-    <a class="soc-metric-card skeleton" href="{{ url_for('web.timeline') }}" data-dashboard-card="timeline">
-      <span class="soc-metric-icon teal"><i class="bi bi-clock-history"></i></span>
-      <div><small>Timeline Events</small><strong data-metric="timeline-count">-</strong><span data-metric-note="timeline">Loading events</span></div>
-      <em data-trend="timeline">-</em>
-    </a>
-    <a class="soc-metric-card skeleton" href="{{ url_for('web.reports') }}" data-dashboard-card="reports">
-      <span class="soc-metric-icon violet"><i class="bi bi-file-earmark-bar-graph"></i></span>
-      <div><small>Reports</small><strong data-metric="reports-count">-</strong><span data-metric-note="reports">Loading deliverables</span></div>
-      <em data-trend="reports">-</em>
-    </a>
-    <a class="soc-metric-card skeleton" href="{{ url_for('web.dashboard') }}" data-dashboard-card="health">
-      <span class="soc-metric-icon green"><i class="bi bi-heart-pulse"></i></span>
-      <div><small>System Health</small><strong data-metric="system-health">-</strong><span data-metric-note="health">Checking services</span></div>
-      <em data-trend="health">-</em>
-    </a>
-    <a class="soc-metric-card skeleton" href="{{ url_for('web.timeline') }}" data-dashboard-card="network">
-      <span class="soc-metric-icon teal"><i class="bi bi-diagram-3"></i></span>
-      <div><small>Network Status</small><strong data-metric="network-status">-</strong><span data-metric-note="network">Loading telemetry</span></div>
-      <em data-trend="network">-</em>
-    </a>
-    {% if can('plugins.read') %}<a class="soc-metric-card skeleton" href="{{ url_for('web.plugins') }}" data-dashboard-card="plugins">
-      <span class="soc-metric-icon amber"><i class="bi bi-puzzle"></i></span>
-      <div><small>Plugin Status</small><strong data-metric="plugin-status">-</strong><span data-metric-note="plugins">Loading health</span></div>
-      <em data-trend="plugins">-</em>
-    </a>{% endif %}
-  </section>
-
-  <section class="soc-main-grid">
-    <div class="soc-primary-column">
-      <section class="soc-chart-grid">
-        <article class="soc-panel soc-panel-wide">
-          <div class="soc-card-head"><div><h3>Threat Trend</h3><p>Timeline-derived risk movement</p></div><a href="{{ url_for('web.timeline') }}">Open Timeline</a></div>
-          <div class="soc-chart soc-chart-large" data-chart="threat"><div class="skeleton-block"></div></div>
-        </article>
-        <article class="soc-panel">
-          <div class="soc-card-head"><div><h3>Attack Distribution</h3><p>Observed activity classes</p></div></div>
-          <div class="soc-donut-wrap" data-chart="attack-distribution"><div class="skeleton-block"></div></div>
-        </article>
-        <article class="soc-panel">
-          <div class="soc-card-head"><div><h3>Investigation Trend</h3><p>Case activity distribution</p></div></div>
-          <div class="soc-chart" data-chart="investigation-trend"><div class="skeleton-block"></div></div>
-        </article>
-        <article class="soc-panel">
-          <div class="soc-card-head"><div><h3>Evidence Growth</h3><p>Recent custody intake</p></div></div>
-          <div class="soc-chart" data-chart="evidence-growth"><div class="skeleton-block"></div></div>
-        </article>
-        <article class="soc-panel">
-          <div class="soc-card-head"><div><h3>Threat Score Trend</h3><p>Score and confidence</p></div></div>
-          <div class="soc-chart" data-chart="score-trend"><div class="skeleton-block"></div></div>
-        </article>
-        <article class="soc-panel">
-          <div class="soc-card-head"><div><h3>Timeline Activity</h3><p>Event volume over time</p></div></div>
-          <div class="soc-chart" data-chart="timeline-activity"><div class="skeleton-block"></div></div>
-        </article>
-        <article class="soc-panel">
-          <div class="soc-card-head"><div><h3>Case Status</h3><p>Investigation state mix</p></div></div>
-          <div class="soc-chart" data-chart="case-status"><div class="skeleton-block"></div></div>
-        </article>
-        <article class="soc-panel">
-          <div class="soc-card-head"><div><h3>IOC Categories</h3><p>Evidence and report indicators</p></div></div>
-          <div class="soc-chart" data-chart="ioc-categories"><div class="skeleton-block"></div></div>
-        </article>
-        <article class="soc-panel">
-          <div class="soc-card-head"><div><h3>MITRE Techniques</h3><p>Technique signal density</p></div></div>
-          <div class="soc-chart" data-chart="mitre-techniques"><div class="skeleton-block"></div></div>
-        </article>
-      </section>
-
-      <article class="soc-panel soc-investigation-panel">
-        <div class="soc-card-head">
-          <div><h3>Active Investigations</h3><p>Case queue with priority, ownership, status, and actions</p></div>
-          <a href="{{ url_for('web.cases') }}">Case Workspace</a>
-        </div>
-        <div class="soc-table-toolbar">
-          <label class="visually-hidden" for="dashboard-case-search">Search investigations</label>
-          <input class="form-control" id="dashboard-case-search" type="search" placeholder="Search cases, owners, status">
-          <select class="form-select" id="dashboard-case-filter" aria-label="Filter dashboard cases">
-            <option value="all">All status</option>
-            <option value="active">Active</option>
-            <option value="closed">Closed</option>
-            <option value="archived">Archived</option>
-          </select>
-          <select class="form-select" id="dashboard-case-sort" aria-label="Sort dashboard cases">
-            <option value="created-desc">Newest created</option>
-            <option value="priority">Priority</option>
-            <option value="title">Title</option>
-            <option value="owner">Owner</option>
-          </select>
-        </div>
-        <div class="table-responsive soc-table-wrap">
-          <table class="table professional-table soc-investigation-table">
-            <thead><tr><th>Case ID</th><th>Title</th><th>Priority</th><th>Owner</th><th>Status</th><th>Created</th><th>Updated</th><th class="text-end">Actions</th></tr></thead>
-            <tbody data-dashboard-cases><tr><td colspan="8"><div class="skeleton-list"></div></td></tr></tbody>
-          </table>
-        </div>
-        <div class="soc-pagination">
-          <span data-dashboard-case-page>Loading cases</span>
-          <div><button class="btn btn-sm btn-outline-secondary" type="button" data-dashboard-page="prev">Prev</button><button class="btn btn-sm btn-outline-secondary" type="button" data-dashboard-page="next">Next</button></div>
-        </div>
-      </article>
+<link href="{{ url_for('static', filename='css/dashboard_soc.css') }}" rel="stylesheet">
+<div class="soc2-dashboard" data-dashboard-root aria-live="polite">
+  <header class="soc2-page-head">
+    <div>
+      <div class="soc2-overline"><span class="soc2-live"></span> Security Operations Center</div>
+      <h2>Investigation command center</h2>
+      <p>Prioritized operational context for {{ current_user.username }}.</p>
     </div>
+    <div class="soc2-head-actions">
+      <button class="soc2-global-search" type="button" data-dashboard-search aria-label="Search workspace">
+        <i class="bi bi-search"></i><span>Search cases, evidence, reports…</span><kbd>Ctrl K</kbd>
+      </button>
+      <span class="soc2-freshness"><i class="bi bi-arrow-repeat"></i> Live workspace data</span>
+    </div>
+  </header>
 
-    <aside class="soc-right-sidebar">
-      <article class="soc-panel">
-        <div class="soc-card-head"><div><h3>Live Threat Feed</h3><p>Recent SOC events</p></div></div>
-        <div class="soc-feed" data-list="live-threat-feed"><div class="skeleton-list"></div></div>
+  <section class="soc2-briefing-grid" aria-label="Daily investigation briefing">
+    <article class="soc2-briefing skeleton" data-dashboard-card="threat">
+      <div class="soc2-briefing-head">
+        <span class="soc2-ai-mark"><i class="bi bi-stars"></i></span>
+        <div><p>AI Daily Briefing</p><span>Prioritized from current workspace activity</span></div>
+        <a href="{{ url_for('web.ai_chat') }}">Continue with AI <i class="bi bi-arrow-up-right"></i></a>
+      </div>
+      <div class="soc2-briefing-body">
+        <div class="soc2-briefing-copy">
+          <span class="soc2-status-label"><i class="bi bi-shield-check"></i> Current posture</span>
+          <h3 data-dashboard-headline>Building your investigation briefing</h3>
+          <p data-dashboard-subtitle>Correlating cases, evidence, timeline activity, AI signals, and platform health.</p>
+          <div class="soc2-focus-case">
+            <span>Current Investigation</span>
+            <strong data-current-case-number>Loading</strong>
+            <small data-current-case-title>Resolving latest active case</small>
+          </div>
+        </div>
+        <div class="soc2-ai-recommendation" data-dashboard-recommendation><div class="skeleton-list"></div></div>
+      </div>
+    </article>
+
+    <aside class="soc2-actions-panel">
+      <div class="soc2-section-head"><div><p>Quick Actions</p><span>Start a high-frequency workflow</span></div></div>
+      <div class="soc2-quick-actions">
+        {% if can('cases.write') %}<a href="{{ url_for('web.cases') }}"><i class="bi bi-plus-lg"></i><span><strong>New case</strong><small>Open an investigation</small></span><i class="bi bi-chevron-right"></i></a>{% endif %}
+        {% if can('evidence.write') %}<a href="{{ url_for('web.evidence') }}"><i class="bi bi-cloud-arrow-up"></i><span><strong>Add evidence</strong><small>Hash and preserve an artifact</small></span><i class="bi bi-chevron-right"></i></a>{% endif %}
+        {% if can('timeline.read') %}<a href="{{ url_for('web.timeline') }}"><i class="bi bi-clock-history"></i><span><strong>Build timeline</strong><small>Review chronological activity</small></span><i class="bi bi-chevron-right"></i></a>{% endif %}
+        {% if can('ai.chat') %}<a href="{{ url_for('web.ai_chat') }}"><i class="bi bi-stars"></i><span><strong>Ask AI</strong><small>Get investigation guidance</small></span><i class="bi bi-chevron-right"></i></a>{% endif %}
+      </div>
+    </aside>
+  </section>
+
+  <section class="soc2-kpi-grid" aria-label="Operational metrics">
+    <a class="soc2-kpi skeleton" href="{{ url_for('web.cases') }}" data-dashboard-card="cases">
+      <div class="soc2-kpi-top"><span class="soc2-kpi-icon blue"><i class="bi bi-briefcase"></i></span><em data-trend="cases">Loading</em></div>
+      <strong data-metric="cases-count">-</strong><span>Investigation cases</span><small data-metric-note="cases">Loading active workload</small>
+    </a>
+    <a class="soc2-kpi skeleton" href="{{ url_for('web.profile') }}#notifications" data-dashboard-card="alerts">
+      <div class="soc2-kpi-top"><span class="soc2-kpi-icon red"><i class="bi bi-exclamation-triangle"></i></span><em data-trend="alerts">Loading</em></div>
+      <strong data-metric="critical-alerts">-</strong><span>Priority alerts</span><small data-metric-note="alerts">Reviewing workspace alerts</small>
+    </a>
+    <a class="soc2-kpi skeleton" href="{{ url_for('web.evidence') }}" data-dashboard-card="evidence">
+      <div class="soc2-kpi-top"><span class="soc2-kpi-icon green"><i class="bi bi-fingerprint"></i></span><em data-trend="evidence">Loading</em></div>
+      <strong data-metric="evidence-count">-</strong><span>Evidence artifacts</span><small data-metric-note="evidence">Loading custody inventory</small>
+    </a>
+    <a class="soc2-kpi skeleton" href="{{ url_for('web.timeline') }}" data-dashboard-card="timeline">
+      <div class="soc2-kpi-top"><span class="soc2-kpi-icon teal"><i class="bi bi-clock-history"></i></span><em data-trend="timeline">Loading</em></div>
+      <strong data-metric="timeline-count">-</strong><span>Correlated events</span><small data-metric-note="timeline">Loading timeline activity</small>
+    </a>
+    <a class="soc2-kpi skeleton" href="{{ url_for('web.reports') }}" data-dashboard-card="reports">
+      <div class="soc2-kpi-top"><span class="soc2-kpi-icon violet"><i class="bi bi-file-earmark-check"></i></span><em data-trend="reports">Loading</em></div>
+      <strong data-metric="reports-count">-</strong><span>Reports generated</span><small data-metric-note="reports">Loading deliverables</small>
+    </a>
+  </section>
+
+  <section class="soc2-work-grid">
+    <article class="soc2-panel soc2-priority-queue soc-investigation-panel">
+      <div class="soc2-section-head">
+        <div><p>Priority Queue</p><span>Active cases · ordered for analyst attention</span></div>
+        <a href="{{ url_for('web.cases') }}">View all cases <i class="bi bi-arrow-right"></i></a>
+      </div>
+      <div class="soc2-queue-toolbar">
+        <div class="soc2-filter-search"><i class="bi bi-search"></i><label class="visually-hidden" for="dashboard-case-search">Search investigations</label><input id="dashboard-case-search" type="search" placeholder="Search case, owner, status"></div>
+        <select id="dashboard-case-filter" aria-label="Filter cases by status"><option value="all">All status</option><option value="active">Active</option><option value="closed">Closed</option><option value="archived">Archived</option></select>
+        <select id="dashboard-case-sort" aria-label="Sort dashboard cases"><option value="priority">Highest priority</option><option value="created-desc">Newest created</option><option value="title">Title</option><option value="owner">Owner</option></select>
+      </div>
+      <div class="table-responsive soc2-table-wrap">
+        <table class="table professional-table soc-investigation-table">
+          <thead><tr><th>Case ID</th><th>Investigation</th><th>Priority</th><th>Owner</th><th>Status</th><th>Opened</th><th>Updated</th><th class="text-end">Action</th></tr></thead>
+          <tbody data-dashboard-cases><tr><td colspan="8"><div class="skeleton-list"></div></td></tr></tbody>
+        </table>
+      </div>
+      <div class="soc2-pagination"><span data-dashboard-case-page>Loading investigations</span><div><button type="button" data-dashboard-page="prev"><i class="bi bi-chevron-left"></i> Previous</button><button type="button" data-dashboard-page="next">Next <i class="bi bi-chevron-right"></i></button></div></div>
+    </article>
+
+    <aside class="soc2-threat-column">
+      <article class="soc2-panel soc2-threat-card">
+        <div class="soc2-section-head"><div><p>Threat Status</p><span>Recorded alerts and investigation activity</span></div><span class="soc2-severity">Live data</span></div>
+        <div class="soc2-threat-score">
+          <div><strong data-metric="threat-alert-count">-</strong><span>priority alerts</span></div>
+          <p data-metric-note="threat">Reviewing recorded notifications</p>
+        </div>
+        <div class="soc2-threat-chart" data-chart="threat-activity"><div class="skeleton-block"></div></div>
+        <a class="soc2-panel-link" href="{{ url_for('web.timeline') }}">Investigate timeline <i class="bi bi-arrow-right"></i></a>
       </article>
-      <article class="soc-panel">
-        <div class="soc-card-head"><div><h3>Recent Login Attempts</h3><p>Authentication signal</p></div></div>
-        <div class="soc-feed compact" data-list="login-attempts"><div class="skeleton-list"></div></div>
-      </article>
-      <article class="soc-panel">
-        <div class="soc-card-head"><div><h3>Recent Alerts</h3><p>Notification priority</p></div></div>
-        <div class="soc-feed compact" data-list="recent-alerts"><div class="skeleton-list"></div></div>
-      </article>
-      <article class="soc-panel ai-recommendation-panel">
-        <div class="soc-card-head"><div><h3>AI Recommendation</h3><p>Suggested next action</p></div></div>
-        <div data-dashboard-recommendation><div class="skeleton-list"></div></div>
-      </article>
-      <article class="soc-panel">
-        <div class="soc-card-head"><div><h3>System Health</h3><p>Platform readiness</p></div></div>
-        <div class="health-grid" data-plugin-health><div class="skeleton-list"></div></div>
+      <article class="soc2-panel">
+        <div class="soc2-section-head"><div><p>Threat Intelligence</p><span>Meaningful recent indicators and alerts</span></div></div>
+        <div class="soc2-feed compact" data-list="recent-alerts"><div class="skeleton-list"></div></div>
       </article>
     </aside>
   </section>
 
-  <section class="soc-bottom-grid">
-    <article class="soc-panel">
-      <div class="soc-card-head"><div><h3>Evidence Intake</h3><p>Recent custody records</p></div><a href="{{ url_for('web.evidence') }}">Open</a></div>
-      <div class="compact-list" data-list="recent-evidence"><div class="skeleton-list"></div></div>
+  <section class="soc2-context-grid">
+    <article class="soc2-panel soc2-overview-panel">
+      <div class="soc2-section-head"><div><p>Investigation Summary</p><span>Workload, activity, and evidence movement</span></div><a href="{{ url_for('web.cases') }}">Open workspace</a></div>
+      <div class="soc2-chart-grid">
+        <div><header><strong>Case activity</strong><small>Investigation volume</small></header><div class="soc2-mini-chart" data-chart="investigation-trend"><div class="skeleton-block"></div></div></div>
+        <div><header><strong>Evidence growth</strong><small>Recent custody intake</small></header><div class="soc2-mini-chart" data-chart="evidence-growth"><div class="skeleton-block"></div></div></div>
+        <div><header><strong>Case status</strong><small>Current workload mix</small></header><div class="soc2-mini-chart" data-chart="case-status"><div class="skeleton-block"></div></div></div>
+      </div>
     </article>
-    <article class="soc-panel">
-      <div class="soc-card-head"><div><h3>Quick Upload</h3><p>Register evidence quickly</p></div></div>
-      <a class="soc-upload-cta" href="{{ url_for('web.evidence') }}"><i class="bi bi-cloud-arrow-up"></i><strong>Upload Evidence</strong><span>Hash, preserve, analyze, and track chain of custody.</span></a>
-    </article>
-    <article class="soc-panel">
-      <div class="soc-card-head"><div><h3>Chain Of Custody</h3><p>Evidence integrity status</p></div></div>
-      <div class="soc-custody-status" data-dashboard-custody><div class="skeleton-list"></div></div>
-    </article>
-    <article class="soc-panel">
-      <div class="soc-card-head"><div><h3>Recent Reports</h3><p>Latest deliverables</p></div><a href="{{ url_for('web.reports') }}">Reports</a></div>
-      <div class="compact-list" data-list="latest-reports"><div class="skeleton-list"></div></div>
+
+    <article class="soc2-panel">
+      <div class="soc2-section-head"><div><p>System Health</p><span>Platform readiness and services</span></div><span class="soc2-healthy"><i class="bi bi-check-circle-fill"></i> <b data-metric="system-health">Checking</b></span></div>
+      <div class="soc2-health-grid" data-plugin-health><div class="skeleton-list"></div></div>
     </article>
   </section>
+
+  <section class="soc2-detail-grid">
+    <article class="soc2-panel">
+      <div class="soc2-section-head"><div><p>Evidence Overview</p><span>Recent artifacts and analysis state</span></div><a href="{{ url_for('web.evidence') }}">Evidence repository</a></div>
+      <div class="soc2-evidence-layout">
+        <div class="soc2-compact-list" data-list="recent-evidence"><div class="skeleton-list"></div></div>
+        <div class="soc2-custody"><header><i class="bi bi-shield-check"></i><div><strong>Chain of custody</strong><small>Analysis completion across recent evidence</small></div></header><div data-dashboard-custody><div class="skeleton-list"></div></div></div>
+      </div>
+    </article>
+
+    <article class="soc2-panel">
+      <div class="soc2-section-head"><div><p>Timeline Preview</p><span>Latest chronological investigation activity</span></div><a href="{{ url_for('web.timeline') }}">Full timeline</a></div>
+      <div class="soc2-feed soc2-timeline-feed" data-list="live-threat-feed"><div class="skeleton-list"></div></div>
+    </article>
+
+    <article class="soc2-panel">
+      <div class="soc2-section-head"><div><p>Recent Reports</p><span>Latest investigation deliverables</span></div><a href="{{ url_for('web.reports') }}">All reports</a></div>
+      <div class="soc2-compact-list" data-list="latest-reports"><div class="skeleton-list"></div></div>
+    </article>
+  </section>
+
+  <span class="d-none" data-metric="ai-status"></span><span class="d-none" data-metric="network-status"></span><span class="d-none" data-metric="plugin-status"></span>
 </div>
+<script src="{{ url_for('static', filename='js/dashboard_soc.js') }}" defer></script>
 {% endblock %}

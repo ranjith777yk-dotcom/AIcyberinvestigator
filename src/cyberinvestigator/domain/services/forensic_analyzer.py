@@ -6,6 +6,7 @@ import base64
 import binascii
 import bz2
 import gzip
+import hashlib
 import io
 import lzma
 import math
@@ -85,8 +86,19 @@ class ForensicAnalyzer:
         """Analyze one stored evidence file and return a full report."""
         notify = progress or (lambda _value, _step: None)
         notify(22, "Hashing and verifying custody metadata")
-        data = path.read_bytes()[: self.MAX_BYTES]
-        truncated = path.stat().st_size > len(data)
+        digest = hashlib.sha256()
+        captured = bytearray()
+        size_bytes = 0
+        with path.open("rb") as source:
+            while chunk := source.read(1024 * 1024):
+                digest.update(chunk)
+                size_bytes += len(chunk)
+                if len(captured) < self.MAX_BYTES:
+                    captured.extend(chunk[: self.MAX_BYTES - len(captured)])
+        if digest.hexdigest() != sha256:
+            raise ValueError("Evidence integrity verification failed; stored bytes do not match the custody hash.")
+        data = bytes(captured)
+        truncated = size_bytes > len(data)
         notify(32, "Detecting archives and embedded files")
         root = self._analyze_bytes(data, original_filename, depth=0)
         notify(48, "Extracting strings and finding encodings")
@@ -108,6 +120,8 @@ class ForensicAnalyzer:
                 "original_filename": original_filename,
                 "stored_path": str(path),
                 "sha256": sha256,
+                "integrity_verified": True,
+                "stored_size_bytes": size_bytes,
                 "bytes_analyzed": len(data),
                 "truncated": truncated,
             },
@@ -120,8 +134,8 @@ class ForensicAnalyzer:
             },
             "recovered_files": self._recovered_files(root),
             "chain_of_custody": [
-                "Evidence bytes were read from immutable local custody storage.",
-                "The persisted SHA-256 hash was retained and included in this report.",
+                "Evidence bytes were read from quarantine custody storage without execution.",
+                "The full stored object was rehashed and matched the persisted SHA-256 custody value.",
                 "Analysis was read-only; extracted children were analyzed in memory.",
             ],
             "root": root,
@@ -186,7 +200,8 @@ class ForensicAnalyzer:
                     if info.is_dir():
                         continue
                     try:
-                        child = archive.read(info, pwd=None)[: self.MAX_BYTES]
+                        with archive.open(info, pwd=None) as member:
+                            child = member.read(self.MAX_BYTES)
                     except (RuntimeError, OSError, zipfile.BadZipFile):
                         children.append(
                             {
@@ -210,19 +225,28 @@ class ForensicAnalyzer:
             return children
         except tarfile.TarError:
             return children
-        for label, decompressor in (
-            ("gzip", gzip.decompress),
-            ("bzip2", bz2.decompress),
-            ("xz", lzma.decompress),
-            ("zlib", zlib.decompress),
-        ):
+        for label in ("gzip", "bzip2", "xz", "zlib"):
             try:
-                expanded = decompressor(data)[: self.MAX_BYTES]
+                expanded = self._bounded_decompress(data, label)
             except (OSError, EOFError, lzma.LZMAError, zlib.error):
                 continue
             children.append(self._analyze_bytes(expanded, f"{name}.{label}.decompressed", depth=depth + 1))
             break
         return children
+
+    def _bounded_decompress(self, data: bytes, algorithm: str) -> bytes:
+        """Expand at most MAX_BYTES so compressed evidence cannot exhaust memory."""
+
+        if algorithm == "gzip":
+            with gzip.GzipFile(fileobj=io.BytesIO(data)) as stream:
+                return stream.read(self.MAX_BYTES)
+        if algorithm == "bzip2":
+            with bz2.BZ2File(io.BytesIO(data)) as stream:
+                return stream.read(self.MAX_BYTES)
+        if algorithm == "xz":
+            with lzma.LZMAFile(io.BytesIO(data)) as stream:
+                return stream.read(self.MAX_BYTES)
+        return zlib.decompressobj().decompress(data, self.MAX_BYTES)
 
     @classmethod
     def _magic_name(cls, data: bytes) -> str:

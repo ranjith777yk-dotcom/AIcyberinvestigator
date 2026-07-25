@@ -1,4 +1,8 @@
 .git
+.github
+.env
+.env.*
+!.env.example
 .venv
 __pycache__
 .pytest_cache
@@ -8,3 +12,6 @@ logs
 backups
 %TEMP%
 *.pyc
+tests
+docs
+scripts

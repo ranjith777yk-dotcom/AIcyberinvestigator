@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import hashlib
 
+import pytest
+
 from cyberinvestigator.domain.services.forensic_analyzer import ForensicAnalyzer
 
 
@@ -43,3 +45,35 @@ def test_forensic_report_contains_enterprise_sections_and_correlations(tmp_path)
     assert report["sigma_results"]
     artifact = report["recovered_artifacts"][0]
     assert {"artifact", "location", "confidence", "evidence_path", "validation", "why_identified"} <= artifact.keys()
+    assert report["evidence"]["integrity_verified"] is True
+    assert report["evidence"]["stored_size_bytes"] == len(payload)
+
+
+def test_forensic_analysis_refuses_custody_hash_mismatch(tmp_path) -> None:
+    sample = tmp_path / "tampered.bin"
+    sample.write_bytes(b"changed after registration")
+
+    with pytest.raises(ValueError, match="integrity verification failed"):
+        ForensicAnalyzer().analyze_path(
+            sample,
+            evidence_number="EV-TAMPER",
+            original_filename="tampered.bin",
+            sha256=hashlib.sha256(b"original bytes").hexdigest(),
+        )
+
+
+def test_forensic_analysis_handles_unsupported_opaque_bytes_without_fabricating_findings(tmp_path) -> None:
+    payload = bytes(range(256))
+    sample = tmp_path / "opaque.bin"
+    sample.write_bytes(payload)
+
+    result = ForensicAnalyzer().analyze_path(
+        sample,
+        evidence_number="EV-OPAQUE",
+        original_filename="opaque.bin",
+        sha256=hashlib.sha256(payload).hexdigest(),
+    )
+
+    assert result.report["root"]["file_signature"] == "Unknown"
+    assert result.report["ioc_table"] == []
+    assert result.report["evidence"]["integrity_verified"] is True
