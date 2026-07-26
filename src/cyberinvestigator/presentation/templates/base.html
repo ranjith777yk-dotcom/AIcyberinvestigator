@@ -147,5 +147,6 @@
   <script src="{{ url_for('static', filename='js/dashboard_extras.js') }}"></script>
   <script src="{{ url_for('static', filename='js/enterprise_shell.js') }}"></script>
   <script src="{{ url_for('static', filename='js/responsive.js') }}"></script>
+  {% block page_scripts %}{% endblock %}
 </body>
 </html>

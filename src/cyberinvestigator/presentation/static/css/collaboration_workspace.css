@@ -21,3 +21,14 @@
   .collaboration-grid { display: contents; }
   #assigned-tasks { order: 1; } #investigation-updates { order: 2; } #comments { order: 3; } #mentions { order: 4; }
 }
+
+/* Workspace hierarchy: shared operational cards retain feature markup and behavior. */
+.collaboration-workspace { gap: 1.25rem; }
+.collaboration-hero { padding: 1.45rem 1.5rem; border: 1px solid color-mix(in srgb, var(--ci-color-primary) 24%, var(--ci-color-border)); border-radius: 16px; background: radial-gradient(circle at 88% 10%, color-mix(in srgb,var(--ci-color-primary) 18%,transparent), transparent 36%), var(--ci-color-surface); box-shadow: var(--ci-shadow-sm); }
+.collaboration-hero h2 { font-size: clamp(1.45rem,2vw,2rem); font-weight: 750; letter-spacing: -.035em; }
+.collaboration-grid > .surface-card,.case-collaboration { padding: 1.2rem; border-radius: 14px; border-color: var(--ci-color-border); box-shadow: var(--ci-shadow-sm); }
+.collaboration-grid > .surface-card > h3,.case-collaboration h3 { display:flex; align-items:center; gap:.55rem; font-size:1rem; font-weight:700; }
+.collaboration-grid > .surface-card > h3::before { content:""; width:8px; height:8px; border-radius:50%; background:var(--ci-color-primary); box-shadow:0 0 0 4px var(--ci-color-primary-soft); }
+.collaboration-item { background: var(--ci-color-surface-subtle); border-color: var(--ci-color-border-subtle); transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease; }
+.collaboration-item:hover { transform: translateY(-2px); border-color: color-mix(in srgb,var(--ci-color-primary) 42%,var(--ci-color-border)); box-shadow: var(--ci-shadow-sm); }
+.collaboration-actions form { background: var(--ci-color-surface-subtle); border-color: var(--ci-color-border-subtle); }

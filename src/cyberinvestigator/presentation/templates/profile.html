@@ -30,8 +30,8 @@
       <a href="#preferences" data-profile-page="preferences"><i class="bi bi-sliders"></i> Preferences</a>
     </aside>
     <section class="settings-pages">
-      <article class="surface-card settings-page active" id="profile">
-        <h3>Profile</h3>
+      <article class="surface-card settings-page active account-overview" id="profile">
+        <div class="account-section-head"><div><p class="eyebrow">Account center</p><h3>Profile Overview</h3><p>Your identity and workspace security at a glance.</p></div><span class="ci-status ci-status--success"><i></i> Verified account</span></div>
         {% if profile_user %}
         <div class="profile-summary">
           <span class="avatar xl">{{ profile_user.username[:2]|upper }}</span>
@@ -41,6 +41,12 @@
             <span class="badge text-bg-primary">{{ 'Administrator' if profile_user.role.name == 'admin' else 'User' }}</span>
             <small>Last login: {{ profile_user.last_login_at or 'Not recorded' }}</small>
           </div>
+        </div>
+        <div class="account-signal-grid" aria-label="Account summary">
+          <div><i class="bi bi-shield-check"></i><small>Security score</small><strong>Protected</strong></div>
+          <div><i class="bi bi-display"></i><small>Active sessions</small><strong>Managed</strong></div>
+          <div><i class="bi bi-building"></i><small>Workspace role</small><strong>{{ 'Administrator' if profile_user.role.name == 'admin' else 'Investigator' }}</strong></div>
+          <div><i class="bi bi-clock-history"></i><small>Last sign-in</small><strong>{{ profile_user.last_login_at or 'Not recorded' }}</strong></div>
         </div>
         <form method="post" class="auth-form mt-3">
           <input type="hidden" name="csrf_token" value="{{ csrf_token }}">

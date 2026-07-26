@@ -26,3 +26,13 @@
   .intelligence-grid { display: flex; flex-direction: column; }
   #intelligence-feed { order: 1; } #intelligence-search { order: 2; } #threat-actors { order: 3; } #campaigns { order: 4; }
 }
+
+.intelligence-center { gap:1.25rem; }
+.intelligence-hero { padding:1.45rem 1.5rem; border:1px solid color-mix(in srgb,var(--ci-color-info) 28%,var(--ci-color-border)); border-radius:16px; background:radial-gradient(circle at 88% 6%,color-mix(in srgb,var(--ci-color-info) 16%,transparent),transparent 38%),var(--ci-color-surface); box-shadow:var(--ci-shadow-sm); }
+.intelligence-hero h2 { font-size:clamp(1.45rem,2vw,2rem); font-weight:750; letter-spacing:-.035em; }
+.intelligence-grid > .surface-card,.intelligence-workbench > .surface-card,.intelligence-graph-section { padding:1.2rem; border-radius:14px; border-color:var(--ci-color-border); box-shadow:var(--ci-shadow-sm); }
+.intelligence-grid h3,.intelligence-workbench h3,.intelligence-graph-section h3 { display:flex; align-items:center; gap:.55rem; font-size:1rem; font-weight:700; }
+.intelligence-grid h3::before { content:""; width:8px; height:8px; border-radius:50%; background:var(--ci-color-info); box-shadow:0 0 0 4px var(--ci-color-info-soft); }
+.intelligence-record { background:var(--ci-color-surface-subtle); border-color:var(--ci-color-border-subtle); transition:transform .18s ease,border-color .18s ease; }
+.intelligence-record:hover { transform:translateY(-2px); border-color:color-mix(in srgb,var(--ci-color-info) 44%,var(--ci-color-border)); }
+#intelligence-graph { background:radial-gradient(circle at 50% 45%,color-mix(in srgb,var(--ci-color-primary) 9%,transparent),transparent 56%),var(--ci-color-surface-subtle); border-color:var(--ci-color-border); }
