@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   quality:
-    name: Quality and tests
+    name: Layered tests and coverage
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -35,13 +35,53 @@ jobs:
       - name: Compile
         run: python -m compileall -q src
       - name: Test
-        run: python -m pytest --junitxml=test-results.xml
+        env:
+          CYBERINVESTIGATOR_ENV: testing
+          DATABASE_URL: sqlite:///:memory:
+        run: |
+          mkdir -p instance/quality
+          python -m pytest tests/unit tests/integration tests/functional tests/architecture \
+            --junitxml=instance/quality/junit.xml \
+            --cov=cyberinvestigator \
+            --cov-report=term-missing \
+            --cov-report=json:instance/quality/coverage-summary.json
       - name: Publish test report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-results
-          path: test-results.xml
+          name: quality-evidence-core
+          path: instance/quality/
+          if-no-files-found: error
+          retention-days: 14
+
+  browser-validation:
+    name: E2E, accessibility, responsive, and performance
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - name: Install project and browser tooling
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+          python -m playwright install --with-deps chromium
+      - name: Run browser quality gates
+        env:
+          CYBERINVESTIGATOR_ENV: testing
+          DATABASE_URL: sqlite:///:memory:
+        run: |
+          mkdir -p instance/quality
+          python -m pytest tests/e2e --junitxml=instance/quality/browser-junit.xml
+      - name: Publish browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-evidence-browser
+          path: instance/quality/
           if-no-files-found: error
           retention-days: 14
 
@@ -60,9 +100,19 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements-dev.txt
       - name: Audit dependencies
-        run: python -m pip_audit
+        run: |
+          mkdir -p instance/quality
+          python -m pip_audit --format=json --output=instance/quality/dependency-audit.json
       - name: Static application security scan
-        run: python -m bandit -r src -x tests -lll -iii
+        run: python -m bandit -r src -x tests -lll -iii -f json -o instance/quality/bandit-report.json
+      - name: Publish security evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-evidence-security
+          path: instance/quality/
+          if-no-files-found: warn
+          retention-days: 14
 
   codeql:
     name: CodeQL
@@ -84,7 +134,7 @@ jobs:
     name: Container build
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    needs: [quality, dependency-security]
+    needs: [quality, browser-validation, dependency-security, codeql]
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3

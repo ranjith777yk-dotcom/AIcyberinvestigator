@@ -1,0 +1,13 @@
+.evidence-lab-mobile-nav { display: none; gap: .5rem; margin-bottom: 1rem; overflow-x: auto; }
+.evidence-lab-mobile-nav a { background: var(--surface-raised, #172033); border-radius: .5rem; color: inherit; padding: .65rem .8rem; white-space: nowrap; }
+.evidence-lab-grid { display: grid; gap: 1rem; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 1rem; }
+.evidence-lab-list { display: grid; gap: .6rem; max-height: 20rem; overflow: auto; }
+.evidence-lab-record { border: 1px solid var(--border-color, #34405a); border-radius: .55rem; padding: .7rem; }
+.evidence-lab-record strong, .evidence-lab-record span { display: block; overflow-wrap: anywhere; }
+.evidence-lab-record span, .evidence-lab-empty, .evidence-lab-provider { color: var(--text-muted, #98a6bd); font-size: .9rem; }
+@media (max-width: 1200px) { .evidence-lab-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 700px) {
+  .evidence-lab-mobile-nav { display: flex; }
+  .evidence-lab-grid { display: flex; flex-direction: column; }
+  #lab-evidence-status { order: 1; } #lab-analysis-results { order: 2; } #lab-queue { order: 3; } #lab-artifacts { order: 4; }
+}

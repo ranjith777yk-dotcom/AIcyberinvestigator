@@ -245,6 +245,41 @@ def plugins() -> str:
     return render_template("plugins.html", active_page="plugins", page_title="Plugins")
 
 
+@web_blueprint.get("/automation")
+@require_role("user")
+def automation() -> str:
+    """Render the tenant-scoped Automation Center."""
+    return render_template("automation.html", active_page="automation", page_title="Automation Center")
+
+
+@web_blueprint.get("/analytics")
+@require_role("user")
+def analytics() -> str:
+    """Render the Analytics & Machine Learning Center."""
+    return render_template("analytics.html", active_page="analytics", page_title="Analytics & ML Center")
+
+
+@web_blueprint.get("/mobile")
+@require_role("user")
+def mobile_companion() -> str:
+    """Render the secure mobile companion view for responsive browsers."""
+    return render_template("mobile_companion.html", active_page="mobile", page_title="Mobile Companion")
+
+
+@web_blueprint.get("/commercial")
+@require_role("admin")
+def commercial() -> str:
+    """Render optional licensing, usage, and marketplace administration."""
+    return render_template("commercial.html", active_page="commercial", page_title="Commercial Administration")
+
+
+@web_blueprint.get("/product")
+@require_role("user")
+def product() -> str:
+    """Render privacy-aware product analytics and improvement workspace."""
+    return render_template("product.html", active_page="product", page_title="Product Analytics Center")
+
+
 @web_blueprint.get("/reports")
 @require_role("user")
 def reports() -> str:
@@ -264,6 +299,66 @@ def settings() -> str:
 def admin() -> str:
     """Render the admin operations workspace."""
     return render_template("admin.html", active_page="admin", page_title="Admin")
+
+
+@web_blueprint.get("/admin/quality")
+@require_role("admin")
+def quality() -> str:
+    """Render the generated-evidence quality management workspace."""
+    return render_template("quality.html", active_page="quality", page_title="Quality Assurance")
+
+
+@web_blueprint.get("/admin/performance")
+@require_role("admin")
+def performance() -> str:
+    """Render the performance, scalability, and availability workspace."""
+    return render_template("performance.html", active_page="performance", page_title="Performance & Scalability")
+
+
+@web_blueprint.get("/admin/governance")
+@require_role("admin")
+def governance() -> str:
+    """Render the compliance, privacy, and governance workspace."""
+    return render_template("governance.html", active_page="governance", page_title="Compliance & Governance")
+
+
+@web_blueprint.get("/developers")
+@require_role("user")
+def developers() -> str:
+    """Render the authenticated developer documentation portal."""
+    return render_template("developers.html", active_page="developers", page_title="Developer Platform")
+
+
+@web_blueprint.get("/organizations")
+@require_role("user")
+def organizations() -> str:
+    """Render the active organization administration and switching workspace."""
+    return render_template("organizations.html", active_page="organizations", page_title="Organizations")
+
+
+@web_blueprint.get("/collaboration")
+@require_role("user")
+def collaboration() -> str:
+    """Render the tenant-scoped investigation collaboration workspace."""
+    return render_template("collaboration.html", active_page="collaboration", page_title="Team Collaboration")
+
+
+@web_blueprint.get("/threat-hunting")
+@require_role("user")
+def threat_hunting() -> str:
+    """Render the tenant-scoped Threat Hunting Center."""
+    return render_template("threat_hunting.html", active_page="threat_hunting", page_title="Threat Hunting Center")
+
+
+@web_blueprint.get("/intelligence")
+@require_role("user")
+def intelligence_center() -> str:
+    """Render the tenant-scoped Threat Intelligence Center."""
+    return render_template(
+        "intelligence_center.html",
+        active_page="intelligence_center",
+        page_title="Threat Intelligence Center",
+    )
 
 
 @web_blueprint.get("/ai-chat")

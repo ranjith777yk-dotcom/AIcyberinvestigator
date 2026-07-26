@@ -26,10 +26,15 @@ class Case(IdentifiedRecord):
     __tablename__ = "cases"
     __table_args__ = (
         Index("ix_cases_owner_opened", "owner", "opened_at"),
+        Index("ix_cases_organization_opened", "organization_id", "opened_at"),
+        UniqueConstraint("organization_id", "case_number", name="uq_cases_organization_number"),
         Index("ix_cases_deleted_archived", "deleted_at", "archived_at"),
     )
 
-    case_number: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
+    organization_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("organizations.id", ondelete="RESTRICT"), nullable=True, index=True
+    )
+    case_number: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
     owner_user_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
     )
@@ -114,6 +119,9 @@ class Artifact(IdentifiedRecord):
     )
 
     evidence_id: Mapped[UUID] = mapped_column(ForeignKey("evidence.id", ondelete="CASCADE"), nullable=False)
+    analysis_run_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("evidence_analysis_runs.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     parent_artifact_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("artifacts.id", ondelete="SET NULL"), nullable=True
     )

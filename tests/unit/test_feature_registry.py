@@ -38,7 +38,12 @@ def test_in_process_dispatcher_implements_replaceable_job_boundary() -> None:
         pass
 
     dispatcher.submit(task)
-    assert executor.tasks == [(task, (), {})]
+    assert len(executor.tasks) == 1
+    submitted, args, kwargs = executor.tasks[0]
+    assert args == ()
+    assert kwargs == {}
+    submitted()
+    assert dispatcher.snapshot()["completed_since_start"] == 1
 
 
 def test_analysis_request_is_an_immutable_provider_neutral_contract() -> None:

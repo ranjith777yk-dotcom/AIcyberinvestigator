@@ -125,3 +125,29 @@ def test_deployment_workspace_enforces_server_side_rbac(tmp_path) -> None:
     )
 
     assert response.status_code == 403
+
+
+def test_release_decision_requires_identity_metadata_and_is_audited(tmp_path, monkeypatch) -> None:
+    app = _app(tmp_path)
+    client = app.test_client()
+
+    unavailable = client.post(
+        "/api/v1/admin/deployments/release-approvals",
+        json={"decision": "approved", "reason": "All required quality gates passed."},
+    )
+    assert unavailable.status_code == 409
+
+    monkeypatch.setenv("RELEASE_VERSION", "v1.2.3")
+    monkeypatch.setenv("GIT_SHA", "a" * 40)
+    recorded = client.post(
+        "/api/v1/admin/deployments/release-approvals",
+        json={"decision": "approved", "reason": "All required quality gates passed."},
+    )
+
+    assert recorded.status_code == 201
+    assert recorded.get_json()["deployment_executed"] is False
+    with app.app_context():
+        database = app.extensions["cyberinvestigator_database"]
+        audit = database.session.scalar(select(AuditLog).where(AuditLog.action == "deployment.release.approved"))
+        assert audit is not None
+        assert audit.affected_object == f"release:v1.2.3@{'a' * 40}"

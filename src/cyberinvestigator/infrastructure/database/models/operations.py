@@ -146,6 +146,9 @@ class AIConversation(IdentifiedRecord):
     __table_args__ = (Index("ix_ai_conversations_owner_created", "owner_user_id", "created_at"),)
 
     owner_user_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
+    organization_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), nullable=True, index=True
+    )
     conversation_id: Mapped[UUID] = mapped_column(default=uuid4, nullable=False, index=True)
     title: Mapped[str] = mapped_column(String(255), nullable=False, default="New chat")
     created_by_user_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)

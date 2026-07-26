@@ -1,15 +1,25 @@
 {% extends "base.html" %}
 {% block content %}
 <link href="{{ url_for('static', filename='css/evidence_workspace.css') }}" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/evidence_lab.css') }}" rel="stylesheet">
 <div data-module="evidence">
   <div class="page-heading">
     <div>
-      <p class="eyebrow">Evidence custody</p>
-      <h2>Evidence repository</h2>
-      <p class="text-muted mb-0">Upload, hash, analyze, and preserve case-linked evidence with chain-of-custody context.</p>
+      <p class="eyebrow">Digital Evidence Laboratory</p>
+      <h2>Digital Evidence Lab</h2>
+      <p class="text-muted mb-0">Enterprise Evidence repository: quarantine, verify, inspect, and preserve case-linked evidence without executing uploaded files.</p>
     </div>
     <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#evidence-modal"><i class="bi bi-cloud-arrow-up"></i> Add evidence</button>
   </div>
+
+  <nav class="evidence-lab-mobile-nav" aria-label="Evidence lab sections"><a href="#lab-evidence-status">Evidence Status</a><a href="#lab-analysis-results">Analysis Results</a><a href="#lab-queue">Queue</a><a href="#lab-artifacts">Artifacts</a></nav>
+  <section class="evidence-lab-grid" aria-label="Digital Evidence Lab status">
+    <article class="surface-card" id="lab-evidence-status"><h3>Evidence Status</h3><div class="evidence-lab-list" data-lab-list="evidence_status"></div></article>
+    <article class="surface-card" id="lab-analysis-results"><h3>Analysis Results</h3><div class="evidence-lab-list" data-lab-list="analysis_results"></div></article>
+    <article class="surface-card" id="lab-queue"><h3>Queue</h3><div class="evidence-lab-list" data-lab-list="queue"></div></article>
+    <article class="surface-card" id="lab-artifacts"><h3>Artifacts</h3><div class="evidence-lab-list" data-lab-list="artifacts"></div></article>
+  </section>
+  <p class="evidence-lab-provider" id="evidence-lab-provider" role="status" aria-live="polite">Checking sandbox adapter availability…</p>
 
   <div class="row g-4">
     <div class="col-xl-8">
@@ -111,3 +121,4 @@
   </div>
 </div>
 {% endblock %}
+{% block page_scripts %}<script src="{{ url_for('static', filename='js/evidence_lab.js') }}" defer></script>{% endblock %}

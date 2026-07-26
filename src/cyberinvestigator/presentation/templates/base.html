@@ -41,10 +41,16 @@
         <div class="nav-group nav-lifecycle">
           <p class="nav-caption">Investigation lifecycle</p>
           {% if can('cases.read') %}<a class="nav-link {% if active_page == 'cases' %}active{% endif %}" href="{{ url_for('web.cases') }}" {% if active_page == 'cases' %}aria-current="page"{% endif %}><i class="bi bi-briefcase"></i><span>Cases</span><small class="nav-stage">01</small></a>{% endif %}
+          {% if can('collaboration.read') %}<a class="nav-link {% if active_page == 'collaboration' %}active{% endif %}" href="{{ url_for('web.collaboration') }}" {% if active_page == 'collaboration' %}aria-current="page"{% endif %}><i class="bi bi-people"></i><span>Collaboration</span></a>{% endif %}
+          {% if can('threat_hunting.read') %}<a class="nav-link {% if active_page == 'threat_hunting' %}active{% endif %}" href="{{ url_for('web.threat_hunting') }}" {% if active_page == 'threat_hunting' %}aria-current="page"{% endif %}><i class="bi bi-crosshair"></i><span>Threat Hunting</span></a>{% endif %}
+          {% if can('intelligence.read') %}<a class="nav-link {% if active_page == 'intelligence_center' %}active{% endif %}" href="{{ url_for('web.intelligence_center') }}" {% if active_page == 'intelligence_center' %}aria-current="page"{% endif %}><i class="bi bi-share"></i><span>Threat Intelligence</span></a>{% endif %}
           {% if can('evidence.read') %}<a class="nav-link {% if active_page == 'evidence' %}active{% endif %}" href="{{ url_for('web.evidence') }}" {% if active_page == 'evidence' %}aria-current="page"{% endif %}><i class="bi bi-fingerprint"></i><span>Evidence</span><small class="nav-stage">02</small></a>{% endif %}
           {% if can('timeline.read') %}<a class="nav-link {% if active_page == 'timeline' %}active{% endif %}" href="{{ url_for('web.timeline') }}" {% if active_page == 'timeline' %}aria-current="page"{% endif %}><i class="bi bi-clock-history"></i><span>Timeline</span><small class="nav-stage">03</small></a>{% endif %}
           {% if can('ai.chat') %}<a class="nav-link {% if active_page == 'ai_chat' %}active{% endif %}" href="{{ url_for('web.ai_chat') }}" {% if active_page == 'ai_chat' %}aria-current="page"{% endif %}><i class="bi bi-stars"></i><span>AI investigation</span><small class="nav-stage">04</small></a>{% endif %}
           {% if can('reports.read') %}<a class="nav-link {% if active_page == 'reports' %}active{% endif %}" href="{{ url_for('web.reports') }}" {% if active_page == 'reports' %}aria-current="page"{% endif %}><i class="bi bi-file-earmark-bar-graph"></i><span>Reports</span><small class="nav-stage">05</small></a>{% endif %}
+          {% if can('automation.read') %}<a class="nav-link {% if active_page == 'automation' %}active{% endif %}" href="{{ url_for('web.automation') }}" {% if active_page == 'automation' %}aria-current="page"{% endif %}><i class="bi bi-diagram-3"></i><span>Automation</span></a>{% endif %}
+          {% if can('analytics.read') %}<a class="nav-link {% if active_page == 'analytics' %}active{% endif %}" href="{{ url_for('web.analytics') }}" {% if active_page == 'analytics' %}aria-current="page"{% endif %}><i class="bi bi-graph-up-arrow"></i><span>Analytics &amp; ML</span></a>{% endif %}
+          {% if can('mobile.companion.read') %}<a class="nav-link {% if active_page == 'mobile' %}active{% endif %}" href="{{ url_for('web.mobile_companion') }}" {% if active_page == 'mobile' %}aria-current="page"{% endif %}><i class="bi bi-phone"></i><span>Mobile Companion</span></a>{% endif %}
         </div>
         {% if can('admin.access') or can('plugins.read') %}
         <div class="nav-group">
@@ -53,7 +59,14 @@
           {% if can('admin.access') %}<a class="nav-link" href="{{ url_for('web.admin') }}#admin-security-pane"><i class="bi bi-shield-check"></i><span>Security center</span></a>{% endif %}
           {% if can('admin.access') %}<a class="nav-link" href="{{ url_for('web.admin') }}#admin-monitoring-pane"><i class="bi bi-activity"></i><span>Monitoring</span></a>{% endif %}
           {% if can('admin.access') %}<a class="nav-link" href="{{ url_for('web.admin') }}#admin-users-pane"><i class="bi bi-people"></i><span>User management</span></a>{% endif %}
+          {% if can('governance.manage') %}<a class="nav-link {% if active_page == 'governance' %}active{% endif %}" href="{{ url_for('web.governance') }}" {% if active_page == 'governance' %}aria-current="page"{% endif %}><i class="bi bi-bank"></i><span>Governance</span></a>{% endif %}
+          {% if can('security.monitor') %}<a class="nav-link {% if active_page == 'performance' %}active{% endif %}" href="{{ url_for('web.performance') }}" {% if active_page == 'performance' %}aria-current="page"{% endif %}><i class="bi bi-speedometer"></i><span>Performance</span></a>{% endif %}
+          {% if can('admin.access') %}<a class="nav-link {% if active_page == 'quality' %}active{% endif %}" href="{{ url_for('web.quality') }}" {% if active_page == 'quality' %}aria-current="page"{% endif %}><i class="bi bi-clipboard-check"></i><span>Quality</span></a>{% endif %}
+          {% if can('dashboard.read') %}<a class="nav-link {% if active_page == 'developers' %}active{% endif %}" href="{{ url_for('web.developers') }}" {% if active_page == 'developers' %}aria-current="page"{% endif %}><i class="bi bi-code-slash"></i><span>Developers</span></a>{% endif %}
+          {% if can('dashboard.read') %}<a class="nav-link {% if active_page == 'organizations' %}active{% endif %}" href="{{ url_for('web.organizations') }}" {% if active_page == 'organizations' %}aria-current="page"{% endif %}><i class="bi bi-buildings"></i><span>Organizations</span></a>{% endif %}
           {% if can('plugins.read') %}<a class="nav-link {% if active_page == 'plugins' %}active{% endif %}" href="{{ url_for('web.plugins') }}" {% if active_page == 'plugins' %}aria-current="page"{% endif %}><i class="bi bi-puzzle"></i><span>Integrations</span></a>{% endif %}
+          {% if can('commercial.read') %}<a class="nav-link {% if active_page == 'commercial' %}active{% endif %}" href="{{ url_for('web.commercial') }}" {% if active_page == 'commercial' %}aria-current="page"{% endif %}><i class="bi bi-credit-card-2-front"></i><span>Commercial</span></a>{% endif %}
+          {% if can('product.read') %}<a class="nav-link {% if active_page == 'product' %}active{% endif %}" href="{{ url_for('web.product') }}" {% if active_page == 'product' %}aria-current="page"{% endif %}><i class="bi bi-bar-chart-steps"></i><span>Product Analytics</span></a>{% endif %}
           {% if can('settings.manage') %}<a class="nav-link {% if active_page == 'settings' %}active{% endif %}" href="{{ url_for('web.settings') }}" {% if active_page == 'settings' %}aria-current="page"{% endif %}><i class="bi bi-sliders"></i><span>Platform settings</span></a>{% endif %}
         </div>
         {% endif %}
@@ -73,7 +86,7 @@
         <div class="breadcrumb-wrap">
           <nav class="app-breadcrumb" aria-label="Breadcrumb">
             <a href="{{ url_for('web.dashboard') }}">Workspace</a><i class="bi bi-chevron-right" aria-hidden="true"></i>
-            {% if active_page in ['cases', 'evidence', 'timeline', 'ai_chat', 'reports'] %}<span>Investigations</span><i class="bi bi-chevron-right" aria-hidden="true"></i>{% elif active_page in ['admin', 'plugins', 'settings'] %}<span>Platform</span><i class="bi bi-chevron-right" aria-hidden="true"></i>{% endif %}
+            {% if active_page in ['cases', 'collaboration', 'threat_hunting', 'intelligence_center', 'evidence', 'timeline', 'ai_chat', 'reports'] %}<span>Investigations</span><i class="bi bi-chevron-right" aria-hidden="true"></i>{% elif active_page in ['admin', 'plugins', 'settings', 'governance', 'performance', 'quality', 'developers', 'organizations'] %}<span>Platform</span><i class="bi bi-chevron-right" aria-hidden="true"></i>{% endif %}
             <span aria-current="page">{{ page_title }}</span>
           </nav>
           <h1>{{ page_title }}</h1>

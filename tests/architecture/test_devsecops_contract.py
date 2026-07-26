@@ -43,6 +43,9 @@ def test_container_runs_unprivileged_with_readiness_healthcheck() -> None:
     assert "no-new-privileges:true" in compose
     assert "cap_drop:" in compose
     assert "${POSTGRES_PASSWORD:?" in compose
+    assert "STOPSIGNAL SIGTERM" in dockerfile
+    assert "gunicorn.conf.py" in dockerfile
+    assert "stop_grace_period:" in compose
 
 
 def test_secrets_are_excluded_from_container_context() -> None:

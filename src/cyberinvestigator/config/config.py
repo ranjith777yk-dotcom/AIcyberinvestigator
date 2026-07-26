@@ -147,6 +147,9 @@ class BaseConfig:
     SQLALCHEMY_ENGINE_OPTIONS: ClassVar[dict[str, object]] = {
         "pool_pre_ping": True,
         "pool_recycle": _positive_integer_value("DATABASE_POOL_RECYCLE_SECONDS", 1_800),
+        "pool_size": _positive_integer_value("DATABASE_POOL_SIZE", 10),
+        "max_overflow": _positive_integer_value("DATABASE_MAX_OVERFLOW", 20),
+        "pool_timeout": _positive_integer_value("DATABASE_POOL_TIMEOUT_SECONDS", 30),
     }
 
     AI_ENABLED: ClassVar[bool] = _boolean_value("AI_ENABLED", True)
@@ -196,6 +199,9 @@ class BaseConfig:
     SECRET_REFERENCES: ClassVar[str] = _environment_value("SECRET_REFERENCES", "")
     HEALTHCHECK_TOKEN: ClassVar[str | None] = os.getenv("HEALTHCHECK_TOKEN") or None
     DASHBOARD_CACHE_SECONDS: ClassVar[int] = _positive_integer_value("DASHBOARD_CACHE_SECONDS", 5)
+    CACHE_MAX_ENTRIES: ClassVar[int] = _positive_integer_value("CACHE_MAX_ENTRIES", 256)
+    BACKGROUND_WORKER_THREADS: ClassVar[int] = _positive_integer_value("BACKGROUND_WORKER_THREADS", 2)
+    MULTI_TENANT_ENABLED: ClassVar[bool] = _boolean_value("MULTI_TENANT_ENABLED", False)
 
     PLUGINS_ENABLED: ClassVar[bool] = _boolean_value("PLUGINS_ENABLED", True)
     PLUGINS_FOLDER: ClassVar[Path] = Path(_environment_value("PLUGINS_FOLDER", str(PROJECT_ROOT / "plugins"))).resolve()
@@ -255,6 +261,7 @@ class TestingConfig(BaseConfig):
     DEBUG: ClassVar[bool] = False
     WTF_CSRF_ENABLED: ClassVar[bool] = False
     SQLALCHEMY_DATABASE_URI: ClassVar[str] = _environment_value("TEST_DATABASE_URL", "sqlite+pysqlite:///:memory:")
+    SQLALCHEMY_ENGINE_OPTIONS: ClassVar[dict[str, object]] = {"pool_pre_ping": True}
     AI_ENABLED: ClassVar[bool] = _boolean_value("TEST_AI_ENABLED", False)
     PLUGINS_ENABLED: ClassVar[bool] = _boolean_value("TEST_PLUGINS_ENABLED", False)
     CSRF_ENABLED: ClassVar[bool] = False

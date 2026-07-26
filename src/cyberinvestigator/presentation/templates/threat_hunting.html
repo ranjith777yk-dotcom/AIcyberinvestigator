@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block page_styles %}<link href="{{ url_for('static', filename='css/threat_hunting.css') }}" rel="stylesheet">{% endblock %}
+{% block content %}
+<main class="hunting-center" aria-labelledby="hunting-title">
+  <header class="hunting-hero"><div><p class="eyebrow">Proactive investigation</p><h2 id="hunting-title">Threat Hunting Center</h2><p>Evidence-backed IOC correlation, hunt lifecycle, and controlled detection engineering.</p></div><button class="button button-secondary" id="hunt-refresh" type="button">Refresh</button></header>
+  <p id="hunt-status" role="status" aria-live="polite">Loading recorded hunting data…</p>
+  <nav class="hunting-mobile-nav" aria-label="Threat Hunting sections"><a href="#active-hunts">Active Hunts</a><a href="#ioc-search">IOC Search</a><a href="#detection-alerts">Detection Alerts</a><a href="#attack-coverage">ATT&amp;CK Coverage</a></nav>
+  <div class="hunting-grid">
+    <section class="surface-card" id="active-hunts"><h3>Active Hunts</h3><div class="hunting-list" data-hunt-list="active_hunts"></div></section>
+    <section class="surface-card" id="ioc-search"><h3>IOC Search</h3><div class="hunting-list" data-hunt-list="ioc_searches"></div></section>
+    <section class="surface-card" id="detection-alerts"><h3>Detection Alerts</h3><div class="hunting-list" data-hunt-list="detection_alerts"></div></section>
+    <section class="surface-card" id="attack-coverage"><h3>ATT&amp;CK Coverage</h3><div class="hunting-list" data-hunt-list="attack_coverage"></div></section>
+  </div>
+  <div class="hunting-workbench">
+    <section class="surface-card"><h3>Start Hunt</h3><form id="hunt-form"><label>Investigation<select id="hunt-case" required><option value="">Select investigation</option></select></label><label>Name<input id="hunt-name" required maxlength="255"></label><label>Hypothesis<textarea id="hunt-hypothesis" required maxlength="20000"></textarea></label><label>Scope<textarea id="hunt-scope" maxlength="20000"></textarea></label><button class="button" type="submit">Create hunt</button></form></section>
+    <section class="surface-card"><h3>Correlate IOC</h3><form id="ioc-form"><label>Hunt<select id="ioc-hunt" required><option value="">Select hunt</option></select></label><label>Type<select id="ioc-type"><option>ipv4</option><option>ipv6</option><option>domain</option><option>url</option><option>email</option><option>md5</option><option>sha1</option><option>sha256</option></select></label><label>Indicator<input id="ioc-value" required></label><label class="check-row"><input id="ioc-enrich" type="checkbox"> Query configured intelligence providers</label><button class="button" type="submit">Search recorded evidence</button></form></section>
+    {% if can('detection_rules.manage') %}<section class="surface-card"><h3>Create Detection Rule</h3><form id="rule-form"><label>Rule key<input id="rule-key" required maxlength="128"></label><label>Sigma-compatible JSON<textarea id="rule-definition" required rows="8">{"title":"Observed indicator match","logsource":{"category":"threat_hunting"},"detection":{"selection":{"indicator":[]},"condition":"selection"},"tags":[]}</textarea></label><label class="check-row"><input id="rule-enabled" type="checkbox"> Enable supported evaluation</label><button class="button" type="submit">Create version</button></form></section>{% endif %}
+    <section class="surface-card"><h3>AI Hunt Suggestions</h3><p>Suggestions use recorded hunt context and are never marked as verified findings.</p><label>Hunt<select id="ai-hunt"><option value="">Select hunt</option></select></label><button class="button button-secondary" id="hunt-ai" type="button">Generate suggestions</button><pre id="hunt-ai-output">No AI suggestion requested.</pre></section>
+  </div>
+  <p class="provider-note" id="hunt-provider-note">Threat intelligence provider status is loading.</p>
+</main>
+{% endblock %}
+{% block page_scripts %}<script src="{{ url_for('static', filename='js/threat_hunting.js') }}" defer></script>{% endblock %}

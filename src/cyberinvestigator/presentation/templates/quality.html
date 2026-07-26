@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block page_styles %}<link href="{{ url_for('static', filename='css/quality_workspace.css') }}" rel="stylesheet">{% endblock %}
+{% block content %}
+<main class="quality-workspace" data-module="quality">
+  <header class="surface-card quality-header">
+    <div><p class="eyebrow">Release confidence</p><h2>Testing, Quality Assurance &amp; Security Validation</h2><p id="quality-collected" role="status" aria-live="polite">Loading generated quality evidence.</p></div>
+    <button class="btn btn-primary" id="quality-refresh" type="button"><i class="bi bi-arrow-repeat"></i> Refresh evidence</button>
+  </header>
+  <nav class="quality-mobile-nav" aria-label="Quality summary sections">
+    <a href="#test-status">Test Status</a><a href="#failed-runs">Failed Runs</a><a href="#security-findings">Security Findings</a><a href="#coverage-summary">Coverage Summary</a>
+  </nav>
+  <div class="quality-grid">
+    <section class="surface-card" id="test-status" aria-labelledby="test-status-title"><h3 id="test-status-title">Test Status</h3><div class="quality-metrics" id="quality-test-status"></div></section>
+    <section class="surface-card" id="failed-runs" aria-labelledby="failed-runs-title"><h3 id="failed-runs-title">Failed Runs</h3><div class="quality-list" id="quality-failed-runs"></div></section>
+    <section class="surface-card quality-wide" id="security-findings" aria-labelledby="security-title"><h3 id="security-title">Security Findings</h3><p>Generated SAST and dependency evidence. Missing scanners remain explicit.</p><div class="quality-security" id="quality-security"></div></section>
+    <section class="surface-card" id="coverage-summary" aria-labelledby="coverage-title"><h3 id="coverage-title">Coverage Summary</h3><div id="quality-coverage"></div></section>
+    <section class="surface-card"><h3>Accessibility</h3><div id="quality-accessibility"></div></section>
+    <section class="surface-card"><h3>Performance</h3><div id="quality-performance"></div></section>
+    <section class="surface-card quality-wide"><h3>Layered Test Suites</h3><div class="quality-list" id="quality-suites"></div></section>
+  </div>
+</main>
+<script src="{{ url_for('static', filename='js/quality_workspace.js') }}" defer></script>
+{% endblock %}

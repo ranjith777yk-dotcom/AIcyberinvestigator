@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block page_styles %}<link href="{{ url_for('static', filename='css/intelligence_center.css') }}" rel="stylesheet">{% endblock %}
+{% block content %}
+<main class="intelligence-center" aria-labelledby="intelligence-title">
+  <header class="intelligence-hero"><div><p class="eyebrow">Provenance-first intelligence</p><h2 id="intelligence-title">Threat Intelligence Center</h2><p>IOC lifecycle, provider enrichment, investigation correlation, and relationship mapping.</p></div><button class="button button-secondary" id="intelligence-refresh" type="button">Refresh</button></header>
+  <p id="intelligence-status" role="status" aria-live="polite">Loading intelligence records…</p>
+  <nav class="intelligence-mobile-nav" aria-label="Threat Intelligence sections"><a href="#intelligence-feed">Intelligence Feed</a><a href="#intelligence-search">IOC Search</a><a href="#threat-actors">Threat Actors</a><a href="#campaigns">Campaigns</a></nav>
+  <div class="intelligence-grid">
+    <section class="surface-card" id="intelligence-feed"><h3>Intelligence Feed</h3><div class="intelligence-list" data-intelligence-list="intelligence_feed"></div></section>
+    <section class="surface-card" id="intelligence-search"><h3>IOC Search</h3><form id="intelligence-search-form"><label>Type<select id="intelligence-ioc-type"><option>ipv4</option><option>ipv6</option><option>domain</option><option>url</option><option>email</option><option>md5</option><option>sha1</option><option>sha256</option></select></label><label>Indicator<input id="intelligence-ioc-value" required></label><label class="check-row"><input id="intelligence-enrich" type="checkbox"> Query configured providers</label><button class="button" type="submit">Search intelligence</button></form><div id="intelligence-search-result"></div></section>
+    <section class="surface-card" id="threat-actors"><h3>Threat Actors</h3><div class="intelligence-list" data-intelligence-list="threat_actors"></div></section>
+    <section class="surface-card" id="campaigns"><h3>Campaigns</h3><div class="intelligence-list" data-intelligence-list="campaigns"></div></section>
+  </div>
+  <section class="surface-card intelligence-graph-section"><div><h3>Intelligence Knowledge Graph</h3><p>Only stored relationships and derived investigation links are shown.</p></div><div class="intelligence-graph-layout"><svg id="intelligence-graph" viewBox="0 0 900 420" role="img" aria-labelledby="graph-title graph-description"><title id="graph-title">Intelligence relationship graph</title><desc id="graph-description">A visual projection of stored intelligence relationships.</desc></svg><ol id="intelligence-graph-list" aria-label="Knowledge graph relationships"></ol></div></section>
+  <div class="intelligence-workbench">
+    {% if can('intelligence.manage') %}<section class="surface-card"><h3>Import Sourced Object</h3><form id="intelligence-import-form"><label>Type<select id="intelligence-object-type"><option>threat_actor</option><option>campaign</option><option>malware</option><option>cve</option><option>attack_technique</option><option>provider_finding</option></select></label><label>Name<input id="intelligence-object-name" required></label><label>External ID<input id="intelligence-external-id" required></label><label>Source<input id="intelligence-source" required></label><label>Reference<input id="intelligence-reference" type="url" required></label><label class="check-row"><input id="intelligence-verified" type="checkbox"> Analyst verified</label><button class="button" type="submit">Import object</button></form></section>{% endif %}
+    <section class="surface-card"><h3>AI Intelligence Summary</h3><p>AI output is an observation, not verified intelligence.</p><button class="button button-secondary" id="intelligence-ai" type="button">Generate summary</button><pre id="intelligence-ai-output">No summary requested.</pre></section>
+  </div>
+  <p id="intelligence-adapters">Provider and sharing-adapter status is loading.</p>
+</main>
+{% endblock %}
+{% block page_scripts %}<script src="{{ url_for('static', filename='js/intelligence_center.js') }}" defer></script>{% endblock %}

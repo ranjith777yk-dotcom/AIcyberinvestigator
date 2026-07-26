@@ -1,0 +1,28 @@
+.intelligence-center { display: grid; gap: 1rem; }
+.intelligence-hero { align-items: center; display: flex; gap: 1rem; justify-content: space-between; }
+.intelligence-hero h2, .intelligence-hero p { margin: .2rem 0; }
+.intelligence-mobile-nav { display: none; gap: .5rem; overflow-x: auto; }
+.intelligence-mobile-nav a { background: var(--surface-raised, #172033); border-radius: .5rem; color: inherit; padding: .65rem .8rem; white-space: nowrap; }
+.intelligence-grid, .intelligence-workbench { display: grid; gap: 1rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.intelligence-list { display: grid; gap: .6rem; max-height: 22rem; overflow: auto; }
+.intelligence-record { border: 1px solid var(--border-color, #34405a); border-radius: .55rem; padding: .7rem; }
+.intelligence-record strong, .intelligence-record span { display: block; overflow-wrap: anywhere; }
+.intelligence-record span, .intelligence-empty, #intelligence-adapters { color: var(--text-muted, #98a6bd); font-size: .9rem; }
+.intelligence-center form { display: grid; gap: .7rem; }
+.intelligence-center input, .intelligence-center select { display: block; margin-top: .3rem; width: 100%; }
+.intelligence-center .check-row { align-items: center; display: flex; gap: .5rem; }
+.intelligence-center .check-row input { margin: 0; width: auto; }
+.intelligence-graph-layout { display: grid; gap: 1rem; grid-template-columns: minmax(0, 2fr) minmax(15rem, 1fr); }
+#intelligence-graph { background: var(--surface-raised, #111827); border: 1px solid var(--border-color, #34405a); border-radius: .7rem; min-height: 22rem; width: 100%; }
+#intelligence-graph line { stroke: #64748b; stroke-width: 1.5; }
+#intelligence-graph circle { fill: #38bdf8; stroke: #e2e8f0; stroke-width: 1; }
+#intelligence-graph text { fill: currentColor; font-size: 11px; }
+#intelligence-graph-list { max-height: 25rem; overflow: auto; padding-left: 1.5rem; }
+#intelligence-ai-output { max-height: 20rem; overflow: auto; white-space: pre-wrap; }
+@media (max-width: 900px) { .intelligence-grid, .intelligence-workbench, .intelligence-graph-layout { grid-template-columns: 1fr; } }
+@media (max-width: 640px) {
+  .intelligence-hero { align-items: flex-start; flex-direction: column; }
+  .intelligence-mobile-nav { display: flex; }
+  .intelligence-grid { display: flex; flex-direction: column; }
+  #intelligence-feed { order: 1; } #intelligence-search { order: 2; } #threat-actors { order: 3; } #campaigns { order: 4; }
+}

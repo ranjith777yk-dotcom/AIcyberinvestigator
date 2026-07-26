@@ -21,6 +21,8 @@ from cyberinvestigator.infrastructure.database.base import utc_now
 from cyberinvestigator.infrastructure.database.models import (
     AuditLog,
     Notification,
+    Organization,
+    OrganizationMembership,
     Permission,
     Role,
     RolePermission,
@@ -57,6 +59,7 @@ ROLE_ALIASES = {
     "investigator": "user",
 }
 ROLE_ORDER = ["user", "admin"]
+DEFAULT_ORGANIZATION_ID = UUID("00000000-0000-0000-0000-000000000001")
 SYSTEM_PERMISSIONS = {
     "user": {
         "dashboard.read",
@@ -71,6 +74,24 @@ SYSTEM_PERMISSIONS = {
         "ai.chat",
         "threat_intelligence.read",
         "threat_intelligence.enrich",
+        "collaboration.read",
+        "collaboration.write",
+        "collaboration.review",
+        "collaboration.manage",
+        "threat_hunting.read",
+        "threat_hunting.write",
+        "detection_rules.read",
+        "intelligence.read",
+        "intelligence.search",
+        "automation.read",
+        "automation.execute",
+        "analytics.read",
+        "analytics.run",
+        "mobile.companion.read",
+        "mobile.device.manage",
+        "commercial.read",
+        "product.read",
+        "product.feedback.write",
     },
     "admin": {
         "dashboard.read",
@@ -93,6 +114,35 @@ SYSTEM_PERMISSIONS = {
         "security.monitor",
         "storage.manage",
         "deployments.manage",
+        "governance.manage",
+        "organizations.manage",
+        "collaboration.read",
+        "collaboration.write",
+        "collaboration.review",
+        "collaboration.manage",
+        "threat_hunting.read",
+        "threat_hunting.write",
+        "detection_rules.read",
+        "detection_rules.manage",
+        "intelligence.read",
+        "intelligence.search",
+        "intelligence.manage",
+        "automation.read",
+        "automation.manage",
+        "automation.execute",
+        "automation.approve",
+        "analytics.read",
+        "analytics.manage",
+        "analytics.run",
+        "mobile.companion.read",
+        "mobile.device.manage",
+        "mobile.offline.manage",
+        "commercial.read",
+        "commercial.manage",
+        "marketplace.manage",
+        "product.read",
+        "product.manage",
+        "product.feedback.write",
     },
 }
 ENDPOINT_PERMISSIONS = {
@@ -105,8 +155,73 @@ ENDPOINT_PERMISSIONS = {
     "web.plugins": ("plugins.manage",),
     "web.settings": ("settings.manage",),
     "web.admin": ("admin.access",),
+    "web.governance": ("governance.manage",),
+    "web.developers": ("dashboard.read",),
+    "web.organizations": ("dashboard.read",),
+    "web.collaboration": ("collaboration.read",),
+    "web.threat_hunting": ("threat_hunting.read",),
+    "web.intelligence_center": ("intelligence.read",),
+    "web.automation": ("automation.read",),
+    "web.analytics": ("analytics.read",),
+    "web.mobile_companion": ("mobile.companion.read",),
+    "web.commercial": ("commercial.read",),
+    "web.product": ("product.read",),
+    "api_v1.product_workspace": ("product.read",),
+    "api_v1.update_product_telemetry": ("product.manage",),
+    "api_v1.create_product_feedback": ("product.feedback.write",),
+    "api_v1.create_product_roadmap_item": ("product.manage",),
+    "api_v1.create_product_release_plan": ("product.manage",),
+    "api_v1.commercial_workspace": ("commercial.read",),
+    "api_v1.update_commercial_license": ("commercial.manage",),
+    "api_v1.update_commercial_feature_flag": ("commercial.manage",),
+    "api_v1.create_marketplace_listing": ("marketplace.manage",),
+    "api_v1.request_marketplace_installation": ("marketplace.manage",),
+    "api_v1.mobile_companion_snapshot": ("mobile.companion.read",),
+    "api_v1.register_mobile_device": ("mobile.device.manage",),
+    "api_v1.synchronize_mobile_device": ("mobile.device.manage",),
+    "api_v1.update_mobile_offline_policy": ("mobile.offline.manage",),
+    "api_v1.analytics_workspace": ("analytics.read",),
+    "api_v1.register_ml_model": ("analytics.manage",),
+    "api_v1.infer_ml_model": ("analytics.run",),
+    "api_v1.metadata_anomaly_analysis": ("analytics.run",),
+    "api_v1.automation_workspace": ("automation.read",),
+    "api_v1.create_automation_playbook": ("automation.manage",),
+    "api_v1.execute_automation_playbook": ("automation.execute",),
+    "api_v1.decide_automation_approval": ("automation.approve",),
     "api_v1.dashboard_snapshot": ("dashboard.read",),
     "api_v1.openapi_spec": ("dashboard.read",),
+    "api_v1.developer_catalog": ("dashboard.read",),
+    "api_v1.list_organizations": ("dashboard.read",),
+    "api_v1.create_organization": ("organizations.manage",),
+    "api_v1.switch_organization": ("dashboard.read",),
+    "api_v1.organization_workspace": ("dashboard.read",),
+    "api_v1.update_organization_settings": ("organizations.manage",),
+    "api_v1.create_organization_invitation": ("organizations.manage",),
+    "api_v1.update_organization_quota": ("organizations.manage",),
+    "api_v1.collaboration_workspace": ("collaboration.read",),
+    "api_v1.case_collaboration": ("collaboration.read",),
+    "api_v1.add_case_team_member": ("collaboration.manage",),
+    "api_v1.create_collaboration_task": ("collaboration.write",),
+    "api_v1.update_collaboration_task": ("collaboration.write",),
+    "api_v1.create_discussion_thread": ("collaboration.write",),
+    "api_v1.create_discussion_comment": ("collaboration.write",),
+    "api_v1.request_case_review": ("collaboration.write",),
+    "api_v1.decide_case_review": ("collaboration.review",),
+    "api_v1.threat_hunting_workspace": ("threat_hunting.read",),
+    "api_v1.create_threat_hunt": ("threat_hunting.write",),
+    "api_v1.update_threat_hunt": ("threat_hunting.write",),
+    "api_v1.search_hunt_ioc": ("threat_hunting.write",),
+    "api_v1.hunt_ai_recommendations": ("threat_hunting.write",),
+    "api_v1.list_detection_rules": ("detection_rules.read",),
+    "api_v1.create_detection_rule": ("detection_rules.manage",),
+    "api_v1.update_detection_rule": ("detection_rules.manage",),
+    "api_v1.evaluate_detection_rule": ("threat_hunting.write",),
+    "api_v1.intelligence_center_workspace": ("intelligence.read",),
+    "api_v1.search_intelligence_ioc": ("intelligence.search",),
+    "api_v1.import_intelligence_object": ("intelligence.manage",),
+    "api_v1.update_indicator_lifecycle": ("intelligence.manage",),
+    "api_v1.create_intelligence_relationship": ("intelligence.manage",),
+    "api_v1.intelligence_ai_summary": ("intelligence.read",),
     "api_v1.ai_status": ("ai.chat",),
     "api_v1.ai_test_connection": ("settings.manage",),
     "api_v1.ai_management": ("settings.manage",),
@@ -147,6 +262,8 @@ ENDPOINT_PERMISSIONS = {
     "api_v1.evidence_analysis": ("evidence.write",),
     "api_v1.start_evidence_analysis": ("evidence.write",),
     "api_v1.evidence_analysis_job": ("evidence.read",),
+    "api_v1.evidence_lab_workspace": ("evidence.read",),
+    "api_v1.evidence_lab_record": ("evidence.read",),
     "api_v1.export_evidence": ("evidence.read",),
     "api_v1.list_timeline": ("timeline.read",),
     "api_v1.export_timeline": ("timeline.read",),
@@ -172,6 +289,16 @@ ENDPOINT_PERMISSIONS = {
     "api_v1.deployment_workspace": ("deployments.manage",),
     "api_v1.verify_deployment": ("deployments.manage",),
     "api_v1.create_rollback_plan": ("deployments.manage",),
+    "api_v1.record_release_approval": ("deployments.manage",),
+    "api_v1.performance_workspace": ("security.monitor",),
+    "api_v1.update_capacity_plan": ("deployments.manage",),
+    "api_v1.invalidate_performance_cache": ("deployments.manage",),
+    "api_v1.governance_workspace": ("governance.manage",),
+    "api_v1.export_governance_report": ("governance.manage",),
+    "api_v1.update_governance_policy": ("governance.manage",),
+    "api_v1.classify_investigation": ("governance.manage",),
+    "api_v1.create_privacy_request": ("governance.manage",),
+    "api_v1.create_disposition_review": ("governance.manage",),
     "api_v1.admin_overview": ("admin.access",),
     "api_v1.admin_operations_center": ("admin.access",),
     "api_v1.update_security_alert": ("security.monitor",),
@@ -257,6 +384,11 @@ def register_web_security(app: Flask) -> None:
             _audit(app, "auth.required", status=401, result="blocked", reason="Authentication required.")
             return auth_response
 
+        organization_response = _establish_organization_context(app)
+        if organization_response is not None:
+            _audit(app, "organization.boundary.blocked", status=403, result="blocked")
+            return organization_response
+
         maintenance = database_setting = None
         database = app.extensions.get("cyberinvestigator_database")
         if database is not None:
@@ -321,6 +453,7 @@ def register_web_security(app: Flask) -> None:
             "csrf_token": token,
             "current_user": getattr(g, "current_user", UserPrincipal("user", "user")),
             "can": lambda permission: _has_permission(getattr(g, "current_user", None), permission),
+            "current_organization": getattr(g, "organization", None),
             "google_oauth_configured": bool(
                 app.config.get("GOOGLE_CLIENT_ID") and app.config.get("GOOGLE_CLIENT_SECRET")
             ),
@@ -419,7 +552,57 @@ def _configured_users(app: Flask) -> dict[str, str]:
 def _rate_limit_key() -> str:
     user = getattr(g, "current_user", None)
     username = user.username if user else "anonymous"
-    return f"{request.remote_addr or 'local'}:{username}"
+    return f"{request.remote_addr or 'local'}:{getattr(g, 'organization_id', 'default')}:{username}"
+
+
+def _establish_organization_context(app: Flask):
+    """Resolve one active membership and reject cross-organization context spoofing."""
+    database = app.extensions.get("cyberinvestigator_database")
+    if database is None:
+        return None
+    user = getattr(g, "current_user", None)
+    requested = session.get("organization_id")
+    if bool(app.config.get("TESTING", False)):
+        requested = request.headers.get("X-CI-Organization") or requested
+    try:
+        organization_id = UUID(str(requested)) if requested else DEFAULT_ORGANIZATION_ID
+    except (TypeError, ValueError):
+        return jsonify({"error": "invalid organization context", "request_id": g.request_id}), 403
+    organization = database.session.get(Organization, organization_id)
+    if organization is None or organization.status != "active":
+        return jsonify({"error": "organization is unavailable", "request_id": g.request_id}), 403
+    membership = None
+    if user and user.user_id:
+        try:
+            user_id = UUID(str(user.user_id))
+        except ValueError:
+            return jsonify({"error": "invalid identity context", "request_id": g.request_id}), 403
+        membership = database.session.scalar(
+            select(OrganizationMembership).where(
+                OrganizationMembership.organization_id == organization_id,
+                OrganizationMembership.user_id == user_id,
+                OrganizationMembership.status == "active",
+            )
+        )
+        if (
+            membership is None
+            and organization_id == DEFAULT_ORGANIZATION_ID
+            and not bool(app.config.get("MULTI_TENANT_ENABLED", False))
+        ):
+            membership = OrganizationMembership(
+                organization_id=organization_id,
+                user_id=user_id,
+                organization_role="owner" if user.role == "admin" else "member",
+                status="active",
+            )
+            database.session.add(membership)
+            database.session.commit()
+        if membership is None:
+            return jsonify({"error": "organization membership required", "request_id": g.request_id}), 403
+    g.organization_id = organization.id
+    g.organization = organization
+    g.organization_role = membership.organization_role if membership else None
+    return None
 
 
 def _validate_csrf(app: Flask):
@@ -650,6 +833,19 @@ def _open_user_session(app: Flask, user: User, *, remember: bool, action: str) -
     session["user_id"] = str(user.id)
     session["role"] = role_name
     session["session_token"] = token
+    membership = database_session.scalar(
+        select(OrganizationMembership)
+        .where(
+            OrganizationMembership.user_id == user.id,
+            OrganizationMembership.status == "active",
+        )
+        .order_by(
+            (OrganizationMembership.organization_id == DEFAULT_ORGANIZATION_ID).desc(),
+            OrganizationMembership.created_at,
+        )
+    )
+    if membership is not None:
+        session["organization_id"] = str(membership.organization_id)
     session.permanent = remember
     database_session.add(
         UserSession(
@@ -793,6 +989,34 @@ def _bootstrap_security_records(app: Flask) -> None:
                     pinned=True,
                 )
             )
+        database.session.flush()
+        organization = database.session.get(Organization, DEFAULT_ORGANIZATION_ID)
+        if organization is None:
+            organization = Organization(
+                id=DEFAULT_ORGANIZATION_ID,
+                name="Default Organization",
+                slug="default",
+                status="active",
+            )
+            database.session.add(organization)
+            database.session.flush()
+        existing_members = set(
+            database.session.scalars(
+                select(OrganizationMembership.user_id).where(
+                    OrganizationMembership.organization_id == DEFAULT_ORGANIZATION_ID
+                )
+            )
+        )
+        for account in database.session.scalars(select(User)):
+            if account.id not in existing_members:
+                database.session.add(
+                    OrganizationMembership(
+                        organization_id=DEFAULT_ORGANIZATION_ID,
+                        user_id=account.id,
+                        organization_role="owner" if account.role.name == "admin" else "member",
+                        status="active",
+                    )
+                )
         database.session.commit()
 
 

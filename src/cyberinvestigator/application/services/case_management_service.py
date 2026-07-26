@@ -47,7 +47,13 @@ class CaseManagementService:
         if self._repository.get_by_case_number(case_number) is not None:
             raise CaseConflictError(f"Case number {case_number!r} is already in use.")
 
-        case = Case(case_number=case_number, title=title, description=description, severity=severity)
+        case = Case(
+            organization_id=getattr(self._repository, "organization_id", None),
+            case_number=case_number,
+            title=title,
+            description=description,
+            severity=severity,
+        )
         self._repository.add(case)
         self._commit_or_raise("create", case_number)
         self._logger.info("Created investigation case %s (%s).", case.id, case.case_number)

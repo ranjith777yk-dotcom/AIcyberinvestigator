@@ -1,0 +1,22 @@
+.hunting-center { display: grid; gap: 1rem; }
+.hunting-hero { align-items: center; display: flex; gap: 1rem; justify-content: space-between; }
+.hunting-hero h2, .hunting-hero p { margin: .2rem 0; }
+.hunting-mobile-nav { display: none; gap: .5rem; overflow-x: auto; }
+.hunting-mobile-nav a { background: var(--surface-raised, #172033); border-radius: .5rem; color: inherit; padding: .65rem .8rem; white-space: nowrap; }
+.hunting-grid, .hunting-workbench { display: grid; gap: 1rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.hunting-list { display: grid; gap: .6rem; max-height: 20rem; overflow: auto; }
+.hunting-record { border: 1px solid var(--border-color, #34405a); border-radius: .55rem; padding: .7rem; }
+.hunting-record strong, .hunting-record span { display: block; overflow-wrap: anywhere; }
+.hunting-record span, .hunting-empty, .provider-note { color: var(--text-muted, #98a6bd); font-size: .9rem; }
+.hunting-workbench form { display: grid; gap: .7rem; }
+.hunting-workbench input, .hunting-workbench select, .hunting-workbench textarea { display: block; margin-top: .3rem; width: 100%; }
+.hunting-workbench .check-row { align-items: center; display: flex; gap: .5rem; }
+.hunting-workbench .check-row input { margin: 0; width: auto; }
+#hunt-ai-output { max-height: 18rem; overflow: auto; white-space: pre-wrap; }
+@media (max-width: 900px) { .hunting-grid, .hunting-workbench { grid-template-columns: 1fr; } }
+@media (max-width: 640px) {
+  .hunting-hero { align-items: flex-start; flex-direction: column; }
+  .hunting-mobile-nav { display: flex; }
+  .hunting-grid { display: flex; flex-direction: column; }
+  #active-hunts { order: 1; } #ioc-search { order: 2; } #detection-alerts { order: 3; } #attack-coverage { order: 4; }
+}

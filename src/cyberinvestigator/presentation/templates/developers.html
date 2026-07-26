@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block page_styles %}<link href="{{ url_for('static', filename='css/developer_portal.css') }}" rel="stylesheet">{% endblock %}
+{% block content %}
+<main class="developer-portal">
+  <header class="surface-card developer-hero"><div><p class="eyebrow">Versioned integration platform</p><h2>CyberInvestigator Developer Platform</h2><p>Implementation-derived API reference, integration guides, SDK previews, and release history.</p></div><span class="developer-version" id="developer-version">Loading v1 contract</span></header>
+  <nav class="developer-mobile-nav" aria-label="Developer portal sections"><a href="#documentation-search">Documentation Search</a><a href="#api-reference">API Reference</a><a href="#developer-guides">Guides</a><a href="#release-notes">Release Notes</a></nav>
+  <section class="surface-card documentation-search" id="documentation-search"><label for="developer-search"><strong>Documentation Search</strong></label><input class="form-control" id="developer-search" type="search" placeholder="Search implemented API operations and guides" autocomplete="off"><p id="developer-search-status" role="status" aria-live="polite">Loading searchable documentation.</p><div class="developer-search-results" id="developer-search-results"></div></section>
+  <div class="developer-layout">
+    <section class="surface-card api-reference" id="api-reference"><div class="developer-section-head"><div><h3>API Reference</h3><p>Generated from registered `/api/v1` routes and centralized access policies.</p></div><a class="btn btn-sm btn-outline-secondary" href="/api/v1/openapi.json" download>Download OpenAPI</a></div><div class="api-filters"><label for="api-tag">Resource</label><select class="form-select" id="api-tag"><option value="">All resources</option></select></div><div class="api-operation-list" id="api-operation-list"></div></section>
+    <aside class="developer-sidebar">
+      <section class="surface-card" id="developer-guides"><h3>Guides</h3><div class="developer-card-list" id="developer-guide-list"></div></section>
+      <section class="surface-card"><h3>SDK Architecture</h3><p>Preview foundations generated and maintained against the v1 OpenAPI contract.</p><div class="developer-card-list" id="developer-sdk-list"></div></section>
+      <section class="surface-card"><h3>Webhook Readiness</h3><div id="developer-webhooks"></div></section>
+      <section class="surface-card" id="release-notes"><h3>Release Notes</h3><pre id="developer-release-notes">Loading release history.</pre></section>
+    </aside>
+  </div>
+</main>
+<script src="{{ url_for('static', filename='js/developer_portal.js') }}" defer></script>
+{% endblock %}

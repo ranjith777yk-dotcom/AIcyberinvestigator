@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block page_styles %}<link href="{{ url_for('static', filename='css/performance_workspace.css') }}" rel="stylesheet">{% endblock %}
+{% block content %}
+<main class="performance-workspace">
+  <header class="surface-card performance-header"><div><p class="eyebrow">Measured operational capacity</p><h2>Performance, Scalability &amp; High Availability</h2><p id="performance-collected" role="status" aria-live="polite">Loading current runtime evidence.</p></div><button class="btn btn-primary" id="performance-refresh" type="button">Refresh metrics</button></header>
+  <nav class="performance-mobile-nav" aria-label="Performance workspace sections"><a href="#platform-health">Platform Health</a><a href="#capacity">Capacity</a><a href="#queue-status">Queue Status</a><a href="#bottlenecks">Bottlenecks</a></nav>
+  <div class="performance-grid">
+    <section class="surface-card" id="platform-health"><h3>Platform Health</h3><div class="performance-metrics" id="performance-health"></div></section>
+    <section class="surface-card" id="capacity"><h3>Capacity</h3><div class="performance-list" id="performance-capacity"></div></section>
+    <section class="surface-card" id="queue-status"><h3>Queue Status</h3><p>Current-process executor measurements.</p><div class="performance-metrics" id="performance-queue"></div></section>
+    <section class="surface-card" id="bottlenecks"><h3>Bottlenecks</h3><div class="performance-list" id="performance-bottlenecks"></div></section>
+    <section class="surface-card"><h3>Protected Cache</h3><div class="performance-metrics" id="performance-cache"></div><button class="btn btn-outline-danger mt-3" id="performance-cache-clear" type="button">Invalidate process cache</button></section>
+    <section class="surface-card"><h3>High Availability Readiness</h3><div class="performance-list" id="performance-ha"></div></section>
+    <section class="surface-card performance-wide"><h3>Capacity Planning</h3><p>Targets are operator-defined and never presented as measured limits.</p><form id="capacity-plan-form" class="capacity-form"><label>Target p95 latency (ms)<input class="form-control" id="capacity-p95" type="number" min="1"></label><label>Maximum queue depth<input class="form-control" id="capacity-queue" type="number" min="1"></label><label>Minimum free storage (%)<input class="form-control" id="capacity-storage" type="number" min="1" max="100"></label><label class="capacity-reason">Change reason<input class="form-control" id="capacity-reason" required minlength="10"></label><button class="btn btn-primary" type="submit">Save audited plan</button></form></section>
+  </div>
+</main>
+<script src="{{ url_for('static', filename='js/performance_workspace.js') }}" defer></script>
+{% endblock %}

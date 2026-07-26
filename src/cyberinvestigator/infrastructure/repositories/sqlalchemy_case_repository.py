@@ -13,9 +13,10 @@ from cyberinvestigator.infrastructure.database.models import Case
 class SQLAlchemyCaseRepository:
     """Repository adapter that persists case models through an injected session."""
 
-    def __init__(self, session: Session) -> None:
+    def __init__(self, session: Session, organization_id: UUID | None = None) -> None:
         """Create a repository bound to one caller-owned SQLAlchemy session."""
         self._session = session
+        self.organization_id = organization_id
 
     def add(self, case: Case) -> None:
         """Stage a newly created case model for persistence."""
@@ -24,6 +25,8 @@ class SQLAlchemyCaseRepository:
     def get_by_id(self, case_id: UUID, *, include_deleted: bool = False) -> Case | None:
         """Return a case by identifier, hiding soft-deleted cases by default."""
         statement = select(Case).where(Case.id == case_id)
+        if self.organization_id is not None:
+            statement = statement.where(Case.organization_id == self.organization_id)
         if not include_deleted:
             statement = statement.where(Case.deleted_at.is_(None))
         return self._session.scalar(statement)
@@ -31,11 +34,15 @@ class SQLAlchemyCaseRepository:
     def get_by_case_number(self, case_number: str) -> Case | None:
         """Return an active case with the supplied case number, if present."""
         statement = select(Case).where(Case.case_number == case_number, Case.deleted_at.is_(None))
+        if self.organization_id is not None:
+            statement = statement.where(Case.organization_id == self.organization_id)
         return self._session.scalar(statement)
 
     def list_all(self, *, include_archived: bool = False) -> list[Case]:
         """List active cases ordered by most recently opened investigation."""
         statement = select(Case).where(Case.deleted_at.is_(None))
+        if self.organization_id is not None:
+            statement = statement.where(Case.organization_id == self.organization_id)
         if not include_archived:
             statement = statement.where(Case.archived_at.is_(None))
         statement = statement.order_by(Case.opened_at.desc())

@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block page_styles %}<link href="{{ url_for('static', filename='css/organization_workspace.css') }}" rel="stylesheet">{% endblock %}
+{% block content %}
+<main class="organization-workspace">
+  <header class="surface-card organization-header"><div><p class="eyebrow">Tenant-isolated administration</p><h2>Organization Management</h2><p id="organization-collected" role="status" aria-live="polite">Loading active organization records.</p></div><div class="organization-actions"><select class="form-select" id="organization-switch" aria-label="Active organization"></select><button class="btn btn-primary" id="organization-refresh" type="button">Refresh</button></div></header>
+  <nav class="organization-mobile-nav" aria-label="Organization sections"><a href="#organization-overview">Organization Overview</a><a href="#organization-usage">Usage</a><a href="#organization-members">Members</a><a href="#organization-invitations">Invitations</a></nav>
+  <div class="organization-grid">
+    <section class="surface-card" id="organization-overview"><h3>Organization Overview</h3><div class="organization-metrics" id="organization-summary"></div></section>
+    <section class="surface-card" id="organization-usage"><h3>Usage</h3><p>Counts from current persisted tenant records.</p><div class="organization-metrics" id="organization-usage-metrics"></div><h4 class="mt-3">Configured quotas</h4><div class="organization-list" id="organization-quotas"></div></section>
+    <section class="surface-card organization-wide" id="organization-members"><h3>Members</h3><div class="organization-list" id="organization-member-list"></div></section>
+    <section class="surface-card organization-wide" id="organization-invitations"><h3>Invitations</h3><p>Invitation delivery remains unavailable until a provider is connected.</p>{% if can('organizations.manage') %}<form class="organization-invite-form" id="organization-invite-form"><label>Email<input class="form-control" id="organization-invite-email" type="email" required></label><label>Organization role<select class="form-select" id="organization-invite-role"><option value="member">Member</option><option value="admin">Administrator</option></select></label><label>Reason<input class="form-control" id="organization-invite-reason" minlength="10" required></label><button class="btn btn-primary" type="submit">Record invitation</button></form>{% endif %}<div class="organization-list mt-3" id="organization-invitation-list"></div></section>
+  </div>
+</main>
+<script src="{{ url_for('static', filename='js/organization_workspace.js') }}" defer></script>
+{% endblock %}

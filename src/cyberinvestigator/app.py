@@ -20,14 +20,18 @@ from cyberinvestigator.domain.services.cybersecurity_ai import (
 from cyberinvestigator.features import register_feature_modules
 from cyberinvestigator.infrastructure.ai import build_ai_registry
 from cyberinvestigator.infrastructure.ai_management import hydrate_ai_config
+from cyberinvestigator.infrastructure.cache import SecureTTLCache
 from cyberinvestigator.infrastructure.database.migrations import run_lightweight_migrations
 from cyberinvestigator.infrastructure.database.models import Setting
 from cyberinvestigator.infrastructure.database.registration import register_database
 from cyberinvestigator.infrastructure.deployment_management import DeploymentInspector
+from cyberinvestigator.infrastructure.governance import GovernanceInspector
 from cyberinvestigator.infrastructure.jobs import InProcessJobDispatcher
 from cyberinvestigator.infrastructure.logging import register_logging
 from cyberinvestigator.infrastructure.observability import register_observability
+from cyberinvestigator.infrastructure.performance import PerformanceInspector
 from cyberinvestigator.infrastructure.plugins import PluginLoader, PluginRegistry
+from cyberinvestigator.infrastructure.quality_management import QualityEvidenceInspector
 from cyberinvestigator.infrastructure.security.web_security import register_web_security
 from cyberinvestigator.infrastructure.storage_management import LocalStorageManager
 from cyberinvestigator.presentation.blueprints.registry import register_blueprints
@@ -100,6 +104,11 @@ def create_app(config_name: str | None = None, config_overrides: dict[str, Any] 
     run_lightweight_migrations(app)
     _register_storage_management(app)
     app.extensions["cyberinvestigator_deployment_inspector"] = DeploymentInspector(Path(app.config["PROJECT_ROOT"]))
+    app.extensions["cyberinvestigator_quality_inspector"] = QualityEvidenceInspector(
+        Path(app.config["INSTANCE_PATH"]) / "quality"
+    )
+    app.extensions["cyberinvestigator_performance_inspector"] = PerformanceInspector(Path(app.config["INSTANCE_PATH"]))
+    app.extensions["cyberinvestigator_governance_inspector"] = GovernanceInspector()
     register_logging(app)
     register_observability(app)
     register_web_security(app)
@@ -120,11 +129,19 @@ def register_extensions(app: Flask) -> None:
     coupling the application factory to module-level singleton instances.
     """
     app.extensions.setdefault("cyberinvestigator", {})
+    worker_capacity = int(app.config.get("BACKGROUND_WORKER_THREADS", 2))
     executor = app.extensions.setdefault(
-        "cyberinvestigator_executor", ThreadPoolExecutor(max_workers=2, thread_name_prefix="ci-bg")
+        "cyberinvestigator_executor", ThreadPoolExecutor(max_workers=worker_capacity, thread_name_prefix="ci-bg")
     )
-    app.extensions.setdefault("cyberinvestigator_job_dispatcher", InProcessJobDispatcher(executor))
+    app.extensions.setdefault(
+        "cyberinvestigator_job_dispatcher",
+        InProcessJobDispatcher(executor, worker_capacity=worker_capacity),
+    )
     app.extensions.setdefault("cyberinvestigator_jobs", {})
+    app.extensions.setdefault(
+        "cyberinvestigator_cache",
+        SecureTTLCache(max_entries=int(app.config.get("CACHE_MAX_ENTRIES", 256))),
+    )
 
 
 def _register_plugin_runtime(app: Flask) -> None:

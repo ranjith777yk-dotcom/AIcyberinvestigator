@@ -170,6 +170,7 @@ class ForensicAnalyzer:
         node: dict[str, object] = {
             "name": name,
             "size_bytes": len(data),
+            "sha256": hashlib.sha256(data).hexdigest(),
             "magic_bytes": data[:16].hex(" ").upper(),
             "file_signature": magic,
             "entropy": round(self._entropy(data), 4),

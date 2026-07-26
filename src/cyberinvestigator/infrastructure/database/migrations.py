@@ -2,8 +2,22 @@
 
 from __future__ import annotations
 
+from uuid import UUID
+
 from flask import Flask
-from sqlalchemy import inspect, text
+from sqlalchemy import inspect, select, text, update
+
+from cyberinvestigator.infrastructure.database.models import (
+    AIConversation,
+    AuditLog,
+    Case,
+    Notification,
+    Organization,
+    OrganizationMembership,
+    User,
+)
+
+DEFAULT_ORGANIZATION_ID = UUID("00000000-0000-0000-0000-000000000001")
 
 INDEXES = (
     ("ix_cases_owner_opened", "cases", "owner, opened_at"),
@@ -35,6 +49,7 @@ ADDITIVE_COLUMNS = (
     ("evidence", "analysis_report", "TEXT"),
     ("evidence", "analysis_summary", "TEXT"),
     ("evidence", "analysis_status", "VARCHAR(32) NOT NULL DEFAULT 'pending'"),
+    ("artifacts", "analysis_run_id", "CHAR(32)"),
     ("evidence", "owner_user_id", "CHAR(32)"),
     ("evidence", "created_by_user_id", "CHAR(32)"),
     ("evidence", "updated_at", "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP"),
@@ -61,6 +76,10 @@ ADDITIVE_COLUMNS = (
     ("user_sessions", "status", "VARCHAR(32) NOT NULL DEFAULT 'active'"),
     ("ai_conversations", "conversation_id", "CHAR(32)"),
     ("ai_conversations", "title", "VARCHAR(255) NOT NULL DEFAULT 'New chat'"),
+    ("cases", "organization_id", "CHAR(32)"),
+    ("ai_conversations", "organization_id", "CHAR(32)"),
+    ("audit_logs", "organization_id", "CHAR(32)"),
+    ("notifications", "organization_id", "CHAR(32)"),
 )
 
 
@@ -84,9 +103,58 @@ def run_lightweight_migrations(app: Flask) -> None:
                     effective_type = "TIMESTAMP"
                 database.session.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {effective_type}"))
         _backfill_ownership(database)
+        _backfill_default_organization(database)
         for index_name, table_name, columns in INDEXES:
             database.session.execute(text(f"CREATE INDEX IF NOT EXISTS {index_name} ON {table_name} ({columns})"))
         database.session.commit()
+
+
+def _backfill_default_organization(database) -> None:
+    """Place legacy records and users into the deterministic compatibility tenant."""
+    organization = database.session.get(Organization, DEFAULT_ORGANIZATION_ID)
+    if organization is None:
+        organization = Organization(
+            id=DEFAULT_ORGANIZATION_ID,
+            name="Default Organization",
+            slug="default",
+            status="active",
+            subscription_status=None,
+        )
+        database.session.add(organization)
+        database.session.flush()
+    existing_members = set(
+        database.session.scalars(
+            select(OrganizationMembership.user_id).where(
+                OrganizationMembership.organization_id == DEFAULT_ORGANIZATION_ID
+            )
+        )
+    )
+    for user in database.session.scalars(select(User)):
+        if user.id not in existing_members:
+            database.session.add(
+                OrganizationMembership(
+                    organization_id=DEFAULT_ORGANIZATION_ID,
+                    user_id=user.id,
+                    organization_role="owner" if user.role.name == "admin" else "member",
+                    status="active",
+                )
+            )
+    database.session.execute(
+        update(Case).where(Case.organization_id.is_(None)).values(organization_id=DEFAULT_ORGANIZATION_ID)
+    )
+    database.session.execute(
+        update(AIConversation)
+        .where(AIConversation.organization_id.is_(None))
+        .values(organization_id=DEFAULT_ORGANIZATION_ID)
+    )
+    database.session.execute(
+        update(AuditLog).where(AuditLog.organization_id.is_(None)).values(organization_id=DEFAULT_ORGANIZATION_ID)
+    )
+    database.session.execute(
+        update(Notification)
+        .where(Notification.organization_id.is_(None))
+        .values(organization_id=DEFAULT_ORGANIZATION_ID)
+    )
 
 
 def _backfill_ownership(database) -> None:
