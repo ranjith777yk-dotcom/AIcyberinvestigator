@@ -153,10 +153,10 @@ class BaseConfig:
     }
 
     AI_ENABLED: ClassVar[bool] = _boolean_value("AI_ENABLED", True)
-    AI_PROVIDER: ClassVar[str] = _environment_value("AI_PROVIDER", "ollama")
+    AI_PROVIDER: ClassVar[str] = _environment_value("AI_PROVIDER", "nvidia")
     AI_MODEL: ClassVar[str] = _normalise_ai_model(
-        _environment_value("AI_MODEL", _environment_value("OLLAMA_MODEL", "qwen3:8b")),
-        provider_name=_environment_value("AI_PROVIDER", "ollama"),
+        _environment_value("AI_MODEL", _environment_value("NVIDIA_MODEL", "meta/llama-3.3-70b-instruct")),
+        provider_name=_environment_value("AI_PROVIDER", "nvidia"),
     )
     AI_API_KEY: ClassVar[str | None] = os.getenv("OPENAI_API_KEY") or os.getenv("AI_API_KEY") or None
     AI_CREDENTIAL_ENCRYPTION_KEY: ClassVar[str | None] = os.getenv("AI_CREDENTIAL_ENCRYPTION_KEY") or None
@@ -177,8 +177,25 @@ class BaseConfig:
     OLLAMA_ENDPOINT: ClassVar[str] = _environment_value("OLLAMA_ENDPOINT", "http://localhost:11434")
     OLLAMA_MODEL: ClassVar[str] = _environment_value("OLLAMA_MODEL", "qwen3:8b")
     OPENAI_MODEL: ClassVar[str] = _environment_value("OPENAI_MODEL", "gpt-4.1-mini")
+    NVIDIA_API_KEY: ClassVar[str | None] = os.getenv("NVIDIA_API_KEY") or None
+    NVIDIA_BASE_URL: ClassVar[str] = _environment_value("NVIDIA_BASE_URL", "https://integrate.api.nvidia.com/v1")
+    NVIDIA_MODEL: ClassVar[str] = _environment_value("NVIDIA_MODEL", "meta/llama-3.3-70b-instruct")
+    OPENROUTER_API_KEY: ClassVar[str | None] = os.getenv("OPENROUTER_API_KEY") or None
+    OPENROUTER_BASE_URL: ClassVar[str] = _environment_value("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
+    OPENROUTER_MODEL: ClassVar[str] = _environment_value("OPENROUTER_MODEL", "meta-llama/llama-3.3-70b-instruct")
+    GROQ_API_KEY: ClassVar[str | None] = os.getenv("GROQ_API_KEY") or None
+    GROQ_BASE_URL: ClassVar[str] = _environment_value("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
+    GROQ_MODEL: ClassVar[str] = _environment_value("GROQ_MODEL", "llama-3.3-70b-versatile")
+    DEEPSEEK_API_KEY: ClassVar[str | None] = os.getenv("DEEPSEEK_API_KEY") or None
+    DEEPSEEK_BASE_URL: ClassVar[str] = _environment_value("DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1")
+    DEEPSEEK_MODEL: ClassVar[str] = _environment_value("DEEPSEEK_MODEL", "deepseek-chat")
+    CUSTOM_AI_API_KEY: ClassVar[str | None] = os.getenv("CUSTOM_AI_API_KEY") or None
+    CUSTOM_AI_BASE_URL: ClassVar[str | None] = os.getenv("CUSTOM_AI_BASE_URL") or None
+    CUSTOM_AI_MODEL: ClassVar[str] = _environment_value("CUSTOM_AI_MODEL", "")
     GEMINI_API_KEY: ClassVar[str | None] = os.getenv("GEMINI_API_KEY") or None
     GEMINI_MODEL: ClassVar[str] = _environment_value("GEMINI_MODEL", "gemini-1.5-flash")
+    ANTHROPIC_API_KEY: ClassVar[str | None] = os.getenv("ANTHROPIC_API_KEY") or None
+    ANTHROPIC_MODEL: ClassVar[str] = _environment_value("ANTHROPIC_MODEL", "claude-3-5-sonnet-latest")
     PERPLEXITY_API_KEY: ClassVar[str | None] = os.getenv("PERPLEXITY_API_KEY") or None
     PERPLEXITY_MODEL: ClassVar[str] = _environment_value("PERPLEXITY_MODEL", "sonar")
     AI_TIMEOUT_SECONDS: ClassVar[int] = _positive_integer_value("AI_TIMEOUT_SECONDS", 60)

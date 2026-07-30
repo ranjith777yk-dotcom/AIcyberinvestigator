@@ -428,6 +428,46 @@ function aiManagementRecord(title, detail, state = "") {
   return article;
 }
 
+function aiProviderCard(provider, selectedProvider) {
+  const state = provider.enabled && provider.available ? "available" : "unavailable";
+  const card = aiManagementRecord(
+    provider.provider,
+    `${provider.model || "No model selected"} · ${provider.message} · ${provider.requests_recorded || 0} recorded request(s)`,
+    state,
+  );
+  const controls = document.createElement("div");
+  controls.className = "d-flex gap-2 mt-2 flex-wrap";
+  const toggle = document.createElement("button");
+  toggle.type = "button";
+  toggle.className = "btn btn-sm btn-outline-secondary";
+  toggle.textContent = provider.enabled ? "Disable" : "Enable";
+  toggle.addEventListener("click", async () => {
+    await api(`/api/v1/admin/ai/providers/${provider.provider}`, { method: "PATCH", body: JSON.stringify({ enabled: !provider.enabled }) });
+    await loadAiManagement();
+  });
+  const test = document.createElement("button");
+  test.type = "button";
+  test.className = "btn btn-sm btn-outline-secondary";
+  test.textContent = "Test";
+  test.addEventListener("click", async () => {
+    const result = await api("/api/v1/ai/test-connection", { method: "POST", body: JSON.stringify({ provider: provider.provider }) });
+    showToast(result.message, result.available ? "success" : "warning");
+    await loadAiManagement();
+  });
+  const makeDefault = document.createElement("button");
+  makeDefault.type = "button";
+  makeDefault.className = "btn btn-sm btn-outline-primary";
+  makeDefault.textContent = provider.provider === selectedProvider ? "Default" : "Make default";
+  makeDefault.disabled = !provider.enabled || provider.provider === selectedProvider;
+  makeDefault.addEventListener("click", async () => {
+    await api("/api/v1/settings", { method: "PATCH", body: JSON.stringify({ namespace: "ai", settings: { provider: provider.provider, model: provider.model } }) });
+    await loadAiManagement();
+  });
+  controls.append(toggle, test, makeDefault);
+  card.append(controls);
+  return card;
+}
+
 function renderAiManagementList(target, records, emptyMessage) {
   if (!target) return;
   if (!records.length) {
@@ -446,7 +486,7 @@ async function loadAiManagement() {
   window.cyberInvestigatorAiManagement = data;
   renderAiManagementList(
     document.querySelector("#ai-management-providers"),
-    data.providers.map((provider) => aiManagementRecord(
+    data.providers.map((provider) => aiProviderCard(provider, data.selected_provider) /* provider card */ || aiManagementRecord(
       provider.provider,
       `${provider.model || "No model selected"} · ${provider.message} · credential ${provider.credential_configured ? "configured" : "not configured"}`,
       provider.available ? "available" : "unavailable",

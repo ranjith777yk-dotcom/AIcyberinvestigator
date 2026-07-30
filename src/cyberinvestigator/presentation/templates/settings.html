@@ -26,7 +26,7 @@
         <div class="ai-management-grid">
           <section class="ai-admin-panel ai-provider-status"><h4>Provider status</h4><p>Configuration and live adapter health.</p><div id="ai-management-providers" class="ai-admin-list"><div class="skeleton-list"></div></div></section>
           <section class="ai-admin-panel ai-active-models"><h4>Active models</h4><p>Workload-specific provider assignments.</p><div id="ai-management-workloads" class="ai-admin-list"></div></section>
-          <section class="ai-admin-panel ai-provider-health"><h4>Health &amp; failover</h4><p>Observed availability and configured routing policy.</p><div id="ai-management-health" class="health-grid"></div><form id="ai-failover-form" class="mt-3"><label class="form-label" for="ai-failover-order">Provider order</label><input class="form-control" id="ai-failover-order" placeholder="ollama, openai"><div class="form-check form-switch mt-2"><input class="form-check-input" id="ai-failover-enabled" type="checkbox"><label class="form-check-label" for="ai-failover-enabled">Enable automatic failover</label></div><button class="btn btn-sm btn-outline-primary mt-2" type="submit">Save routing policy</button></form></section>
+          <section class="ai-admin-panel ai-provider-health"><h4>Health &amp; failover</h4><p>Observed availability and configured routing policy.</p><div id="ai-management-health" class="health-grid"></div><form id="ai-failover-form" class="mt-3"><label class="form-label" for="ai-failover-order">Provider order</label><input class="form-control" id="ai-failover-order" placeholder="nvidia, ollama"><div class="form-check form-switch mt-2"><input class="form-check-input" id="ai-failover-enabled" type="checkbox"><label class="form-check-label" for="ai-failover-enabled">Enable automatic failover</label></div><button class="btn btn-sm btn-outline-primary mt-2" type="submit">Save routing policy</button></form></section>
           <section class="ai-admin-panel ai-provider-usage"><h4>Usage</h4><p>Only provider-reported token records; no estimated cost or latency.</p><div id="ai-management-usage" class="ai-admin-list"></div></section>
         </div>
         <form class="settings-form mt-4" id="ai-settings-form">
@@ -36,7 +36,7 @@
               <label class="form-label" for="ai-provider">AI Provider</label>
               <select class="form-select" id="ai-provider">
                 <option value="ollama">Ollama</option>
-                <option value="openai">OpenAI</option>
+                <option value="nvidia">NVIDIA Build API</option><option value="openai">OpenAI</option><option value="openrouter">OpenRouter</option><option value="groq">Groq</option><option value="deepseek">DeepSeek</option><option value="claude">Anthropic Claude</option><option value="custom">Custom OpenAI-compatible</option>
                 <option value="gemini">Gemini</option>
                 <option value="perplexity">Perplexity</option>
               </select>

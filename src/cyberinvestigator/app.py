@@ -92,6 +92,11 @@ def create_app(config_name: str | None = None, config_overrides: dict[str, Any] 
         static_folder=str(package_root / "presentation" / "static"),
     )
     app.config.from_object(config_class)
+    # Config classes are imported before this factory runs.  Re-read the AI
+    # settings after loading .env so a process started from a different module
+    # cannot retain import-time defaults (notably an empty NVIDIA_API_KEY).
+    if profile_name != "testing":
+        _refresh_ai_environment_config(app)
     app.config["ENVIRONMENT"] = profile_name
     if config_overrides:
         app.config.update(config_overrides)
@@ -187,7 +192,25 @@ def _register_ai_runtime(app: Flask) -> None:
     memory = ConversationMemoryStore()
     with app.app_context():
         managed_config = hydrate_ai_config(app.config, app.extensions["cyberinvestigator_database"].session)
-    app.extensions["cyberinvestigator_ai_registry"] = build_ai_registry(managed_config)
+    registry = build_ai_registry(managed_config)
+    # A registry without NVIDIA is never useful for the NVIDIA-first default.
+    # Rebuild once from effective config and record the exact registration state.
+    if not registry.has_provider("nvidia"):
+        app.logger.error("AI provider registry was missing NVIDIA; rebuilding registry.")
+        registry = build_ai_registry(dict(app.config))
+    app.extensions["cyberinvestigator_ai_registry"] = registry
+    nvidia_status = registry.status("nvidia")
+    app.logger.info(
+        "AI startup: Loaded providers=%s; Default provider=%s; Provider registry=%s; "
+        "NVIDIA configuration: Model=%s; Base URL=%s; API key loaded=%s; Health check=%s",
+        registry.provider_names,
+        app.config.get("AI_PROVIDER"),
+        registry.provider_names,
+        app.config.get("NVIDIA_MODEL"),
+        app.config.get("NVIDIA_BASE_URL"),
+        bool(app.config.get("NVIDIA_API_KEY")),
+        nvidia_status.message,
+    )
     app.extensions["cyberinvestigator_analysis_engine"] = analyzer
     app.extensions["cyberinvestigator_ai_memory"] = memory
     app.extensions["cyberinvestigator_investigation_assistant"] = InvestigationAssistant(analyzer, memory)
@@ -248,3 +271,18 @@ def _normalize_flask_config_types(app: Flask) -> None:
         # Normalize Path-like values that might slip through in overrides.
         if isinstance(app.config[key], Path):
             app.config[key] = str(app.config[key])
+
+
+def _refresh_ai_environment_config(app: Flask) -> None:
+    """Apply runtime AI environment values after the local .env file is loaded."""
+    string_keys = (
+        "AI_PROVIDER", "AI_MODEL", "AI_API_KEY", "AI_BASE_URL", "NVIDIA_API_KEY",
+        "NVIDIA_BASE_URL", "NVIDIA_MODEL", "OPENAI_API_KEY", "OPENAI_MODEL",
+    )
+    for key in string_keys:
+        value = os.getenv(key)
+        if value and value.strip():
+            app.config[key] = value.strip()
+    enabled = os.getenv("AI_ENABLED")
+    if enabled and enabled.strip().lower() in {"true", "1", "yes", "on", "false", "0", "no", "off"}:
+        app.config["AI_ENABLED"] = enabled.strip().lower() in {"true", "1", "yes", "on"}

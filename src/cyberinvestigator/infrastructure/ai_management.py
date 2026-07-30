@@ -10,8 +10,14 @@ from cyberinvestigator.infrastructure.database.models import Setting
 from cyberinvestigator.infrastructure.security.credential_vault import CredentialVault, CredentialVaultUnavailable
 
 PROVIDER_CONFIG_KEYS = {
+    "nvidia": ("NVIDIA_API_KEY", "NVIDIA_MODEL"),
+    "openrouter": ("OPENROUTER_API_KEY", "OPENROUTER_MODEL"),
+    "groq": ("GROQ_API_KEY", "GROQ_MODEL"),
+    "deepseek": ("DEEPSEEK_API_KEY", "DEEPSEEK_MODEL"),
+    "custom": ("CUSTOM_AI_API_KEY", "CUSTOM_AI_MODEL"),
     "openai": ("OPENAI_API_KEY", "OPENAI_MODEL"),
     "gemini": ("GEMINI_API_KEY", "GEMINI_MODEL"),
+    "claude": ("ANTHROPIC_API_KEY", "ANTHROPIC_MODEL"),
     "perplexity": ("PERPLEXITY_API_KEY", "PERPLEXITY_MODEL"),
     "ollama": (None, "OLLAMA_MODEL"),
 }

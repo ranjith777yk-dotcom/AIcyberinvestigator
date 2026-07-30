@@ -8,6 +8,7 @@ from cyberinvestigator.application.ports import (
     ClaudeProviderStrategy,
     GeminiProviderStrategy,
     LMStudioProviderStrategy,
+    NVIDIAProviderStrategy,
     OllamaProviderStrategy,
     OpenAIProviderStrategy,
     PerplexityProviderStrategy,
@@ -18,6 +19,11 @@ def test_all_supported_provider_families_are_declared() -> None:
     """The strategy boundary declares every requested provider family."""
     assert {provider.value for provider in AIProviderName} == {
         "openai",
+        "nvidia",
+        "openrouter",
+        "groq",
+        "deepseek",
+        "custom",
         "gemini",
         "perplexity",
         "claude",
@@ -31,6 +37,7 @@ def test_provider_strategies_remain_abstract_interfaces() -> None:
     strategies = (
         AIProviderStrategy,
         OpenAIProviderStrategy,
+        NVIDIAProviderStrategy,
         GeminiProviderStrategy,
         PerplexityProviderStrategy,
         ClaudeProviderStrategy,

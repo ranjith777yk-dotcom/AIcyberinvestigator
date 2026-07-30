@@ -18,10 +18,16 @@ def test_ai_management_reports_registered_state_without_synthetic_usage() -> Non
     assert response.status_code == 200
     payload = response.get_json()
     assert {item["provider"] for item in payload["providers"]} == {
+        "nvidia",
         "ollama",
         "openai",
         "gemini",
+        "claude",
         "perplexity",
+        "openrouter",
+        "groq",
+        "deepseek",
+        "custom",
     }
     assert payload["usage"] == []
     assert "Latency and cost are unavailable" in payload["usage_notice"]
@@ -118,6 +124,22 @@ def test_ai_management_mutations_require_server_side_permission() -> None:
         json={"enabled": True, "order": ["ollama"]},
     )
     assert response.status_code == 403
+
+
+def test_provider_can_be_disabled_without_exposing_credentials() -> None:
+    app = create_app("testing")
+    client = app.test_client()
+
+    response = client.patch(
+        "/api/v1/admin/ai/providers/nvidia",
+        headers=_headers(),
+        json={"enabled": False},
+    )
+
+    assert response.status_code == 200
+    nvidia = next(item for item in response.get_json()["providers"] if item["provider"] == "nvidia")
+    assert nvidia["enabled"] is False
+    assert nvidia["credential_exposed"] is False
 
 
 def test_local_provider_endpoint_requires_an_explicitly_allowed_host() -> None:

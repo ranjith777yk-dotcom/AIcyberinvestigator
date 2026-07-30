@@ -1,4 +1,4 @@
-"""Provider-based AI adapters with Ollama-first local defaults."""
+"""Provider-based AI adapters with NVIDIA-first enterprise routing."""
 
 from __future__ import annotations
 
@@ -18,8 +18,11 @@ from cyberinvestigator.application.ports.ai_provider import (
     AIRequest,
     AIResponse,
     AIUsage,
+    ClaudeProviderStrategy,
     GeminiProviderStrategy,
+    NVIDIAProviderStrategy,
     OllamaProviderStrategy,
+    OpenAICompatibleProviderStrategy,
     OpenAIProviderStrategy,
     PerplexityProviderStrategy,
 )
@@ -272,6 +275,174 @@ class OpenAISDKProvider(OpenAIProviderStrategy):
         return self._client
 
 
+class NVIDIAOpenAIProvider(NVIDIAProviderStrategy):
+    """NVIDIA Build API adapter using the official OpenAI Python SDK."""
+
+    def __init__(self, *, api_key: str | None, model: str, base_url: str, timeout: int = 60) -> None:
+        self.api_key = api_key
+        self.model = model
+        self.base_url = base_url.rstrip("/")
+        self.timeout = timeout
+        self._client = None
+
+    @property
+    def provider_name(self) -> AIProviderName:
+        return AIProviderName.NVIDIA
+
+    @property
+    def status(self) -> ProviderStatus:
+        configured = bool(self.api_key)
+        return ProviderStatus(
+            provider=self.provider_name.value,
+            available=configured,
+            configured=configured,
+            model=self.model,
+            message=("NVIDIA Build API is configured." if configured else "NVIDIA API key is not configured."),
+            endpoint=self.base_url,
+            health_source="configuration",
+        )
+
+    def test_connection(self) -> ProviderStatus:
+        if not self.api_key:
+            return self.status
+        try:
+            self._client_instance().chat.completions.create(
+                model=self.model,
+                messages=[{"role": "user", "content": "Respond with OK."}],
+                temperature=0.2,
+                max_tokens=4,
+            )
+        except Exception as error:
+            logger.exception("NVIDIA health check failed: %s: %s", type(error).__name__, error)
+            return ProviderStatus(self.provider_name.value, False, True, self.model, "NVIDIA connection test failed; provider details were suppressed.", self.base_url, health_source="live_endpoint", checked_at=time.time())
+        return ProviderStatus(self.provider_name.value, True, True, self.model, "NVIDIA connection test succeeded.", self.base_url, health_source="live_endpoint", checked_at=time.time())
+
+    def generate(self, request: AIRequest) -> AIResponse:
+        if not self.api_key:
+            raise AIProviderUnavailable("NVIDIA API key is not configured.")
+        model = request.model or self.model
+        try:
+            response = self._client_instance().chat.completions.create(
+                model=model,
+                messages=self._chat_messages(request),
+                temperature=request.temperature if request.temperature is not None else 0.2,
+                max_tokens=request.max_output_tokens,
+            )
+            content = str((response.choices[0].message.content if response.choices else "") or "").strip()
+        except Exception as error:
+            self._raise_unavailable(error)
+        if not content:
+            raise AIProviderUnavailable("NVIDIA returned an empty response.")
+        usage = getattr(response, "usage", None)
+        return AIResponse(
+            content=content,
+            model=getattr(response, "model", None) or model,
+            provider=self.provider_name,
+            usage=AIUsage(
+                input_tokens=getattr(usage, "prompt_tokens", None),
+                output_tokens=getattr(usage, "completion_tokens", None),
+            ),
+            response_id=getattr(response, "id", None),
+        )
+
+    def stream(self, request: AIRequest) -> Iterator[str]:
+        if not self.api_key:
+            raise AIProviderUnavailable("NVIDIA API key is not configured.")
+        try:
+            stream = self._client_instance().chat.completions.create(model=request.model or self.model, messages=self._chat_messages(request), temperature=request.temperature if request.temperature is not None else 0.2, max_tokens=request.max_output_tokens, stream=True)
+            yielded = False
+            for chunk in stream:
+                content = str((chunk.choices[0].delta.content if chunk.choices else "") or "")
+                if content:
+                    yielded = True
+                    yield content
+            if not yielded:
+                raise AIProviderUnavailable("NVIDIA returned an empty streamed response.")
+        except AIProviderUnavailable:
+            raise
+        except Exception as error:
+            self._raise_unavailable(error)
+
+    @staticmethod
+    def _chat_messages(request: AIRequest) -> list[dict[str, str]]:
+        return [{"role": item.role, "content": item.content} for item in request.messages]
+
+    def _client_instance(self):
+        if self._client is None:
+            try:
+                from openai import OpenAI
+            except ImportError as error:
+                raise AIProviderUnavailable("OpenAI Python SDK is not installed.") from error
+            self._client = OpenAI(api_key=self.api_key, base_url=self.base_url, timeout=self.timeout, max_retries=0)
+        return self._client
+
+    @staticmethod
+    def _raise_unavailable(error: Exception) -> None:
+        logger.exception("NVIDIA request failed: %s: %s", type(error).__name__, error)
+        name = type(error).__name__.lower()
+        if "authentication" in name or "permission" in name:
+            message = "NVIDIA authentication failed. Contact an administrator to verify the server configuration."
+        elif "rate" in name:
+            message = "NVIDIA is temporarily rate-limiting requests. Please try again shortly."
+        elif "timeout" in name:
+            message = "NVIDIA did not respond in time. Please try again."
+        else:
+            message = "NVIDIA AI service is temporarily unavailable. Please try again."
+        raise AIProviderUnavailable(message) from error
+
+
+class OpenAICompatibleSDKProvider(NVIDIAOpenAIProvider, OpenAICompatibleProviderStrategy):
+    """Reusable adapter for supported OpenAI-compatible cloud or local APIs."""
+
+    def __init__(
+        self,
+        *,
+        provider_name: AIProviderName,
+        display_name: str,
+        api_key: str | None,
+        model: str,
+        base_url: str | None,
+        timeout: int = 60,
+    ) -> None:
+        super().__init__(api_key=api_key, model=model, base_url=base_url or "", timeout=timeout)
+        self._provider_name = provider_name
+        self.display_name = display_name
+
+    @property
+    def provider_name(self) -> AIProviderName:
+        return self._provider_name
+
+    @property
+    def status(self) -> ProviderStatus:
+        configured = bool(self.api_key and self.base_url)
+        return ProviderStatus(
+            provider=self.provider_name.value,
+            available=configured,
+            configured=configured,
+            model=self.model,
+            message=(
+                f"{self.display_name} is configured."
+                if configured
+                else f"{self.display_name} API key or base URL is not configured."
+            ),
+            endpoint=self.base_url or None,
+            health_source="configuration",
+        )
+
+    def _raise_unavailable(self, error: Exception) -> None:
+        logger.warning("%s request failed: %s", self.display_name, type(error).__name__)
+        name = type(error).__name__.lower()
+        if "authentication" in name or "permission" in name:
+            message = f"{self.display_name} authentication failed. Contact an administrator to verify the server configuration."
+        elif "rate" in name:
+            message = f"{self.display_name} is temporarily rate-limiting requests. Please try again shortly."
+        elif "timeout" in name:
+            message = f"{self.display_name} did not respond in time. Please try again."
+        else:
+            message = f"{self.display_name} AI service is temporarily unavailable. Please try again."
+        raise AIProviderUnavailable(message) from error
+
+
 class OptionalAPIKeyProvider(AIProviderStrategy):
     """Configured-but-deferred provider for future API-key-backed integrations."""
 
@@ -312,10 +483,15 @@ class PerplexityFutureProvider(OptionalAPIKeyProvider, PerplexityProviderStrateg
     """Perplexity placeholder that preserves the provider contract."""
 
 
+class ClaudeFutureProvider(OptionalAPIKeyProvider, ClaudeProviderStrategy):
+    """Claude placeholder that preserves the provider contract."""
+
+
 class AIProviderManager:
     """Select providers from settings and fall back without crashing."""
 
     fallback_order = (
+        AIProviderName.NVIDIA.value,
         AIProviderName.OLLAMA.value,
         AIProviderName.OPENAI.value,
         AIProviderName.GEMINI.value,
@@ -329,6 +505,28 @@ class AIProviderManager:
         self.status_ttl_seconds = 5.0
         self.failover_enabled = True
         self._fallback_order = list(self.fallback_order)
+        self._disabled: set[str] = set()
+
+    @property
+    def provider_names(self) -> list[str]:
+        """Registered provider names, exposed for diagnostics without secrets."""
+        return sorted(self._providers)
+
+    def has_provider(self, provider_name: str) -> bool:
+        return str(provider_name) in self._providers
+
+    def register(self, provider: AIProviderStrategy) -> None:
+        """Register or replace an adapter and clear stale selection state."""
+        key = provider.provider_name.value
+        self._providers[key] = provider
+        self._disabled.discard(key)
+        self._failed_until.pop(key, None)
+        self._status_cache.pop(key, None)
+        logger.info("AI provider registered: %s", key)
+
+    def configure_enabled_providers(self, enabled: set[str]) -> None:
+        """Restrict routing to the enabled providers without rebuilding adapters."""
+        self._disabled = set(self._providers) - {str(name) for name in enabled}
 
     def configure_failover(self, *, enabled: bool, order: list[str] | tuple[str, ...]) -> None:
         """Apply an allow-listed routing order without changing provider adapters."""
@@ -340,14 +538,29 @@ class AIProviderManager:
     def select(self, provider_name: AIProviderName | str) -> AIProviderStrategy:
         key = provider_name.value if isinstance(provider_name, AIProviderName) else str(provider_name)
         provider = self._providers.get(key)
-        if provider and not self._temporarily_failed(key) and self.status(key).available:
+        if provider and key not in self._disabled and not self._temporarily_failed(key) and self.status(key).available:
+            logger.debug("Selected provider: %s", key)
             return provider
         if not self.failover_enabled:
             raise AIProviderUnavailable(f"AI provider '{key}' is unavailable and failover is disabled.")
         for fallback_key in self._fallback_order:
             provider = self._providers.get(fallback_key)
-            if provider and not self._temporarily_failed(fallback_key) and self.status(fallback_key).available:
+            if provider and fallback_key not in self._disabled and not self._temporarily_failed(fallback_key) and self.status(fallback_key).available:
+                logger.warning("Selected provider fallback: requested=%s selected=%s", key, fallback_key)
                 return provider
+        # Do not turn a transient failure into an empty registry.  If NVIDIA is
+        # configured and every alternative is unavailable, retry it on the next
+        # request; its request-level error remains the actionable diagnosis.
+        requested = self._providers.get(key)
+        if requested and key not in self._disabled and self.status(key).available:
+            self._failed_until.pop(key, None)
+            logger.warning("Provider selection repaired: retrying configured provider=%s", key)
+            return requested
+        logger.error(
+            "No AI provider selected: requested=%s registry=%s disabled=%s temporarily_failed=%s statuses=%s",
+            key, self.provider_names, sorted(self._disabled), sorted(self._failed_until),
+            {name: self.status(name).available for name in self._providers},
+        )
         raise AIProviderUnavailable("No AI provider available.")
 
     def status(self, provider_name: str) -> ProviderStatus:
@@ -422,24 +635,82 @@ def build_ai_registry(config: dict) -> AIProviderManager:
         base_url=config.get("AI_BASE_URL"),
         timeout=int(config.get("AI_TIMEOUT_SECONDS") or 60),
     )
+    nvidia = NVIDIAOpenAIProvider(
+        api_key=config.get("NVIDIA_API_KEY"),
+        model=str(config.get("NVIDIA_MODEL") or "meta/llama-3.3-70b-instruct"),
+        base_url=str(config.get("NVIDIA_BASE_URL") or "https://integrate.api.nvidia.com/v1"),
+        timeout=int(config.get("AI_TIMEOUT_SECONDS") or 60),
+    )
+    compatible_providers = {
+        AIProviderName.OPENROUTER.value: OpenAICompatibleSDKProvider(
+            provider_name=AIProviderName.OPENROUTER,
+            display_name="OpenRouter",
+            api_key=config.get("OPENROUTER_API_KEY"),
+            model=str(config.get("OPENROUTER_MODEL") or "meta-llama/llama-3.3-70b-instruct"),
+            base_url=config.get("OPENROUTER_BASE_URL"),
+            timeout=int(config.get("AI_TIMEOUT_SECONDS") or 60),
+        ),
+        AIProviderName.GROQ.value: OpenAICompatibleSDKProvider(
+            provider_name=AIProviderName.GROQ,
+            display_name="Groq",
+            api_key=config.get("GROQ_API_KEY"),
+            model=str(config.get("GROQ_MODEL") or "llama-3.3-70b-versatile"),
+            base_url=config.get("GROQ_BASE_URL"),
+            timeout=int(config.get("AI_TIMEOUT_SECONDS") or 60),
+        ),
+        AIProviderName.DEEPSEEK.value: OpenAICompatibleSDKProvider(
+            provider_name=AIProviderName.DEEPSEEK,
+            display_name="DeepSeek",
+            api_key=config.get("DEEPSEEK_API_KEY"),
+            model=str(config.get("DEEPSEEK_MODEL") or "deepseek-chat"),
+            base_url=config.get("DEEPSEEK_BASE_URL"),
+            timeout=int(config.get("AI_TIMEOUT_SECONDS") or 60),
+        ),
+        AIProviderName.CUSTOM.value: OpenAICompatibleSDKProvider(
+            provider_name=AIProviderName.CUSTOM,
+            display_name="Custom OpenAI-compatible provider",
+            api_key=config.get("CUSTOM_AI_API_KEY"),
+            model=str(config.get("CUSTOM_AI_MODEL") or ""),
+            base_url=config.get("CUSTOM_AI_BASE_URL"),
+            timeout=int(config.get("AI_TIMEOUT_SECONDS") or 60),
+        ),
+    }
     gemini = GeminiFutureProvider(
         provider_name=AIProviderName.GEMINI,
         api_key=config.get("GEMINI_API_KEY"),
         model=str(config.get("GEMINI_MODEL") or "gemini-1.5-flash"),
+    )
+    claude = ClaudeFutureProvider(
+        provider_name=AIProviderName.CLAUDE,
+        api_key=config.get("ANTHROPIC_API_KEY"),
+        model=str(config.get("ANTHROPIC_MODEL") or "claude-3-5-sonnet-latest"),
     )
     perplexity = PerplexityFutureProvider(
         provider_name=AIProviderName.PERPLEXITY,
         api_key=config.get("PERPLEXITY_API_KEY"),
         model=str(config.get("PERPLEXITY_MODEL") or "sonar"),
     )
-    return AIProviderManager(
+    registry = AIProviderManager(
         {
+            AIProviderName.NVIDIA.value: nvidia,
             AIProviderName.OLLAMA.value: ollama,
             AIProviderName.OPENAI.value: openai,
             AIProviderName.GEMINI.value: gemini,
+            AIProviderName.CLAUDE.value: claude,
             AIProviderName.PERPLEXITY.value: perplexity,
+            **compatible_providers,
         }
     )
+    logger.info(
+        "AI registry built: Loaded providers=%s; Default provider=%s; NVIDIA configuration: "
+        "Model=%s; Base URL=%s; API key loaded=%s",
+        registry.provider_names,
+        config.get("AI_PROVIDER", "nvidia"),
+        nvidia.model,
+        nvidia.base_url,
+        bool(nvidia.api_key),
+    )
+    return registry
 
 
 def messages(system: str, user: str) -> tuple[AIMessage, AIMessage]:

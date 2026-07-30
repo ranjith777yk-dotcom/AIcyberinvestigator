@@ -1952,8 +1952,21 @@ def _invalidate_dashboard_cache() -> None:
 
 def _ai_runtime():
     registry = current_app.extensions.get("cyberinvestigator_ai_registry")
+    if registry is None or not getattr(registry, "has_provider", lambda _name: False)("nvidia"):
+        # Self-heal a partially initialized extension instead of allowing chat
+        # to report a misleading empty-provider error.
+        try:
+            managed_config = hydrate_ai_config(
+                current_app.config, current_app.extensions["cyberinvestigator_database"].session
+            )
+            registry = build_ai_registry(managed_config)
+            current_app.extensions["cyberinvestigator_ai_registry"] = registry
+            current_app.logger.warning("AI registry repaired at request time: providers=%s", registry.provider_names)
+        except Exception as error:
+            current_app.logger.exception("AI registry repair failed: %s: %s", type(error).__name__, error)
     if registry is not None and hasattr(registry, "configure_failover"):
         _configure_ai_failover(registry)
+        _configure_enabled_ai_providers(registry)
     return (
         registry,
         current_app.extensions.get("cyberinvestigator_investigation_assistant"),
@@ -1973,6 +1986,10 @@ def _provider_status() -> dict[str, object]:
             "message": "AI runtime is unavailable.",
         }
     status = registry.status(provider)
+    current_app.logger.debug(
+        "AI provider health check: provider=%s available=%s configured=%s model=%s endpoint=%s message=%s",
+        status.provider, status.available, status.configured, status.model, status.endpoint, status.message,
+    )
     if current_app.config.get("AI_ENABLED") and not status.available:
         try:
             selected = registry.select(provider)
@@ -2013,6 +2030,7 @@ def _provider_status_payload() -> dict[str, object]:
             "installed_models": list(status.installed_models),
             "health_source": status.health_source,
             "checked_at": status.checked_at,
+            "enabled": _ai_provider_enabled(name),
         }
         for name, status in statuses.items()
     }
@@ -2037,6 +2055,18 @@ def _setting_json(namespace: str, key: str, default: object) -> object:
         return json.loads(raw)
     except (TypeError, json.JSONDecodeError):
         return default
+
+
+def _ai_provider_enabled(provider: str) -> bool:
+    document = _setting_json("ai.providers", provider, {})
+    return not isinstance(document, dict) or bool(document.get("enabled", True))
+
+
+def _configure_enabled_ai_providers(registry) -> None:
+    if registry is None or not hasattr(registry, "configure_enabled_providers"):
+        return
+    statuses = registry.all_statuses() if hasattr(registry, "all_statuses") else {}
+    registry.configure_enabled_providers({name for name in statuses if _ai_provider_enabled(name)})
 
 
 def _validated_ai_endpoint(value: object) -> str:
@@ -2082,7 +2112,7 @@ def _configure_ai_failover(registry) -> dict[str, object]:
     document = _setting_json(
         "ai.platform",
         "failover",
-        {"enabled": True, "order": ["ollama", "openai", "gemini", "perplexity"]},
+        {"enabled": True, "order": ["nvidia", "openai", "ollama", "gemini", "claude", "groq", "deepseek"]},
     )
     policy = document if isinstance(document, dict) else {}
     enabled = bool(policy.get("enabled", True))
@@ -2412,7 +2442,7 @@ def _generate_chat_reply(
     test_live_ai_disabled = bool(current_app.config.get("TESTING")) and not bool(current_app.config.get("AI_ENABLED"))
     if registry is None or ai_disabled or test_live_ai_disabled:
         return (
-            "No AI provider available. Ollama is not reachable, and no configured cloud provider can be used.",
+            "No AI provider is currently available. Local analysis can continue while service configuration is checked.",
             {
                 **status,
                 "provider_called": False,
@@ -2432,6 +2462,10 @@ def _generate_chat_reply(
             selected_model
             if resolved_provider == selected_provider
             else str(getattr(provider, "model", None) or selected_model)
+        )
+        current_app.logger.info(
+            "AI chat selected provider=%s requested_provider=%s model=%s registry=%s",
+            resolved_provider, selected_provider, actual_model, registry.provider_names,
         )
         response = provider.generate(
             AIRequest(
@@ -2471,8 +2505,8 @@ def _generate_chat_reply(
                 else str(provider.provider_name)
             )
             registry.mark_unavailable(failed_name)
-        current_app.logger.warning("AI chat provider failed: %s", error)
-        unavailable = "No AI provider available. Start Ollama locally or configure OpenAI, Gemini, or Perplexity."
+        current_app.logger.exception("AI chat provider failed: %s: %s", type(error).__name__, error)
+        unavailable = f"Configured AI provider failed: {error}"
         return unavailable, {
             **status,
             "available": False,
@@ -2487,7 +2521,7 @@ def _generate_chat_reply(
         current_app.logger.warning("AI chat provider failed: %s", error)
         return (
             "I could not reach the configured AI provider for this request. "
-            "Your case data and uploads were preserved. Check AI Provider settings or start Ollama locally.",
+            "Your case data and uploads were preserved. Check AI Provider settings and try again.",
             {
                 **status,
                 "available": False,
@@ -3564,11 +3598,21 @@ def ai_management():  # type: ignore[no-untyped-def]
         record["output_tokens"] = int(record["output_tokens"]) + int(item.output_tokens or 0)
     providers = []
     for name, status in statuses.items():
+        records = [item for item in reasoning if item.provider == name]
         providers.append(
             {
                 **status,
+                "is_default": name == str(current_app.config.get("AI_PROVIDER")),
+                "requests_recorded": len(records),
+                "last_successful_request": _iso(records[0].created_at) if records else None,
+                "last_failed_request": None,
+                "average_latency_ms": None,
+                "error_rate": None,
+                "context_length": None,
+                "version": None,
                 "credential_configured": name in credentials
-                or (name == "openai" and bool(current_app.config.get("AI_API_KEY"))),
+                or (name == "openai" and bool(current_app.config.get("AI_API_KEY")))
+                or (name == "nvidia" and bool(current_app.config.get("NVIDIA_API_KEY"))),
                 "credential_exposed": False,
             }
         )
@@ -3593,9 +3637,9 @@ def update_ai_provider(provider: str):  # type: ignore[no-untyped-def]
     if registry is None or provider not in _provider_status_payload():
         return _json_error("Provider is not registered.", 404)
     document = request.get_json(silent=True) or {}
-    allowed = {"model", "endpoint", "credential"}
+    allowed = {"model", "endpoint", "credential", "enabled", "base_url", "temperature", "max_tokens", "timeout", "streaming"}
     if any(key not in allowed for key in document):
-        return _json_error("Only model, endpoint, and credential may be configured.", 400)
+        return _json_error("Unsupported provider configuration field.", 400)
     metadata = _setting_json("ai.providers", provider, {})
     metadata = dict(metadata) if isinstance(metadata, dict) else {}
     if "model" in document:
@@ -3608,6 +3652,18 @@ def update_ai_provider(provider: str):  # type: ignore[no-untyped-def]
             return _json_error("A managed endpoint is supported only for the local Ollama adapter.", 400)
         try:
             metadata["endpoint"] = _validated_ai_endpoint(document.get("endpoint"))
+        except ValueError as error:
+            return _json_error(str(error), 400)
+    if "enabled" in document:
+        metadata["enabled"] = bool(document["enabled"])
+    for key in ("temperature", "max_tokens", "timeout", "streaming"):
+        if key in document:
+            metadata[key] = document[key]
+    if "base_url" in document:
+        if provider != "custom":
+            return _json_error("Only the custom provider supports a managed base URL.", 400)
+        try:
+            metadata["base_url"] = _validated_ai_endpoint(document.get("base_url"))
         except ValueError as error:
             return _json_error(str(error), 400)
     if "credential" in document:
@@ -7146,17 +7202,19 @@ def update_settings():  # type: ignore[no-untyped-def]
 
 
 def _apply_ai_setting(key: str, value: object) -> None:
-    providers = {"ollama", "openai", "gemini", "perplexity"}
+    providers = {"nvidia", "ollama", "openai", "openrouter", "gemini", "claude", "groq", "deepseek", "custom", "perplexity"}
     if key == "provider":
         provider = str(value).strip().lower()
         if provider not in providers:
-            raise ValueError("AI provider must be Ollama, OpenAI, Gemini, or Perplexity.")
+            raise ValueError("AI provider must be a registered provider.")
         current_app.config["AI_PROVIDER"] = provider
     elif key == "model":
         model = str(value).strip()
         if not model:
             raise ValueError("AI model must not be empty.")
         current_app.config["AI_MODEL"] = model
+        if str(current_app.config.get("AI_PROVIDER", "nvidia")) == "nvidia":
+            current_app.config["NVIDIA_MODEL"] = model
         if str(current_app.config.get("AI_PROVIDER", "ollama")) == "ollama":
             current_app.config["OLLAMA_MODEL"] = model
     elif key == "temperature":

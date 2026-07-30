@@ -16,6 +16,11 @@ class AIProviderName(str, Enum):
     """Supported provider families available to the strategy boundary."""
 
     OPENAI = "openai"
+    NVIDIA = "nvidia"
+    OPENROUTER = "openrouter"
+    GROQ = "groq"
+    DEEPSEEK = "deepseek"
+    CUSTOM = "custom"
     GEMINI = "gemini"
     PERPLEXITY = "perplexity"
     CLAUDE = "claude"
@@ -101,6 +106,14 @@ class OpenAIProvider(BaseAIProvider, ABC):
     """Abstract strategy contract for an OpenAI provider implementation."""
 
 
+class NVIDIAProvider(BaseAIProvider, ABC):
+    """Abstract strategy contract for NVIDIA's OpenAI-compatible API."""
+
+
+class OpenAICompatibleProvider(BaseAIProvider, ABC):
+    """Contract for a provider offering the OpenAI chat-completions protocol."""
+
+
 class GeminiProvider(BaseAIProvider, ABC):
     """Abstract strategy contract for a Gemini provider implementation."""
 
@@ -120,6 +133,14 @@ class OllamaProvider(BaseAIProvider, ABC):
 # Backwards-compatible strategy interface names (used by existing code/tests)
 class OpenAIProviderStrategy(OpenAIProvider, ABC):
     """Abstract strategy contract for an OpenAI provider implementation."""
+
+
+class NVIDIAProviderStrategy(NVIDIAProvider, ABC):
+    """Abstract strategy contract for NVIDIA's OpenAI-compatible API."""
+
+
+class OpenAICompatibleProviderStrategy(OpenAICompatibleProvider, ABC):
+    """Contract for OpenAI-compatible third-party provider implementations."""
 
 
 class GeminiProviderStrategy(GeminiProvider, ABC):
